@@ -6,6 +6,127 @@ type AuthTab = 'login' | 'signup';
 function LoginPage() {
     const [activeTab, setActiveTab] = useState<AuthTab>('login');
 
+    const [loginEmail, setLoginEmail] = useState("");
+    const [loginPassword, setLoginPassword] = useState("");
+
+    const [loginEmailError, setLoginEmailError] = useState("");
+    const [loginPasswordError, setLoginPasswordError] = useState("");
+
+    const [loginEmailFlash, setLoginEmailFlash] = useState(0);
+    const [loginPasswordFlash, setLoginPasswordFlash] = useState(0);
+
+    const handleLoginSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        let hasError = false;
+
+        setLoginEmailError("");
+        setLoginPasswordError("");
+
+        if (!loginEmail.trim()) {
+            setLoginEmailError("이메일을 입력해 주세요.");
+            setLoginEmailFlash((prev) => prev + 1);
+            hasError = true;
+        } else if (!isValidEmail(loginEmail)) {
+            setLoginEmailError("올바른 이메일 형식으로 입력해 주세요.");
+            setLoginEmailFlash((prev) => prev + 1);
+            hasError = true;
+        }
+
+        if (!loginPassword.trim()) {
+            setLoginPasswordError("비밀번호를 입력해 주세요.");
+            setLoginPasswordFlash((prev) => prev + 1);
+            hasError = true;
+        } else if (!isValidPassword(loginPassword)) {
+            setLoginPasswordError("비밀번호는 6자 이상 입력해 주세요.");
+            setLoginPasswordFlash((prev) => prev + 1);
+            hasError = true;
+        }
+
+        if (hasError) {
+            return;
+        }
+
+        alert(`이메일: ${loginEmail}\n비밀번호: ${loginPassword}`);
+
+        // TODO: 로그인 API 호출
+    };
+
+
+    const [signupEmail, setSignupEmail] = useState("");
+    const [signupPassword, setSignupPassword] = useState("");
+    const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
+    const [signupNickname, setSignupNickname] = useState("");
+
+    const [signupEmailError, setSignupEmailError] = useState("");
+    const [signupPasswordError, setSignupPasswordError] = useState("");
+    const [signupPasswordConfirmError, setSignupPasswordConfirmError] = useState("");
+    const [signupNicknameError, setSignupNicknameError] = useState("");
+
+    const [signupEmailFlash, setSignupEmailFlash] = useState(0);
+    const [signupPasswordFlash, setSignupPasswordFlash] = useState(0);
+    const [signupPasswordConfirmFlash, setSignupPasswordConfirmFlash] = useState(0);
+    const [signupNicknameFlash, setSignupNicknameFlash] = useState(0);
+
+    const handleSignupSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        let hasError = false;
+
+        setSignupEmailError("");
+        setSignupPasswordError("");
+        setSignupPasswordConfirmError("");
+        setSignupNicknameError("");
+
+        if (!signupEmail.trim()) {
+            setSignupEmailError("이메일을 입력해 주세요.");
+            setSignupEmailFlash((prev) => prev + 1);
+            hasError = true;
+        } else if (!isValidEmail(signupEmail)) {
+            setSignupEmailError("올바른 이메일 형식으로 입력해 주세요.");
+            setSignupEmailFlash((prev) => prev + 1);
+            hasError = true;
+        }
+
+        if (!signupPassword.trim()) {
+            setSignupPasswordError("비밀번호를 입력해 주세요.");
+            setSignupPasswordFlash((prev) => prev + 1);
+            hasError = true;
+        } else if (!isValidPassword(signupPassword)) {
+            setSignupPasswordError("비밀번호는 6자 이상 입력해 주세요.");
+            setSignupPasswordFlash((prev) => prev + 1);
+            hasError = true;
+        }
+
+        if (signupPassword !== signupPasswordConfirm) {
+            setSignupPasswordConfirmError("비밀번호가 일치하지 않습니다.");
+            setSignupPasswordConfirmFlash((prev) => prev + 1);
+            hasError = true;
+        }
+
+        if (!signupNickname.trim()) {
+            setSignupNicknameError("이름 / 닉네임을 입력해 주세요.");
+            setSignupNicknameFlash((prev) => prev + 1);
+            hasError = true;
+        }
+
+        if (hasError) {
+            return;
+        }
+
+        alert(`이메일: ${signupEmail}\n비밀번호: ${signupPassword}\n닉네임: ${signupNickname}`);
+
+        // TODO: 회원가입 API 호출
+    };
+
+    const isValidEmail = (email: string) => {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    };
+
+    const isValidPassword = (password: string) => {
+        return password.length >= 6;
+    };
+
     return (
         <main className="login-page">
             <section className="login-panel">
@@ -49,39 +170,59 @@ function LoginPage() {
                 </nav>
 
                 {activeTab === 'login' && (
-                    <form className="login-form">
-                        <div className="form-field">
-                            <label htmlFor="email">
+                    <form className="login-form" onSubmit={handleLoginSubmit}>
+                        <div className={`form-field ${loginEmailError
+                            ? `form-field--error ${loginEmailFlash % 2 === 0
+                                ? "form-field--flash-a"
+                                : "form-field--flash-b"
+                            }`
+                            : ""
+                            }`}>
+                            <label htmlFor="login-email">
                                 이메일
                             </label>
 
                             <input
-                                id="email"
+                                id="login-email"
                                 type="email"
                                 autoComplete="email"
                                 placeholder="user@example.com"
+                                value={loginEmail}
+                                required
+                                pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
+                                onChange={(e) => setLoginEmail(e.target.value)}
                             />
 
-                            {/* 검증 구현 후 출력 */}
-                            <p className="field-error">
-                                {/* 올바른 이메일 형식이 아닙니다. */}
-                            </p>
+                            {loginEmailError && (
+                                <p className="form-error">{loginEmailError}</p>
+                            )}
                         </div>
 
-                        <div className="form-field">
-                            <label htmlFor="password">
+
+                        <div className={`form-field ${loginPasswordError
+                            ? `form-field--error ${loginPasswordFlash % 2 === 0
+                                ? "form-field--flash-a"
+                                : "form-field--flash-b"
+                            }`
+                            : ""
+                            }`}>
+                            <label htmlFor="login-password">
                                 비밀번호
                             </label>
 
                             <input
-                                id="password"
+                                id="login-password"
                                 type="password"
                                 autoComplete="current-password"
+                                value={loginPassword}
+                                required
+                                minLength={6}
+                                onChange={(e) => setLoginPassword(e.target.value)}
                             />
 
-                            <p className="field-error">
-                                {/* 비밀번호는 8자 이상이어야 합니다. */}
-                            </p>
+                            {loginPasswordError && (
+                                <p className="form-error">{loginPasswordError}</p>
+                            )}
                         </div>
 
                         <button
@@ -94,8 +235,14 @@ function LoginPage() {
                 )}
 
                 {activeTab === 'signup' && (
-                    <form className="login-form">
-                        <div className="form-field">
+                    <form className="login-form" onSubmit={handleSignupSubmit}>
+                        <div className={`form-field ${signupEmailError
+                            ? `form-field--error ${signupEmailFlash % 2 === 0
+                                ? "form-field--flash-a"
+                                : "form-field--flash-b"
+                            }`
+                            : ""
+                            }`}>
                             <label htmlFor="signup-email">
                                 이메일
                             </label>
@@ -105,14 +252,24 @@ function LoginPage() {
                                 type="email"
                                 autoComplete="email"
                                 placeholder="user@example.com"
+                                value={signupEmail}
+                                required
+                                pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
+                                onChange={(e) => setSignupEmail(e.target.value)}
                             />
 
-                            <p className="field-error">
-                                {/* 올바른 이메일 형식이 아닙니다. */}
-                            </p>
+                            {signupEmailError && (
+                                <p className="form-error">{signupEmailError}</p>
+                            )}
                         </div>
 
-                        <div className="form-field">
+                        <div className={`form-field ${signupPasswordError
+                            ? `form-field--error ${signupPasswordFlash % 2 === 0
+                                ? "form-field--flash-a"
+                                : "form-field--flash-b"
+                            }`
+                            : ""
+                            }`}>
                             <label htmlFor="signup-password">
                                 비밀번호
                             </label>
@@ -121,30 +278,64 @@ function LoginPage() {
                                 id="signup-password"
                                 type="password"
                                 autoComplete="new-password"
+                                value={signupPassword}
+                                required
+                                minLength={6}
+                                onChange={(e) => setSignupPassword(e.target.value)}
                             />
+
+                            {signupPasswordError && (
+                                <p className="form-error">{signupPasswordError}</p>
+                            )}
                         </div>
 
-                        <div className="form-field">
-                            <label htmlFor="password-confirm">
+                        <div className={`form-field ${signupPasswordConfirmError
+                            ? `form-field--error ${signupPasswordConfirmFlash % 2 === 0
+                                ? "form-field--flash-a"
+                                : "form-field--flash-b"
+                            }`
+                            : ""
+                            }`}>
+                            <label htmlFor="signup-password-confirm">
                                 비밀번호 재입력
                             </label>
 
                             <input
-                                id="password-confirm"
+                                id="signup-password-confirm"
                                 type="password"
                                 autoComplete="new-password"
+                                value={signupPasswordConfirm}
+                                required
+                                minLength={6}
+                                onChange={(e) => setSignupPasswordConfirm(e.target.value)}
                             />
+                            {signupPasswordConfirmError && (
+                                <p className="form-error">{signupPasswordConfirmError}</p>
+                            )}
                         </div>
 
-                        <div className="form-field">
-                            <label htmlFor="nickname">
+                        <div className={`form-field ${signupNicknameError
+                            ? `form-field--error ${signupNicknameFlash % 2 === 0
+                                ? "form-field--flash-a"
+                                : "form-field--flash-b"
+                            }`
+                            : ""
+                            }`}>
+                            <label htmlFor="signup-nickname">
                                 이름 / 닉네임
                             </label>
 
                             <input
-                                id="nickname"
+                                id="signup-nickname"
                                 type="text"
+                                value={signupNickname}
+                                required
+                                onChange={(e) => setSignupNickname(e.target.value)}
                             />
+
+                            {signupNicknameError && (
+                                <p className="form-error">{signupNicknameError}</p>
+                            )}
                         </div>
 
                         <button

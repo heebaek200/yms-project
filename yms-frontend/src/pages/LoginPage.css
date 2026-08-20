@@ -105,12 +105,61 @@
     padding: 0 12px;
 }
 
-.field-error {
-    min-height: 0;
-    margin: 2px 0 0;
+.form-error {
+  min-height: 0;
+  margin: 2px 0 0;
 
-    color: var(--color-primary);
-    font-size: 12px;
+  color: var(--color-primary);
+  font-size: 12px;
+  margin-top: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #d32f2f;
+}
+
+.form-field--error {
+  border-radius: 8px;
+  animation: 1.8s ease-out;
+}
+
+.form-field--error input {
+  border-color: #d32f2f;
+}
+
+.form-field--flash-a {
+  animation: error-glow-a 1.5s ease-out;
+}
+
+.form-field--flash-b {
+  animation: error-glow-b 1.5s ease-out;
+}
+
+@keyframes error-glow-a {
+  0% {
+    box-shadow: 0 0 0 rgba(211, 47, 47, 0);
+  }
+
+  20% {
+    box-shadow: 0 0 16px rgba(211, 47, 47, 0.6);
+  }
+
+  100% {
+    box-shadow: 0 0 0 rgba(211, 47, 47, 0);
+  }
+}
+
+@keyframes error-glow-b {
+  0% {
+    box-shadow: 0 0 0 rgba(211, 47, 47, 0);
+  }
+
+  20% {
+    box-shadow: 0 0 16px rgba(211, 47, 47, 0.6);
+  }
+
+  100% {
+    box-shadow: 0 0 0 rgba(211, 47, 47, 0);
+  }
 }
 
 .login-button {
@@ -207,11 +256,6 @@
 
 .social-button:disabled .coming-soon {
     color: #a1a1aa;
-}
-
-.social-button:disabled:hover {
-    background: #f3f4f6;
-    border-color: #e5e7eb;
 }
 
 .social-icon {
