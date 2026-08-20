@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import './LoginPage.css';
 import { login } from '../api/auth/login';
+import { signup } from '../api/auth/signup';
 
 type AuthTab = 'login' | 'signup';
 
@@ -116,31 +117,38 @@ function LoginPage() {
         }
     };
 
+    const [isSigningUp, setIsSigningUp] = useState(false);
+    const [signupError, setSignupError] = useState("");
 
     const [signupEmail, setSignupEmail] = useState("");
     const [signupPassword, setSignupPassword] = useState("");
     const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
-    const [signupNickname, setSignupNickname] = useState("");
+    const [signupName, setSignupName] = useState("");
 
     const [signupEmailError, setSignupEmailError] = useState("");
     const [signupPasswordError, setSignupPasswordError] = useState("");
     const [signupPasswordConfirmError, setSignupPasswordConfirmError] = useState("");
-    const [signupNicknameError, setSignupNicknameError] = useState("");
+    const [signupNameError, setSignupNameError] = useState("");
 
     const [signupEmailFlash, setSignupEmailFlash] = useState(0);
     const [signupPasswordFlash, setSignupPasswordFlash] = useState(0);
     const [signupPasswordConfirmFlash, setSignupPasswordConfirmFlash] = useState(0);
-    const [signupNicknameFlash, setSignupNicknameFlash] = useState(0);
+    const [signupNameFlash, setSignupNameFlash] = useState(0);
 
     const handleSignupSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
+
+        if (isSigningUp) {
+            return;
+        }
 
         let hasError = false;
 
         setSignupEmailError("");
         setSignupPasswordError("");
         setSignupPasswordConfirmError("");
-        setSignupNicknameError("");
+        setSignupNameError("");
+        setSignupError("");
 
         if (!signupEmail.trim()) {
             setSignupEmailError("이메일을 입력해 주세요.");
@@ -168,9 +176,9 @@ function LoginPage() {
             hasError = true;
         }
 
-        if (!signupNickname.trim()) {
-            setSignupNicknameError("이름 / 닉네임을 입력해 주세요.");
-            setSignupNicknameFlash((prev) => prev + 1);
+        if (!signupName.trim()) {
+            setSignupNameError("이름을 입력해 주세요.");
+            setSignupNameFlash((prev) => prev + 1);
             hasError = true;
         }
 
@@ -178,9 +186,70 @@ function LoginPage() {
             return;
         }
 
-        alert(`이메일: ${signupEmail}\n비밀번호: ${signupPassword}\n닉네임: ${signupNickname}`);
+        // 회원가입 API 호출
+        try {
+            setIsSigningUp(true);
 
-        // TODO: 회원가입 API 호출
+            const response = await signup({
+                email: signupEmail,
+                password: signupPassword,
+                name: signupName
+            });
+
+            if (!response.success) {
+                if (
+                    (response.errorCode === 'INVALID_INPUT_VALUE' || response.errorCode === 'DUPLICATE_EMAIL')
+                    && response.errors
+                ) {
+                    let handled = false;
+
+                    response.errors.forEach(error => {
+                        if (error.field === 'email') {
+                            setSignupEmailError(error.reason);
+                            setSignupEmailFlash(prev => prev + 1);
+                            handled = true;
+                        }
+
+                        if (error.field === 'password') {
+                            setSignupPasswordError(error.reason);
+                            setSignupPasswordFlash(prev => prev + 1);
+                            handled = true;
+                        }
+
+                        if (error.field === 'name') {
+                            setSignupNameError(error.reason);
+                            setSignupNameFlash(prev => prev + 1);
+                            handled = true;
+                        }
+                    });
+
+                    if (!handled) {
+                        setSignupError(response.message);
+                    }
+
+                    return;
+                }
+
+                setSignupError(response.message);
+                return;
+            }
+
+            console.log(response);
+            alert(
+                `회원가입이 완료되었습니다.\n` +
+                `사용자: ${response.data.name}\n` +
+                `이메일: ${response.data.email}\n` +
+                `초기 설정 필요 여부: ${response.data.isInitialSetupRequired ? "예" : "아니오"}`
+            );
+        } catch (error) {
+            console.error(error);
+
+            setSignupError(
+                '서버와 통신할 수 없습니다. 잠시 후 다시 시도해 주세요.'
+            );
+        } finally {
+            setIsSigningUp(false);
+        }
     };
 
     const isValidEmail = (email: string) => {
@@ -385,8 +454,8 @@ function LoginPage() {
                             )}
                         </div>
 
-                        <div className={`form-field ${signupNicknameError
-                            ? `form-field--error ${signupNicknameFlash % 2 === 0
+                        <div className={`form-field ${signupNameError
+                            ? `form-field--error ${signupNameFlash % 2 === 0
                                 ? "form-field--flash-a"
                                 : "form-field--flash-b"
                             }`
@@ -399,15 +468,21 @@ function LoginPage() {
                             <input
                                 id="signup-nickname"
                                 type="text"
-                                value={signupNickname}
+                                value={signupName}
                                 required
-                                onChange={(e) => setSignupNickname(e.target.value)}
+                                onChange={(e) => setSignupName(e.target.value)}
                             />
 
-                            {signupNicknameError && (
-                                <p className="form-error">{signupNicknameError}</p>
+                            {signupNameError && (
+                                <p className="form-error">{signupNameError}</p>
                             )}
                         </div>
+
+                        {signupError && (
+                            <p className="form-error">
+                                {signupError}
+                            </p>
+                        )}
 
                         <button
                             type="submit"
