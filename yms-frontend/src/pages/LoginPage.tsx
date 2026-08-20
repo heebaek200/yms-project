@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import './LoginPage.css';
+import { login } from '../api/auth/login';
 
 type AuthTab = 'login' | 'signup';
 
 function LoginPage() {
     const [activeTab, setActiveTab] = useState<AuthTab>('login');
+
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
+    const [loginError, setLoginError] = useState("");
 
     const [loginEmail, setLoginEmail] = useState("");
     const [loginPassword, setLoginPassword] = useState("");
@@ -15,13 +19,19 @@ function LoginPage() {
     const [loginEmailFlash, setLoginEmailFlash] = useState(0);
     const [loginPasswordFlash, setLoginPasswordFlash] = useState(0);
 
-    const handleLoginSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+    const handleLoginSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
+
+        // 이미 로그인 요청 중이면 추가 요청 차단
+        if (isLoggingIn) {
+            return;
+        }
 
         let hasError = false;
 
         setLoginEmailError("");
         setLoginPasswordError("");
+        setLoginError("");
 
         if (!loginEmail.trim()) {
             setLoginEmailError("이메일을 입력해 주세요.");
@@ -47,9 +57,63 @@ function LoginPage() {
             return;
         }
 
-        alert(`이메일: ${loginEmail}\n비밀번호: ${loginPassword}`);
+        // 로그인 API 호출
+        try {
+            setIsLoggingIn(true);
 
-        // TODO: 로그인 API 호출
+            const response = await login({
+                email: loginEmail,
+                password: loginPassword
+            });
+
+            if (!response.success) {
+                if (
+                    response.errorCode === 'INVALID_INPUT_VALUE' &&
+                    response.errors
+                ) {
+                    let handled = false;
+
+                    response.errors.forEach(error => {
+                        if (error.field === 'email') {
+                            setLoginEmailError(error.reason);
+                            setLoginEmailFlash(prev => prev + 1);
+                            handled = true;
+                        }
+
+                        if (error.field === 'password') {
+                            setLoginPasswordError(error.reason);
+                            setLoginPasswordFlash(prev => prev + 1);
+                            handled = true;
+                        }
+                    });
+
+                    if (!handled) {
+                        setLoginError(response.message);
+                    }
+
+                    return;
+                }
+
+                setLoginError(response.message);
+                return;
+            }
+
+            console.log(response);
+            alert(
+                `${response.message}\n` +
+                `사용자: ${response.data.name}\n` +
+                `이메일: ${response.data.email}`
+            );
+
+        } catch (error) {
+            console.error(error);
+
+            setLoginError(
+                '서버와 통신할 수 없습니다. 잠시 후 다시 시도해 주세요.'
+            );
+        } finally {
+            setIsLoggingIn(false);
+        }
     };
 
 
@@ -68,7 +132,7 @@ function LoginPage() {
     const [signupPasswordConfirmFlash, setSignupPasswordConfirmFlash] = useState(0);
     const [signupNicknameFlash, setSignupNicknameFlash] = useState(0);
 
-    const handleSignupSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+    const handleSignupSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         let hasError = false;
@@ -225,11 +289,18 @@ function LoginPage() {
                             )}
                         </div>
 
+                        {loginError && (
+                            <p className="form-error">
+                                {loginError}
+                            </p>
+                        )}
+
                         <button
                             type="submit"
                             className="login-button"
+                            disabled={isLoggingIn}
                         >
-                            로그인
+                            {isLoggingIn ? '로그인 중...' : '로그인'}
                         </button>
                     </form>
                 )}
