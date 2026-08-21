@@ -2,10 +2,15 @@ import { useState } from 'react';
 import './LoginPage.css';
 import { login } from '../api/auth/login';
 import { signup } from '../api/auth/signup';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router';
 
 type AuthTab = 'login' | 'signup';
 
 function LoginPage() {
+    const { signIn } = useAuth();
+    const navigate = useNavigate();
+    
     const [activeTab, setActiveTab] = useState<AuthTab>('login');
 
     const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -99,12 +104,11 @@ function LoginPage() {
                 return;
             }
 
-            console.log(response);
-            alert(
-                `${response.message}\n` +
-                `사용자: ${response.data.name}\n` +
-                `이메일: ${response.data.email}`
-            );
+            // 로그인 성공 시 인증 정보 저장
+            signIn(response.data);
+
+            // 로그인 후 대시보드 페이지로 이동
+            navigate('/dashboard');
 
         } catch (error) {
             console.error(error);
@@ -487,8 +491,9 @@ function LoginPage() {
                         <button
                             type="submit"
                             className="login-button"
+                            disabled={isSigningUp}
                         >
-                            회원가입
+                            {isSigningUp ? '가입 중...' : '회원가입'}
                         </button>
                     </form>
                 )}

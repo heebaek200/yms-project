@@ -1,3 +1,4 @@
+import type { UserRole } from '../../types/auth';
 // 로그인 Mock API
 
 export type LoginRequest = {
@@ -9,7 +10,7 @@ export type LoginSuccessData = {
     userId: number;
     email: string;
     name: string;
-    roles: string[];
+    roles: UserRole[];
     accessToken: string;
     tokenType: string;
 };
