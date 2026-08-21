@@ -57,7 +57,7 @@ import NotFoundPage from '../pages/NotFoundPage';
 function RootRoute() {
     const { user, isAuthenticated } = useAuth();
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
         return <LoginPage />;
     }
 
@@ -74,9 +74,9 @@ function AuthenticatedRoute({
 }: {
     children: ReactNode
 }) {
-    const { isAuthenticated } = useAuth();
+    const { user, isAuthenticated } = useAuth();
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
         return <Navigate to="/" replace />;
     }
 
@@ -87,11 +87,11 @@ function AuthenticatedRoute({
 function ProtectedRoute({
     children
 }: {
-    children: React.ReactNode
+    children: ReactNode
 }) {
     const { user, isAuthenticated } = useAuth();
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
         return <Navigate to="/" replace />;
     }
 
