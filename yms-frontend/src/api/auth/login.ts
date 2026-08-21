@@ -1,18 +1,11 @@
-import type { UserRole } from '../../types/auth';
+import type { AuthSession } from '../../types/auth';
 // 로그인 Mock API
+
+export type LoginSuccessData = AuthSession;
 
 export type LoginRequest = {
     email: string;
     password: string;
-};
-
-export type LoginSuccessData = {
-    userId: number;
-    email: string;
-    name: string;
-    roles: UserRole[];
-    accessToken: string;
-    tokenType: string;
 };
 
 export type LoginSuccessResponse = {
@@ -56,6 +49,7 @@ export async function login(
                 userId: 24601,
                 email: request.email,
                 name: '테스트 사용자',
+                //roles: [],
                 roles: ["CREATOR", "EDITOR"],
                 accessToken: 'mock-access-token',
                 tokenType: 'Bearer'

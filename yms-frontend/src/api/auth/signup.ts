@@ -1,17 +1,14 @@
 // 회원가입 Mock API
 
+import type { AuthSession } from '../../types/auth';
+// 로그인 Mock API
+
+export type SignupSuccessData = AuthSession;
+
 export type SignupRequest = {
     email: string;
     password: string;
     name: string;
-};
-
-export type SignupSuccessData = {
-    userId: number;
-    email: string;
-    name: string;
-    roles: string[];
-    isInitialSetupRequired: boolean;
 };
 
 export type SignupSuccessResponse = {
@@ -86,7 +83,9 @@ export async function signup(
             email: request.email,
             name: request.name,
             roles: [],
-            isInitialSetupRequired: true
+            //roles: ["CREATOR", "EDITOR"],
+            accessToken: 'mock-access-token',
+            tokenType: 'Bearer'
         }
     };
 }

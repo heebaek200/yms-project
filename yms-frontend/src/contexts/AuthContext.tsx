@@ -5,8 +5,10 @@ import {
     type ReactNode
 } from 'react';
 
-import type { LoginSuccessData } from '../api/auth/login';
-import type { AuthUser } from '../types/auth';
+import type {
+    AuthSession,
+    AuthUser
+} from '../types/auth';
 
 type AuthContextValue = {
     user: AuthUser | null;
@@ -14,7 +16,7 @@ type AuthContextValue = {
     tokenType: string | null;
     isAuthenticated: boolean;
 
-    signIn: (data: LoginSuccessData) => void;
+    signIn: (data: AuthSession) => void;
     signOut: () => void;
 };
 
@@ -73,7 +75,7 @@ function AuthProvider({
     const isAuthenticated = accessToken !== null;
 
     // 로그인 성공 시 인증 정보 저장
-    function signIn(data: LoginSuccessData) {
+    function signIn(data: AuthSession) {
         const authUser: AuthUser = {
             userId: data.userId,
             email: data.email,
