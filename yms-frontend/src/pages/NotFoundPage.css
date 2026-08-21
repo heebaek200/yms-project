@@ -1,0 +1,332 @@
+.not-found-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 100vh;
+    padding: 20px;
+
+    background: var(--color-surface);
+}
+
+.not-found-panel {
+    width: 100%;
+    max-width: 620px;
+    padding: 48px 40px;
+
+    text-align: center;
+
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+
+/* =========================
+   깨진 영상 플레이어
+   ========================= */
+
+.not-found-player {
+    width: 220px;
+    margin: 0 auto 28px;
+
+    overflow: hidden;
+
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+
+    background: var(--color-surface);
+
+    animation: player-glitch 700ms ease-out;
+}
+
+.not-found-player__screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    height: 120px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #fafafa 0%,
+            #f1f1f1 100%
+        );
+}
+
+.not-found-glitch {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 64px;
+    height: 64px;
+
+    color: var(--color-primary);
+}
+
+.not-found-play {
+    font-size: 34px;
+    line-height: 1;
+}
+
+.not-found-slash {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    font-size: 58px;
+    font-weight: 300;
+    line-height: 1;
+
+    transform:
+        translate(-50%, -50%)
+        rotate(-18deg);
+
+    color: var(--color-primary);
+}
+
+
+/* 영상 플레이어 하단 컨트롤 느낌 */
+
+.not-found-player__bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    height: 22px;
+    padding: 0 10px;
+
+    border-top: 1px solid var(--color-border);
+    background: var(--color-background);
+}
+
+.not-found-player__bar span {
+    display: block;
+
+    width: 5px;
+    height: 5px;
+
+    border-radius: 50%;
+
+    background: var(--color-text-muted);
+    opacity: 0.4;
+}
+
+.not-found-player__bar span:first-child {
+    width: 52px;
+
+    border-radius: 999px;
+}
+
+
+/* =========================
+   404
+   ========================= */
+
+.not-found-code {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    margin-bottom: 12px;
+
+    color: var(--color-text);
+
+    font-size: 72px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -4px;
+}
+
+.not-found-code__glitch {
+    position: relative;
+
+    color: var(--color-primary);
+
+    animation:
+        code-glitch 700ms ease-out,
+        code-flicker 2.6s 1.2s infinite;
+}
+
+
+/* =========================
+   텍스트
+   ========================= */
+
+.not-found-panel h1 {
+    margin: 0 0 10px;
+
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.not-found-panel p {
+    margin: 0 auto 26px;
+
+    max-width: 380px;
+
+    color: var(--color-text-muted);
+
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+
+/* =========================
+   버튼
+   ========================= */
+
+.not-found-button {
+    min-width: 180px;
+    height: 42px;
+    padding: 0 20px;
+
+    border: 0;
+    border-radius: var(--radius-sm);
+
+    background: var(--color-primary);
+    color: #ffffff;
+
+    font-weight: 600;
+
+    transition:
+        transform 120ms ease,
+        background 120ms ease;
+}
+
+.not-found-button:hover {
+    background: var(--color-primary-hover);
+
+    transform: translateY(-1px);
+}
+
+.not-found-button:active {
+    transform: translateY(0);
+}
+
+
+/* =========================
+   Glitch Animation
+   ========================= */
+
+@keyframes player-glitch {
+
+    0% {
+        transform: translateX(0);
+    }
+
+    12% {
+        transform: translateX(-4px);
+    }
+
+    24% {
+        transform: translateX(5px);
+    }
+
+    36% {
+        transform: translateX(-2px);
+    }
+
+    48% {
+        transform: translateX(2px);
+    }
+
+    62% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(0);
+    }
+}
+
+
+@keyframes code-glitch {
+
+    0% {
+        transform: translate(0, 0);
+    }
+
+    15% {
+        transform: translate(-5px, 2px);
+    }
+
+    30% {
+        transform: translate(5px, -2px);
+    }
+
+    45% {
+        transform: translate(-3px, 1px);
+    }
+
+    60% {
+        transform: translate(2px, 0);
+    }
+
+    100% {
+        transform: translate(0, 0);
+    }
+}
+
+
+@keyframes code-flicker {
+
+    0%,
+    94%,
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    95% {
+        opacity: 0.55;
+        transform: translateX(-2px);
+    }
+
+    96% {
+        opacity: 1;
+        transform: translateX(2px);
+    }
+
+    97% {
+        opacity: 0.7;
+        transform: translateX(0);
+    }
+}
+
+
+/* =========================
+   Mobile
+   ========================= */
+
+@media (max-width: 480px) {
+
+    .not-found-page {
+        padding: 10px;
+    }
+
+    .not-found-panel {
+        padding: 36px 20px;
+    }
+
+    .not-found-player {
+        width: 190px;
+    }
+
+    .not-found-player__screen {
+        height: 104px;
+    }
+
+    .not-found-code {
+        font-size: 60px;
+    }
+
+    .not-found-panel h1 {
+        font-size: 21px;
+    }
+}
