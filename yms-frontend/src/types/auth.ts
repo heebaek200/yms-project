@@ -9,3 +9,11 @@ export type AuthUser = {
     name: string;
     roles: UserRole[];
 };
+export type AuthSession = {
+    userId: number;
+    email: string;
+    name: string;
+    roles: UserRole[];
+    accessToken: string;
+    tokenType: string;
+};

@@ -107,8 +107,8 @@ function LoginPage() {
             // 로그인 성공 시 인증 정보 저장
             signIn(response.data);
 
-            // 로그인 후 대시보드 페이지로 이동
-            navigate('/dashboard');
+            // 로그인 후 메인 페이지 재이동
+            navigate('/');
 
         } catch (error) {
             console.error(error);
@@ -238,13 +238,11 @@ function LoginPage() {
                 return;
             }
 
-            console.log(response);
-            alert(
-                `회원가입이 완료되었습니다.\n` +
-                `사용자: ${response.data.name}\n` +
-                `이메일: ${response.data.email}\n` +
-                `초기 설정 필요 여부: ${response.data.isInitialSetupRequired ? "예" : "아니오"}`
-            );
+            // 로그인 성공 시 인증 정보 저장
+            signIn(response.data);
+
+            // 로그인 후 메인 페이지 재이동
+            navigate('/');
         } catch (error) {
             console.error(error);
 
