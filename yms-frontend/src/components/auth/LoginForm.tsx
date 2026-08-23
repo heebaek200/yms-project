@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import '../../pages/LoginPage.css';
 import { useNavigate } from 'react-router';
 import { isValidEmail, isValidPassword } from '../../utils/validation';
 import { login } from '../../api/auth/login';

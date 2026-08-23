@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import '../../pages/LoginPage.css';
 import { useNavigate } from 'react-router';
 import { isValidEmail, isValidPassword } from '../../utils/validation';
 import { signup } from '../../api/auth/signup';
@@ -144,123 +143,123 @@ function SignupForm() {
 
     return (
 
-                    <form className="login-form" onSubmit={handleSignupSubmit}>
-                        <div className={`form-field ${signupEmailError
-                            ? `form-field--error ${signupEmailFlash % 2 === 0
-                                ? "form-field--flash-a"
-                                : "form-field--flash-b"
-                            }`
-                            : ""
-                            }`}>
-                            <label htmlFor="signup-email">
-                                이메일
-                            </label>
+        <form className="login-form" onSubmit={handleSignupSubmit}>
+            <div className={`form-field ${signupEmailError
+                ? `form-field--error ${signupEmailFlash % 2 === 0
+                    ? "form-field--flash-a"
+                    : "form-field--flash-b"
+                }`
+                : ""
+                }`}>
+                <label htmlFor="signup-email">
+                    이메일
+                </label>
 
-                            <input
-                                id="signup-email"
-                                type="email"
-                                autoComplete="email"
-                                placeholder="user@example.com"
-                                value={signupEmail}
-                                required
-                                pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
-                                onChange={(e) => setSignupEmail(e.target.value)}
-                            />
+                <input
+                    id="signup-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="user@example.com"
+                    value={signupEmail}
+                    required
+                    pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                />
 
-                            {signupEmailError && (
-                                <p className="form-error">{signupEmailError}</p>
-                            )}
-                        </div>
+                {signupEmailError && (
+                    <p className="form-error">{signupEmailError}</p>
+                )}
+            </div>
 
-                        <div className={`form-field ${signupPasswordError
-                            ? `form-field--error ${signupPasswordFlash % 2 === 0
-                                ? "form-field--flash-a"
-                                : "form-field--flash-b"
-                            }`
-                            : ""
-                            }`}>
-                            <label htmlFor="signup-password">
-                                비밀번호
-                            </label>
+            <div className={`form-field ${signupPasswordError
+                ? `form-field--error ${signupPasswordFlash % 2 === 0
+                    ? "form-field--flash-a"
+                    : "form-field--flash-b"
+                }`
+                : ""
+                }`}>
+                <label htmlFor="signup-password">
+                    비밀번호
+                </label>
 
-                            <input
-                                id="signup-password"
-                                type="password"
-                                autoComplete="new-password"
-                                value={signupPassword}
-                                required
-                                minLength={6}
-                                onChange={(e) => setSignupPassword(e.target.value)}
-                            />
+                <input
+                    id="signup-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={signupPassword}
+                    required
+                    minLength={6}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                />
 
-                            {signupPasswordError && (
-                                <p className="form-error">{signupPasswordError}</p>
-                            )}
-                        </div>
+                {signupPasswordError && (
+                    <p className="form-error">{signupPasswordError}</p>
+                )}
+            </div>
 
-                        <div className={`form-field ${signupPasswordConfirmError
-                            ? `form-field--error ${signupPasswordConfirmFlash % 2 === 0
-                                ? "form-field--flash-a"
-                                : "form-field--flash-b"
-                            }`
-                            : ""
-                            }`}>
-                            <label htmlFor="signup-password-confirm">
-                                비밀번호 재입력
-                            </label>
+            <div className={`form-field ${signupPasswordConfirmError
+                ? `form-field--error ${signupPasswordConfirmFlash % 2 === 0
+                    ? "form-field--flash-a"
+                    : "form-field--flash-b"
+                }`
+                : ""
+                }`}>
+                <label htmlFor="signup-password-confirm">
+                    비밀번호 재입력
+                </label>
 
-                            <input
-                                id="signup-password-confirm"
-                                type="password"
-                                autoComplete="new-password"
-                                value={signupPasswordConfirm}
-                                required
-                                minLength={6}
-                                onChange={(e) => setSignupPasswordConfirm(e.target.value)}
-                            />
-                            {signupPasswordConfirmError && (
-                                <p className="form-error">{signupPasswordConfirmError}</p>
-                            )}
-                        </div>
+                <input
+                    id="signup-password-confirm"
+                    type="password"
+                    autoComplete="new-password"
+                    value={signupPasswordConfirm}
+                    required
+                    minLength={6}
+                    onChange={(e) => setSignupPasswordConfirm(e.target.value)}
+                />
+                {signupPasswordConfirmError && (
+                    <p className="form-error">{signupPasswordConfirmError}</p>
+                )}
+            </div>
 
-                        <div className={`form-field ${signupNameError
-                            ? `form-field--error ${signupNameFlash % 2 === 0
-                                ? "form-field--flash-a"
-                                : "form-field--flash-b"
-                            }`
-                            : ""
-                            }`}>
-                            <label htmlFor="signup-nickname">
-                                이름 / 닉네임
-                            </label>
+            <div className={`form-field ${signupNameError
+                ? `form-field--error ${signupNameFlash % 2 === 0
+                    ? "form-field--flash-a"
+                    : "form-field--flash-b"
+                }`
+                : ""
+                }`}>
+                <label htmlFor="signup-nickname">
+                    이름 / 닉네임
+                </label>
 
-                            <input
-                                id="signup-nickname"
-                                type="text"
-                                value={signupName}
-                                required
-                                onChange={(e) => setSignupName(e.target.value)}
-                            />
+                <input
+                    id="signup-nickname"
+                    type="text"
+                    value={signupName}
+                    required
+                    onChange={(e) => setSignupName(e.target.value)}
+                />
 
-                            {signupNameError && (
-                                <p className="form-error">{signupNameError}</p>
-                            )}
-                        </div>
+                {signupNameError && (
+                    <p className="form-error">{signupNameError}</p>
+                )}
+            </div>
 
-                        {signupError && (
-                            <p className="form-error">
-                                {signupError}
-                            </p>
-                        )}
+            {signupError && (
+                <p className="form-error">
+                    {signupError}
+                </p>
+            )}
 
-                        <button
-                            type="submit"
-                            className="login-button"
-                            disabled={isSigningUp}
-                        >
-                            {isSigningUp ? '가입 중...' : '회원가입'}
-                        </button>
-                    </form>
+            <button
+                type="submit"
+                className="login-button"
+                disabled={isSigningUp}
+            >
+                {isSigningUp ? '가입 중...' : '회원가입'}
+            </button>
+        </form>
     );
 }
 
