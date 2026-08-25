@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import type { UserRole } from '../types/auth';
-import { validateRate } from '../utils/validation';
+import type { UserRole, RateScope } from '../types/auth';
+import { isValidName, validateRate } from '../utils/validation';
 import { formatRate } from '../utils/format';
 import './ProfileSetupPage.css';
+import { setupProfile } from '../api/auth/profilesetup';
+import { useNavigate } from 'react-router';
 
 function ProfileSetupPage() {
-    const { user } = useAuth();
+    const { user, updateUser } = useAuth();
+    const navigate = useNavigate();
 
     const [isSettingUp, setIsSettingUp] = useState(false);  // submit 동작 중 액션 방지 처리
     const [setupError, setSetupError] = useState("");       // submit 동작 중 발생한 에러 메시지 처리
@@ -19,7 +22,7 @@ function ProfileSetupPage() {
     );
     const [longFormRate, setLongFormRate] = useState('');
     const [shortFormRate, setShortFormRate] = useState('');
-    const [rateScope, setRateScope] = useState<'future' | 'all'>('future');
+    const [rateScope, setRateScope] = useState<RateScope>('future');
 
     const [nameError, setNameError] = useState('');
     const [longFormRateError, setLongFormRateError] = useState('');
@@ -56,6 +59,10 @@ function ProfileSetupPage() {
         if (!name.trim()) {
             setNameError("이름을 입력해 주세요.");
             setNameFlash((prev) => prev + 1);
+            hasError = true;
+        } else if (!isValidName(name)) {
+            setNameError('이름은 2자 이상 100자 이하로 입력해 주세요.');
+            setNameFlash(prev => prev + 1);
             hasError = true;
         }
 
@@ -95,20 +102,66 @@ function ProfileSetupPage() {
         try {
             setIsSettingUp(true);
 
-            console.log({
+            const requestField = isCreator ? {
                 name: name,
                 roles: selectedRoles,
                 longFormRate: longFormRate,
                 shortFormRate: shortFormRate,
                 rateScope: rateScope
-            });
+            } : {
+                name: name,
+                roles: selectedRoles
+            };
+
+            const response = await setupProfile(requestField);
+
+            if (!response.success) {
+                if (
+                    (response.errorCode === 'INVALID_INPUT_VALUE')
+                    && response.errors
+                ) {
+                    let handled = false;
+
+                    response.errors.forEach(error => {
+                        if (error.field === 'longFormRate') {
+                            setLongFormRateError(error.reason);
+                            setLongFormRateFlash(prev => prev + 1);
+                            handled = true;
+                        }
+
+                        if (error.field === 'shortFormRate') {
+                            setShortFormRateError(error.reason);
+                            setShortFormRateFlash(prev => prev + 1);
+                            handled = true;
+                        }
+
+                        if (error.field === 'name') {
+                            setNameError(error.reason);
+                            setNameFlash(prev => prev + 1);
+                            handled = true;
+                        }
+                    });
+
+                    if (!handled) {
+                        setSetupError(response.message);
+                    }
+
+                    return;
+                }
+
+                setSetupError(response.message);
+                return;
+            }
 
 
             // 설정 저장 성공 시 계정 관련 정보 갱신
-            // TODO
+            updateUser({
+                name: response.data.name,
+                roles: response.data.roles
+            });
 
             // 설정 저장 후 메인 페이지 재이동
-            // navigate('/');
+            navigate('/');
         } catch (error) {
             console.error(error);
 
@@ -167,6 +220,8 @@ function ProfileSetupPage() {
                                 type="text"
                                 value={name}
                                 required
+                                minLength={2}
+                                maxLength={100}
                                 onChange={(e) => setName(e.target.value)}
                             />
 

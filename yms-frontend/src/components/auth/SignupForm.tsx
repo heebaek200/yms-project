@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { isValidEmail, isValidPassword } from '../../utils/validation';
+import { isValidEmail, isValidPassword, isValidName } from '../../utils/validation';
 import { signup } from '../../api/auth/signup';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -70,6 +70,10 @@ function SignupForm() {
         if (!signupName.trim()) {
             setSignupNameError("이름을 입력해 주세요.");
             setSignupNameFlash((prev) => prev + 1);
+            hasError = true;
+        } else if (!isValidName(signupName)) {
+            setSignupNameError('이름은 2자 이상 100자 이하로 입력해 주세요.');
+            setSignupNameFlash(prev => prev + 1);
             hasError = true;
         }
 
@@ -238,6 +242,8 @@ function SignupForm() {
                     type="text"
                     value={signupName}
                     required
+                    minLength={2}
+                    maxLength={100}
                     onChange={(e) => setSignupName(e.target.value)}
                 />
 

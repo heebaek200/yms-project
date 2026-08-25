@@ -1,3 +1,4 @@
+// 유저 역할 범위
 export type UserRole =
     | 'CREATOR'
     | 'EDITOR'
@@ -17,3 +18,8 @@ export type AuthSession = {
     accessToken: string;
     tokenType: string;
 };
+
+// 단가 변경 적용 범위
+export type RateScope =
+    | 'future'
+    | 'all';

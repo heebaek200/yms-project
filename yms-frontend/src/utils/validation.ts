@@ -6,6 +6,13 @@ const isValidPassword = (password: string) => {
     return password.length >= 6;
 };
 
+const isValidName = (name: string) => {
+    const trimmed = name.trim();
+
+    return trimmed.length >= 2
+        && trimmed.length <= 100;
+};
+
 // 단가 validation
 const validateRate = (value: string) => {
     const trimmed = value.trim();
@@ -27,4 +34,4 @@ const validateRate = (value: string) => {
     return '';
 };
 
-export { isValidEmail, isValidPassword, validateRate };
+export { isValidEmail, isValidPassword, isValidName, validateRate };
