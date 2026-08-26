@@ -17,6 +17,7 @@ type AuthContextValue = {
     isAuthenticated: boolean;
 
     signIn: (data: AuthSession) => void;
+    updateUser: (data: Partial<AuthUser>) => void;
     signOut: () => void;
 };
 
@@ -100,6 +101,30 @@ function AuthProvider({
         );
     }
 
+    // 프로필 설정에서 일부 정보 수정
+    function updateUser(data: Partial<AuthUser>) {
+        if (!user || !accessToken || !tokenType) {
+            return;
+        }
+
+        const updatedUser: AuthUser = {
+            ...user,
+            ...data
+        };
+
+        setUser(updatedUser);
+
+        const storedAuth: StoredAuth = {
+            user: updatedUser,
+            accessToken,
+            tokenType
+        };
+
+        sessionStorage.setItem(
+            AUTH_STORAGE_KEY,
+            JSON.stringify(storedAuth)
+        );
+    }
 
     // 로그아웃 시 인증 정보 제거
     function signOut() {
@@ -119,6 +144,7 @@ function AuthProvider({
                 tokenType,
                 isAuthenticated,
                 signIn,
+                updateUser,
                 signOut
             }}
         >

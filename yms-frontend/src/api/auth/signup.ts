@@ -1,7 +1,5 @@
-// 회원가입 Mock API
-
 import type { AuthSession } from '../../types/auth';
-// 로그인 Mock API
+// 회원가입 Mock API
 
 export type SignupSuccessData = AuthSession;
 

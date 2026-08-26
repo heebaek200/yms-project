@@ -1,0 +1,261 @@
+.setup-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 100vh;
+    padding: 12px;
+
+    background: var(--color-surface);
+}
+
+.setup-panel {
+    width: 100%;
+    max-width: 420px;
+    padding: 28px 32px;
+
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.setup-header {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.setup-header img {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 10px;
+}
+
+.setup-header h1 {
+    margin: 0 0 6px;
+
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.setup-header p {
+    margin: 0;
+
+    color: var(--color-text-muted);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.setup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-field label {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.form-field > input {   /* checkbox, radio는 wrapper 안에서 구현하여 다른 스타일 적용 */
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+}
+
+.form-field input:read-only {
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+}
+
+.setup-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.setup-section:last-of-type {
+    border-bottom: 0;
+}
+
+.setup-section h2 {
+    margin: 0;
+
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.creator-rate-section {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    padding-bottom: 0;
+    border-bottom: 0;
+
+    transform: translateY(-4px);
+
+    transition:
+        max-height 0.3s ease,
+        opacity 0.2s ease,
+        transform 0.2s ease,
+        padding-bottom 0.3s ease;
+}
+
+.creator-rate-section--open {
+    max-height: 500px;
+    opacity: 1;
+    padding-bottom: 16px;
+
+    transform: translateY(0);
+}
+
+.role-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.role-option,
+.scope-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    min-height: 36px;
+
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.role-option input,
+.scope-option input {
+    width: auto;
+    height: auto;
+    margin: 0;
+}
+
+.rate-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rate-input input {
+    flex: 1;
+    height: 42px;
+    padding: 0 12px;
+}
+
+.rate-input span {
+    color: var(--color-text-muted);
+    font-size: 14px;
+}
+
+.form-label {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.form-hint {
+    margin: 0;
+
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.form-error {
+    min-height: 0;
+    margin: 6px 0 0;
+
+    color: #d32f2f;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.form-field--error {
+    border-radius: 8px;
+}
+
+.form-field--error input {
+    border-color: #d32f2f;
+}
+
+.form-field--flash-a {
+    animation: error-glow-a 1.5s ease-out;
+}
+
+.form-field--flash-b {
+    animation: error-glow-b 1.5s ease-out;
+}
+
+@keyframes error-glow-a {
+    0% {
+        box-shadow: 0 0 0 rgba(211, 47, 47, 0);
+    }
+
+    20% {
+        box-shadow: 0 0 16px rgba(211, 47, 47, 0.6);
+    }
+
+    100% {
+        box-shadow: 0 0 0 rgba(211, 47, 47, 0);
+    }
+}
+
+@keyframes error-glow-b {
+    0% {
+        box-shadow: 0 0 0 rgba(211, 47, 47, 0);
+    }
+
+    20% {
+        box-shadow: 0 0 16px rgba(211, 47, 47, 0.6);
+    }
+
+    100% {
+        box-shadow: 0 0 0 rgba(211, 47, 47, 0);
+    }
+}
+
+.setup-button {
+    height: 42px;
+    margin-top: 2px;
+
+    border: 0;
+    border-radius: var(--radius-sm);
+
+    background: var(--color-primary);
+    color: #ffffff;
+
+    font-weight: 600;
+}
+
+.setup-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+@media (max-width: 480px) {
+    .setup-page {
+        padding: 8px;
+    }
+
+    .setup-panel {
+        padding: 22px 20px;
+    }
+
+    .setup-header {
+        margin-bottom: 16px;
+    }
+
+    .setup-form {
+        gap: 12px;
+    }
+}
