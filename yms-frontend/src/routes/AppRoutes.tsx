@@ -6,6 +6,7 @@ import LoginPage from '../pages/LoginPage';
 import ProfileSetupPage from '../pages/ProfileSetupPage';
 import DashboardPage from '../pages/DashboardPage';
 import NotFoundPage from '../pages/NotFoundPage';
+import AppLayout from '../layouts/AppLayout';
 
 /** 
 인증 상태 및 사용자 설정 상태에 따른 라우팅 기준을 아래와 같이 정의합니다.
@@ -112,6 +113,12 @@ function AppRoutes() {
                 element={<RootRoute />}
             />
 
+            {/* 404 화면 */}
+            <Route
+                path="*"
+                element={<NotFoundPage />}
+            />
+
             {/* SCR-02 프로필 및 채널 수익 설정 */}
             <Route
                 path="/profile-setup"
@@ -122,21 +129,26 @@ function AppRoutes() {
                 }
             />
 
-            {/* SCR-03 메인 대시보드 및 스케줄러 */}
+            {/* 공통 레이아웃 */}
             <Route
-                path="/dashboard"
                 element={
                     <ProtectedRoute>
-                        <DashboardPage />
+                        <AppLayout />
                     </ProtectedRoute>
                 }
-            />
+            >
 
-            {/* 404 화면 */}
-            <Route
-                path="*"
-                element={<NotFoundPage />}
-            />
+                {/* SCR-03 메인 대시보드 및 스케줄러 */}
+                <Route
+                    path="/dashboard"
+                    element={<DashboardPage />}
+                />
+
+                {/* 향후 공통 레이아웃을 사용하는 화면 라우터 설정 */}
+
+
+
+            </Route>
         </Routes>
     );
 }

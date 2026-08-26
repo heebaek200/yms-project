@@ -1,0 +1,20 @@
+.app-layout {
+    min-height: 100vh;
+
+    background: var(--color-background);
+}
+
+.app-main {
+    width: 100%;
+    max-width: var(--content-width);
+    min-height: calc(100vh - var(--app-header-height));
+
+    margin: 0 auto;
+    padding: 24px;
+}
+
+@media (max-width: 768px) {
+    .app-main {
+        padding: 16px;
+    }
+}
