@@ -58,21 +58,23 @@ export type ProfileSetupResponse =
     | ProfileSetupSuccessResponse
     | ProfileSetupFailureResponse;
 
+// mock 데이터
+let mockProfile: ProfileSetupData = {
+    userId: 24601,
+    email: 'test@test.com',
+    name: '테스트 사용자',
+    roles: [],
+    longFormRate: null,
+    shortFormRate: null
+};
+
 // GET
 export async function getProfileSetup(): Promise<ProfileSetupData> {
     // TODO 백엔드 완성 후 GET /api/auth/profile-setup 로 교체
 
     await new Promise(resolve => setTimeout(resolve, 500));
-    //await new Promise(resolve => setTimeout(resolve, 5000)); // 로딩 메시지 테스트용
 
-    return {
-        userId: 24601,
-        email: 'test@test.com',
-        name: '테스트 사용자',
-        roles: ['CREATOR', 'EDITOR'],
-        longFormRate: '3.00',
-        shortFormRate: '0.25'
-    };
+    return { ...mockProfile };
 
 }
 
@@ -151,6 +153,18 @@ export async function setupProfile(
         }
     }
 
+    // PATCH로 갱신한 내용을 GET에 반영. TODO: API 구현 시 제거.
+    mockProfile = {
+        ...mockProfile,
+        name: trimmedName,
+        roles: request.roles,
+        longFormRate: isCreator
+            ? request.longFormRate ?? null
+            : null,
+        shortFormRate: isCreator
+            ? request.shortFormRate ?? null
+            : null
+    };
 
     // Mock 성공 응답
     const processedPastProjectCount =

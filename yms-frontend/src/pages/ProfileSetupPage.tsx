@@ -130,9 +130,13 @@ function ProfileSetupPage() {
         }
 
         // 단가 포맷 처리
+        let normalizedLongFormRate: string | undefined;
+        let normalizedShortFormRate: string | undefined;
+
         if (isCreator) {
-            const normalizedLongFormRate = formatRate(longFormRate);
-            const normalizedShortFormRate = formatRate(shortFormRate);
+            // 단가 정규화
+            normalizedLongFormRate = formatRate(longFormRate);
+            normalizedShortFormRate = formatRate(shortFormRate);
             setLongFormRate(normalizedLongFormRate);
             setShortFormRate(normalizedShortFormRate);
         }
@@ -142,13 +146,13 @@ function ProfileSetupPage() {
             setIsSettingUp(true);
 
             const requestField = isCreator ? {
-                name: name,
+                name: name.trim(),
                 roles: selectedRoles,
-                longFormRate: longFormRate,
-                shortFormRate: shortFormRate,
+                longFormRate: normalizedLongFormRate!,
+                shortFormRate: normalizedShortFormRate!,
                 rateScope: rateScope
             } : {
-                name: name,
+                name: name.trim(),
                 roles: selectedRoles
             };
 
@@ -305,107 +309,110 @@ function ProfileSetupPage() {
                         </div>
                     </section>
 
-                    {selectedRoles.includes('CREATOR') && (
-                        <section className="setup-section">
-                            <h2>크리에이터 기본 단가 설정</h2>
+                    <section
+                        className={`setup-section creator-rate-section ${selectedRoles.includes('CREATOR')
+                                ? 'creator-rate-section--open'
+                                : ''
+                            }`}
+                    >
+                        <h2>크리에이터 기본 단가 설정</h2>
 
-                            <div className={`form-field ${longFormRateError
-                                ? `form-field--error ${longFormRateFlash % 2 === 0
-                                    ? "form-field--flash-a"
-                                    : "form-field--flash-b"
-                                }`
-                                : ""
-                                }`}>
-                                <label htmlFor="long-form-rate">
-                                    롱폼 기본 단가
-                                </label>
+                        <div className={`form-field ${longFormRateError
+                            ? `form-field--error ${longFormRateFlash % 2 === 0
+                                ? "form-field--flash-a"
+                                : "form-field--flash-b"
+                            }`
+                            : ""
+                            }`}>
+                            <label htmlFor="long-form-rate">
+                                롱폼 기본 단가
+                            </label>
 
-                                <div className="rate-input">
-                                    <input
-                                        id="long-form-rate"
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={longFormRate}
-                                        onChange={(e) => setLongFormRate(e.target.value)}
-                                        onBlur={() => {
-                                            if (!validateRate(longFormRate)) {
-                                                setLongFormRate(formatRate(longFormRate));
-                                            }
-                                        }}
-                                        placeholder="3.00"
-                                    />
+                            <div className="rate-input">
+                                <input
+                                    id="long-form-rate"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={longFormRate}
+                                    onChange={(e) => setLongFormRate(e.target.value)}
+                                    onBlur={() => {
+                                        if (!validateRate(longFormRate)) {
+                                            setLongFormRate(formatRate(longFormRate));
+                                        }
+                                    }}
+                                    placeholder="3.00"
+                                />
 
-                                    <span>원</span>
-                                </div>
-
-                                {longFormRateError && (
-                                    <p className="form-error">{longFormRateError}</p>
-                                )}
+                                <span>원</span>
                             </div>
 
-                            <div className={`form-field ${shortFormRateError
-                                ? `form-field--error ${shortFormRateFlash % 2 === 0
-                                    ? "form-field--flash-a"
-                                    : "form-field--flash-b"
-                                }`
-                                : ""
-                                }`}>
-                                <label htmlFor="short-form-rate">
-                                    숏폼 기본 단가
-                                </label>
+                            {longFormRateError && (
+                                <p className="form-error">{longFormRateError}</p>
+                            )}
+                        </div>
 
-                                <div className="rate-input">
-                                    <input
-                                        id="short-form-rate"
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={shortFormRate}
-                                        onChange={(e) => setShortFormRate(e.target.value)}
-                                        onBlur={() => {
-                                            if (!validateRate(shortFormRate)) {
-                                                setShortFormRate(formatRate(shortFormRate));
-                                            }
-                                        }}
-                                        placeholder="0.20"
-                                    />
+                        <div className={`form-field ${shortFormRateError
+                            ? `form-field--error ${shortFormRateFlash % 2 === 0
+                                ? "form-field--flash-a"
+                                : "form-field--flash-b"
+                            }`
+                            : ""
+                            }`}>
+                            <label htmlFor="short-form-rate">
+                                숏폼 기본 단가
+                            </label>
 
-                                    <span>원</span>
-                                </div>
+                            <div className="rate-input">
+                                <input
+                                    id="short-form-rate"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={shortFormRate}
+                                    onChange={(e) => setShortFormRate(e.target.value)}
+                                    onBlur={() => {
+                                        if (!validateRate(shortFormRate)) {
+                                            setShortFormRate(formatRate(shortFormRate));
+                                        }
+                                    }}
+                                    placeholder="0.20"
+                                />
 
-                                {shortFormRateError && (
-                                    <p className="form-error">{shortFormRateError}</p>
-                                )}
+                                <span>원</span>
                             </div>
 
-                            <div className="form-field">
-                                <span className="form-label">
-                                    단가 변경 적용 범위
-                                </span>
+                            {shortFormRateError && (
+                                <p className="form-error">{shortFormRateError}</p>
+                            )}
+                        </div>
 
-                                <label className="scope-option">
-                                    <input
-                                        type="radio"
-                                        name="rate-scope"
-                                        value="future"
-                                        checked={rateScope === 'future'}
-                                        onChange={() => setRateScope('future')}
-                                    />
-                                    앞으로 새롭게 마감/동기화할 프로젝트부터 적용
-                                </label>
+                        <div className="form-field">
+                            <span className="form-label">
+                                단가 변경 적용 범위
+                            </span>
 
-                                <label className="scope-option">
-                                    <input
-                                        type="radio"
-                                        name="rate-scope"
-                                        value="all"
-                                        checked={rateScope === 'all'}
-                                        onChange={() => setRateScope('all')}
-                                    />
-                                    기존 완료 프로젝트까지 새 단가를 소급 적용
-                                </label>
-                            </div>
-                        </section>
-                    )}
+                            <label className="scope-option">
+                                <input
+                                    type="radio"
+                                    name="rate-scope"
+                                    value="future"
+                                    checked={rateScope === 'future'}
+                                    onChange={() => setRateScope('future')}
+                                />
+                                앞으로 새롭게 마감/동기화할 프로젝트부터 적용
+                            </label>
+
+                            <label className="scope-option">
+                                <input
+                                    type="radio"
+                                    name="rate-scope"
+                                    value="all"
+                                    checked={rateScope === 'all'}
+                                    onChange={() => setRateScope('all')}
+                                />
+                                기존 완료 프로젝트까지 새 단가를 소급 적용
+                            </label>
+                        </div>
+                    </section>
 
                     {!hasRole && (
                         <p className="form-hint">

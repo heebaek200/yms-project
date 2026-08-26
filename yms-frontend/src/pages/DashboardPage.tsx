@@ -1,9 +1,15 @@
 // 이 페이지는 목업을 위한 임시 페이지임.
 
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router';
 
 function DashboardPage() {
     const { user, isAuthenticated, signOut } = useAuth();
+    const navigate = useNavigate();
+
+    const handleProfileSettingClick = async () => {
+        navigate('/profile-setup');
+    };
 
     return (
         <main>
@@ -19,6 +25,7 @@ function DashboardPage() {
             <p>역할: {user?.roles.join(', ')}</p>
 
             <button onClick={signOut}>로그아웃</button>
+            <button onClick={handleProfileSettingClick}>설정</button>
         </main>
     );
 }
