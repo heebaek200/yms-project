@@ -7,7 +7,7 @@ function DashboardPage() {
     const { user, isAuthenticated, signOut } = useAuth();
     const navigate = useNavigate();
 
-    const handleProfileSettingClick = async () => {
+    const handleProfileSettingClick = () => {
         navigate('/profile-setup');
     };
 

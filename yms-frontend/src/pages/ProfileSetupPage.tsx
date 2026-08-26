@@ -20,6 +20,8 @@ function ProfileSetupPage() {
     const [selectedRoles, setSelectedRoles] = useState<UserRole[]>(
         user?.roles ?? []
     );
+    const isCreator = selectedRoles.includes('CREATOR');
+
     const [longFormRate, setLongFormRate] = useState('');
     const [shortFormRate, setShortFormRate] = useState('');
     const [rateScope, setRateScope] = useState<RateScope>('future');
@@ -104,8 +106,6 @@ function ProfileSetupPage() {
             setNameFlash(prev => prev + 1);
             hasError = true;
         }
-
-        const isCreator = selectedRoles.includes('CREATOR');
 
         // 크리에이터 역할일 경우 단가 처리
         if (isCreator) {
@@ -341,6 +341,7 @@ function ProfileSetupPage() {
                                         }
                                     }}
                                     placeholder="3.00"
+                                    disabled={!isCreator}
                                 />
 
                                 <span>원</span>
@@ -375,6 +376,7 @@ function ProfileSetupPage() {
                                         }
                                     }}
                                     placeholder="0.20"
+                                    disabled={!isCreator}
                                 />
 
                                 <span>원</span>
@@ -397,6 +399,7 @@ function ProfileSetupPage() {
                                     value="future"
                                     checked={rateScope === 'future'}
                                     onChange={() => setRateScope('future')}
+                                    disabled={!isCreator}
                                 />
                                 앞으로 새롭게 마감/동기화할 프로젝트부터 적용
                             </label>
@@ -408,6 +411,7 @@ function ProfileSetupPage() {
                                     value="all"
                                     checked={rateScope === 'all'}
                                     onChange={() => setRateScope('all')}
+                                    disabled={!isCreator}
                                 />
                                 기존 완료 프로젝트까지 새 단가를 소급 적용
                             </label>
