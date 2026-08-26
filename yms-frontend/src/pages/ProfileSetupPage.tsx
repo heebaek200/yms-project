@@ -310,7 +310,7 @@ function ProfileSetupPage() {
                     </section>
 
                     <section
-                        className={`setup-section creator-rate-section ${selectedRoles.includes('CREATOR')
+                        className={`setup-section creator-rate-section ${isCreator
                                 ? 'creator-rate-section--open'
                                 : ''
                             }`}
