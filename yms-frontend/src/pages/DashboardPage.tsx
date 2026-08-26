@@ -12,7 +12,7 @@ function DashboardPage() {
     };
 
     return (
-        <main>
+        <div className="dashboard-page">
             <h1>Dashboard</h1>
 
             <p>
@@ -26,7 +26,7 @@ function DashboardPage() {
 
             <button onClick={signOut}>로그아웃</button>
             <button onClick={handleProfileSettingClick}>설정</button>
-        </main>
+        </div>
     );
 }
 
