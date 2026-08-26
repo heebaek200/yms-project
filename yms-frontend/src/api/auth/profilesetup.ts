@@ -2,7 +2,17 @@ import type { UserRole, RateScope } from '../../types/auth';
 
 // 프로필 및 채널 설정 Mock API
 
-// 설정 저장 요청 필드
+// 화면 불러오기 시 (GET) 필드
+export type ProfileSetupData = {
+    userId: number;
+    email: string;
+    name: string;
+    roles: UserRole[];
+    longFormRate: string | null;
+    shortFormRate: string | null;
+};
+
+// 설정 저장 요청 (PATCH) 필드
 export type ProfileSetupRequest = {
     name: string;
     roles: UserRole[];
@@ -48,7 +58,25 @@ export type ProfileSetupResponse =
     | ProfileSetupSuccessResponse
     | ProfileSetupFailureResponse;
 
+// GET
+export async function getProfileSetup(): Promise<ProfileSetupData> {
+    // TODO 백엔드 완성 후 GET /api/auth/profile-setup 로 교체
 
+    await new Promise(resolve => setTimeout(resolve, 500));
+    //await new Promise(resolve => setTimeout(resolve, 5000)); // 로딩 메시지 테스트용
+
+    return {
+        userId: 24601,
+        email: 'test@test.com',
+        name: '테스트 사용자',
+        roles: ['CREATOR', 'EDITOR'],
+        longFormRate: '3.00',
+        shortFormRate: '0.25'
+    };
+
+}
+
+// PATCH
 export async function setupProfile(
     request: ProfileSetupRequest
 ): Promise<ProfileSetupResponse> {

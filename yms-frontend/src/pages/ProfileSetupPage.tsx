@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserRole, RateScope } from '../types/auth';
 import { isValidName, validateRate } from '../utils/validation';
 import { formatRate } from '../utils/format';
 import './ProfileSetupPage.css';
-import { setupProfile } from '../api/auth/profilesetup';
+import { getProfileSetup, setupProfile } from '../api/auth/profilesetup';
 import { useNavigate } from 'react-router';
 
 function ProfileSetupPage() {
@@ -31,6 +31,45 @@ function ProfileSetupPage() {
     const [nameFlash, setNameFlash] = useState(0);
     const [longFormRateFlash, setLongFormRateFlash] = useState(0);
     const [shortFormRateFlash, setShortFormRateFlash] = useState(0);
+
+    const [isLoading, setIsLoading] = useState(true);       // 초기 호출 동작 중 로딩
+
+    useEffect(() => {
+        const loadProfileSetup = async () => {
+            try {
+                const data = await getProfileSetup();
+
+                setName(data.name);
+                setSelectedRoles(data.roles);
+
+                setLongFormRate(
+                    data.longFormRate ?? ''
+                );
+
+                setShortFormRate(
+                    data.shortFormRate ?? ''
+                );
+
+            } catch (error) {
+                console.error(error);
+
+                setSetupError(
+                    '프로필 정보를 불러올 수 없습니다.'
+                );
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadProfileSetup();
+    }, []);
+    if (isLoading) {
+        return (
+            <main className="setup-page">
+                <p>설정 정보를 불러오는 중...</p>
+            </main>
+        );
+    }
 
     // 역할이 하나라도 부여되어 있는지 체크
     const hasRole = selectedRoles.length > 0;
