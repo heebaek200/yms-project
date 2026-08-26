@@ -23,9 +23,6 @@ function DashboardPage() {
             <p>사용자: {user?.name}</p>
             <p>이메일: {user?.email}</p>
             <p>역할: {user?.roles.join(', ')}</p>
-
-            <button onClick={signOut}>로그아웃</button>
-            <button onClick={handleProfileSettingClick}>설정</button>
         </div>
     );
 }

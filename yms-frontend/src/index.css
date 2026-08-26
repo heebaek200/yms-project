@@ -3,8 +3,10 @@
     --color-primary-hover: #d93c42;
 
     --color-background: #ffffff;
+
     --color-surface: #f8f9fa;
     --color-surface-hover: #f1f3f5;
+    --color-surface-active: #eceef1;
 
     --color-text: #18181b;
     --color-text-muted: #71717a;
@@ -16,6 +18,8 @@
 
     --content-width: 1200px;
 
+    --app-header-height: 64px;
+
     font-family:
         Inter,
         Pretendard,
@@ -26,6 +30,12 @@
 
     color: var(--color-text);
     background: var(--color-background);
+}
+
+@media (max-width: 768px) {
+    :root {
+        --app-header-height: 56px;
+    }
 }
 
 * {
@@ -55,6 +65,10 @@ select {
 
 button {
     cursor: pointer;
+}
+
+button:disabled {
+    cursor: not-allowed;
 }
 
 a {
