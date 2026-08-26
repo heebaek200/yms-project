@@ -11,31 +11,32 @@ function AppHeader() {
 
                 <NavLink
                     to="/dashboard"
-                    className={({ isActive }) =>
-                        isActive
-                            ? 'app-nav__link app-nav__link--active'
-                            : 'app-nav__link'
-                    }
+                    className="app-header__brand"
                 >
                     YMS
                 </NavLink>
 
                 <NavLink 
-                    to="/scheduler"
-                    className="app-nav__link">
+                    to="/dashboard"
+                    className={({ isActive }) =>
+                        isActive
+                            ? 'app-nav__link app-nav__link--active'
+                            : 'app-nav__link'
+                    }>
                     <span className="app-nav__icon">🗓</span>
                     <span className="app-nav__label">
                         스케줄러
                     </span>
                 </NavLink>
 
-                <div className="app-header__user">
+                <div className="app-header__actions">
                     <button
                         type="button"
                         className="app-header__user"
+                        onClick={() => navigate('/profile-setup')}
                     >
                         <span>👤</span>
-                        <span className="app-header__user-name" onClick={() => navigate('/profile-setup')}>
+                        <span className="app-header__user-name">
                             {user?.name} 님
                         </span>
                     </button>

@@ -1,13 +1,4 @@
 :root {
-    font-family:
-        Pretendard,
-        "Noto Sans KR",
-        Arial,
-        sans-serif;
-
-    color: #18181b;
-    background: #ffffff;
-
     --color-primary: #e5484d;
     --color-primary-hover: #d93c42;
 
@@ -24,6 +15,17 @@
     --radius-md: 10px;
 
     --content-width: 1200px;
+
+    font-family:
+        Inter,
+        Pretendard,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+    color: var(--color-text);
+    background: var(--color-background);
 }
 
 * {
@@ -33,17 +35,15 @@
 html,
 body,
 #root {
-    min-width: 320px;
     min-height: 100%;
-    margin: 0;
 }
 
 body {
-    min-height: 100vh;
     margin: 0;
+    min-width: 320px;
 
-    color: var(--color-text);
     background: var(--color-background);
+    color: var(--color-text);
 }
 
 button,
@@ -55,10 +55,6 @@ select {
 
 button {
     cursor: pointer;
-}
-
-button:disabled {
-    cursor: default;
 }
 
 a {
