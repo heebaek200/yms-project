@@ -1,16 +1,9 @@
-// 이 페이지는 목업을 위한 임시 페이지임.
-
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router';
 
 function DashboardPage() {
-    const { user, isAuthenticated, signOut } = useAuth();
-    const navigate = useNavigate();
+    const { user, isAuthenticated } = useAuth();
 
-    const handleProfileSettingClick = () => {
-        navigate('/profile-setup');
-    };
-
+    // 이 페이지는 목업을 위한 임시 페이지임.
     return (
         <div className="dashboard-page">
             <h1>Dashboard</h1>
