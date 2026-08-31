@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getNotifications, type NotificationsResponse } from "../../api/dashboard/notifications";
+import { getNotifications, type NotificationsResponse } from "../../api/notifications/notifications";
 
 
 function DashboardNotifications() {
@@ -7,34 +7,34 @@ function DashboardNotifications() {
     const [mockData, setMockData] = useState<NotificationsResponse | null>(null);
 
     useEffect(() => {
-            const loadDashboardSummary = async () => {
-                try {
-                    const data = await getNotifications();
-    
-                    setMockData(data);
-                } catch (error) {
-                    console.error(error);
-    
-                    // TODO 에러 처리
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-    
-            loadDashboardSummary();
-        });
+        const loadNotifications = async () => {
+            try {
+                const data = await getNotifications();
+
+                setMockData(data);
+            } catch (error) {
+                console.error(error);
+
+                // TODO 에러 처리
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadNotifications();
+    }, []);
 
     if (isLoading) {
         return (
-            <main className="setup-page">
-                <p>정보를 불러오는 중...</p>
-            </main>
+            <p className="dashboard-loading">
+                정보를 불러오는 중...
+            </p>
         );
     }
 
     return (
         <pre style={{ background: '#f4f4f4', padding: '16px', borderRadius: '4px' }}>
-            { JSON.stringify(mockData, null, 2) }
+            {JSON.stringify(mockData, null, 2)}
         </pre>
     );
 }

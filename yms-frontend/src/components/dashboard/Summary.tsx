@@ -23,19 +23,19 @@ function DashboardSummary() {
         };
 
         loadDashboardSummary();
-    });
+    }, []);
 
     if (isLoading) {
         return (
-            <main className="setup-page">
-                <p>정보를 불러오는 중...</p>
-            </main>
+            <p className="dashboard-loading">
+                정보를 불러오는 중...
+            </p>
         );
     }
 
     return (
         <pre style={{ background: '#f4f4f4', padding: '16px', borderRadius: '4px' }}>
-            { JSON.stringify(mockData, null, 2) }
+            {JSON.stringify(mockData, null, 2)}
         </pre>
     );
 }

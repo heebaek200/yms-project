@@ -115,6 +115,7 @@ export type DashboardScheduleResponse =
 
 // GET /api/dashboard/schedule
 export async function getDashboardSchedule(
+    request: DashboardScheduleRequest
 ): Promise<DashboardScheduleResponse> {
 
     // TODO:
