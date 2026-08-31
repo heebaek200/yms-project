@@ -118,6 +118,8 @@ export async function getDashboardSchedule(
     request: DashboardScheduleRequest
 ): Promise<DashboardScheduleResponse> {
 
+    void request;
+
     // TODO:
     // 백엔드 완성 후
     // GET /api/dashboard/schedule
