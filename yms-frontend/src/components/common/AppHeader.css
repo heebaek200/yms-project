@@ -54,6 +54,10 @@
     background: var(--color-surface-active);
 }
 
+.app-nav__link:not(:first-child) {
+    margin-left: 10px;
+}
+
 .app-nav__icon {
     font-size: 16px;
 }
