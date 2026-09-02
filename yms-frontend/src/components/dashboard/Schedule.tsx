@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getDashboardSchedule, type DashboardScheduleResponse } from "../../api/dashboard/schedule";
+import SchedulerCalendar from './SchedulerCalendar';
 
 
 function DashboardSchedule() {
@@ -37,9 +38,12 @@ function DashboardSchedule() {
     }
 
     return (
-        <pre style={{ background: '#f4f4f4', padding: '16px', borderRadius: '4px' }}>
-            {JSON.stringify(mockData, null, 2)}
-        </pre>
+        <>
+            <SchedulerCalendar />
+            <pre style={{ background: '#f4f4f4', padding: '16px', borderRadius: '4px' }}>
+                {JSON.stringify(mockData, null, 2)}
+            </pre>
+        </>
     );
 }
 
