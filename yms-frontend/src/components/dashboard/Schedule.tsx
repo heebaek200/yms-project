@@ -5,7 +5,7 @@ import { toFullCalendarEvents } from './schedulerCalendarAdapter';
 
 function DashboardSchedule() {
 
-    const [isLoading, setIsLoading] = useState(true);       // 초기 호출 동작 중 로딩
+    const [isLoading, setIsLoading] = useState(false);       // 초기 호출 동작 중 로딩
     const [mockData, setMockData] = useState<DashboardScheduleResponse | null>(null);
 
     const [dateRange, setDateRange] =
@@ -77,7 +77,7 @@ function DashboardSchedule() {
                     일정을 불러오는 중...
                 </p>
             )}
-            
+
             <pre>
                 {JSON.stringify(mockData, null, 2)}
             </pre>

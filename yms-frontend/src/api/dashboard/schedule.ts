@@ -129,12 +129,6 @@ export async function getDashboardSchedule(
         setTimeout(resolve, 500)
     );
 
-    // 임시 출력
-    console.log(
-        '[Schedule API Request]',
-        request
-    );
-
     // 날짜 범위 오류
     if (mockScenario === 'INVALID_DATE_RANGE') {
         return {
