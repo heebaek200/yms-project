@@ -1,0 +1,140 @@
+.scheduler-calendar {
+    width: 100%;
+
+    color: var(--color-text);
+}
+
+
+/* FullCalendar 전체 */
+
+.scheduler-calendar .fc {
+    font-size: 14px;
+}
+
+
+/* 상단 Toolbar */
+
+.scheduler-calendar .fc-toolbar {
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.scheduler-calendar .fc-toolbar-title {
+    color: var(--color-text);
+    font-size: 20px;
+    font-weight: 700;
+}
+
+
+/* Toolbar 버튼 */
+
+.scheduler-calendar .fc .fc-button {
+    padding: 7px 12px;
+
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+
+    color: var(--color-text);
+    font-size: 13px;
+    font-weight: 600;
+
+    box-shadow: none;
+}
+
+.scheduler-calendar .fc .fc-button:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-border);
+
+    color: var(--color-text);
+}
+
+.scheduler-calendar .fc .fc-button-active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+
+    color: #fff;
+}
+
+
+/* 캘린더 테두리 */
+
+.scheduler-calendar .fc-theme-standard td,
+.scheduler-calendar .fc-theme-standard th,
+.scheduler-calendar .fc-theme-standard .fc-scrollgrid {
+    border-color: var(--color-border);
+}
+
+
+/* 요일 Header */
+
+.scheduler-calendar .fc-col-header-cell {
+    background: var(--color-surface);
+}
+
+.scheduler-calendar .fc-col-header-cell-cushion {
+    padding: 8px 4px;
+
+    color: var(--color-text-muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+
+/* 날짜 */
+
+.scheduler-calendar .fc-daygrid-day-number {
+    padding: 6px;
+
+    color: var(--color-text);
+    font-size: 13px;
+}
+
+
+/* 오늘 */
+
+.scheduler-calendar .fc .fc-day-today {
+    background: var(--color-surface-active);
+}
+
+
+/* 일정 */
+
+.scheduler-calendar .fc-event {
+    border: 0;
+    border-radius: var(--radius-sm);
+
+    cursor: pointer;
+    font-size: 12px;
+}
+
+
+/* Mobile */
+
+@media (max-width: 768px) {
+
+    .scheduler-calendar .fc {
+        font-size: 12px;
+    }
+
+    .scheduler-calendar .fc-toolbar {
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .scheduler-calendar .fc-toolbar-title {
+        font-size: 18px;
+    }
+
+    .scheduler-calendar .fc .fc-button {
+        padding: 6px 8px;
+
+        font-size: 12px;
+    }
+
+    .scheduler-calendar .fc-col-header-cell-cushion {
+        padding: 6px 2px;
+
+        font-size: 12px;
+    }
+}

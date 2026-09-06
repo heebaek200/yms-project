@@ -129,6 +129,11 @@ export async function getDashboardSchedule(
         setTimeout(resolve, 500)
     );
 
+    // 임시 출력
+    console.log(
+        '[Schedule API Request]',
+        request
+    );
 
     // 날짜 범위 오류
     if (mockScenario === 'INVALID_DATE_RANGE') {
@@ -234,7 +239,18 @@ export async function getDashboardSchedule(
                     endDate: '2026-08-31',
                     cost: 80000,
                     assignmentStatus: 'PROGRESS'
-                }
+                },
+                {
+                    assignmentId: 106,
+                    projectId: 15,
+                    projectTitle: '송년 특집 및 신년 카운트다운',
+                    taskType: 'MAIN_EDIT',
+                    workerName: '윤편집',
+                    startDate: '2026-12-30',
+                    endDate: '2027-01-01',
+                    cost: 650000,
+                    assignmentStatus: 'PROGRESS'
+                },
             ],
 
             todayDeadlines: [
