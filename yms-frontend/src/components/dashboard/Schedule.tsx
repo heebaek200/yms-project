@@ -69,7 +69,8 @@ function DashboardSchedule() {
     return (
         <>
             <SchedulerCalendar
-                events={calendarEvents} onRangeChange={handleRangeChange}
+                events={calendarEvents}
+                onRangeChange={handleRangeChange}
             />
 
             {isLoading && (
