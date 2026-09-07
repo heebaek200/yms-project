@@ -1,7 +1,22 @@
 import { useEffect, useState } from "react";
 import { getDashboardSchedule, type DashboardScheduleResponse } from "../../api/dashboard/schedule";
-import SchedulerCalendar, { type SchedulerDateRange } from './SchedulerCalendar';
+import SchedulerCalendar, { type SchedulerDateRange, type SchedulerEventClickData } from './SchedulerCalendar';
 import { toFullCalendarEvents } from './schedulerCalendarAdapter';
+
+/**
+ * 캘린더에서 선택된 작업 일정의 식별자를 전달받습니다.
+ * TODO #17 프로젝트 상세 화면 연결
+ * 현재 단계에서는 클릭 데이터가 정상 전달되는지만 검증하며,
+ * 실제 프로젝트 상세 페이지 이동은 #17 구현 시 연결합니다.
+ */
+const handleEventClick = (
+    event: SchedulerEventClickData
+) => {
+    console.log(
+        '[Scheduler Event Click]',
+        event
+    );
+};
 
 function DashboardSchedule() {
 
@@ -71,6 +86,7 @@ function DashboardSchedule() {
             <SchedulerCalendar
                 events={calendarEvents}
                 onRangeChange={handleRangeChange}
+                onEventClick={handleEventClick}
             />
 
             {isLoading && (

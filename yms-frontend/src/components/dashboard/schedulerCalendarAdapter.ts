@@ -21,6 +21,15 @@ import { Temporal } from 'temporal-polyfill';
     start = 2026-08-01       ← 포함
     end   = 2026-08-08       ← 제외
  */
+
+// 작업유형
+const TASK_TYPE_LABELS = {
+    PRE_EDIT: '가편집',
+    MAIN_EDIT: '본편집',
+    THUMBNAIL: '썸네일'
+} as const;
+
+
 function toExclusiveEndDate(
     endDate: string
 ): string {
@@ -54,6 +63,7 @@ export function toFullCalendarEvent(
             assignmentId: event.assignmentId,
             projectId: event.projectId,
             taskType: event.taskType,
+            taskTypeLabel: TASK_TYPE_LABELS[event.taskType],
             workerName: event.workerName,
             cost: event.cost,
             assignmentStatus: event.assignmentStatus,
