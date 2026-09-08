@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getDashboardSchedule, type DashboardScheduleResponse } from "../../api/dashboard/schedule";
 import SchedulerCalendar, { type SchedulerDateRange, type SchedulerEventClickData } from './SchedulerCalendar';
 import { toFullCalendarEvents } from './schedulerCalendarAdapter';
+import FeedbackMessage from "../common/FeedbackMessage";
 
 /**
  * 캘린더에서 선택된 작업 일정의 식별자를 전달받습니다.
@@ -29,34 +30,60 @@ function DashboardSchedule() {
         );
 
     useEffect(() => {
+        if (!dateRange) {
+            return;
+        }
+
+        let isCurrentRequest = true;
+
+        /**
+         * 현재 FullCalendar가 표시하고 있는 날짜 범위의 일정을 조회합니다.
+         * 요청 도중 다른 날짜 범위로 이동한 경우 이전 응답은 반영하지 않습니다.
+         * 실제 API 적용 시에는 AbortController 등을 이용한 요청 취소로 교체할 수 있습니다.
+         */
         const loadDashboardSchedule = async () => {
             try {
-                if (!dateRange) {
-                    return;
-                }
-
                 setIsLoading(true);
 
                 const data =
                     await getDashboardSchedule({
-                        startDate:
-                            dateRange.startDate,
-
-                        endDate:
-                            dateRange.endDate
+                        startDate: dateRange.startDate,
+                        endDate: dateRange.endDate
                     });
 
+                // 이미 다른 날짜 범위로 이동했다면 이전 응답은 무시합니다.
+                if (!isCurrentRequest) {
+                    return;
+                }
+
                 setMockData(data);
+
             } catch (error) {
+                if (!isCurrentRequest) {
+                    return;
+                }
+
                 console.error(error);
 
-                // TODO 에러 처리
+                setMockData({
+                    success: false,
+                    errorCode: 'UNKNOWN_ERROR',
+                    message: '일정을 불러오지 못했습니다.'
+                });
+
             } finally {
-                setIsLoading(false);
+                if (isCurrentRequest) {
+                    setIsLoading(false);
+                }
             }
         };
 
         loadDashboardSchedule();
+
+        return () => {
+            isCurrentRequest = false;
+        };
+        
     }, [dateRange]);
 
     const handleRangeChange = (
@@ -81,8 +108,20 @@ function DashboardSchedule() {
         )
         : [];
 
+    const errorMessage =
+        mockData && !mockData.success
+            ? mockData.message
+            : null;
+
     return (
         <>
+            {errorMessage && (
+                <FeedbackMessage
+                    type="error"
+                    message={errorMessage}
+                />
+            )}
+
             <SchedulerCalendar
                 events={calendarEvents}
                 onRangeChange={handleRangeChange}
@@ -94,10 +133,6 @@ function DashboardSchedule() {
                     일정을 불러오는 중...
                 </p>
             )}
-
-            <pre>
-                {JSON.stringify(mockData, null, 2)}
-            </pre>
         </>
     );
 }

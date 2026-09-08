@@ -1,10 +1,17 @@
 import FullCalendar from '@fullcalendar/react';
 import type { DatesSetInfo, EventClickInfo, EventInput } from '@fullcalendar/react';
 
+import themePlugin from '@fullcalendar/react/themes/classic';
 import dayGridPlugin from '@fullcalendar/react/daygrid';
 import timeGridPlugin from '@fullcalendar/react/timegrid';
 import listPlugin from '@fullcalendar/react/list';
+import koLocale from '@fullcalendar/react/locales/ko';
 import { Temporal } from 'temporal-polyfill';
+
+/* FullCalendar v7 기본 스타일 */
+import '@fullcalendar/react/skeleton.css';
+import '@fullcalendar/react/themes/classic/theme.css';
+import '@fullcalendar/react/themes/classic/palette.css';
 
 import './SchedulerCalendar.css';
 
@@ -83,6 +90,7 @@ function SchedulerCalendar({
         <div className="scheduler-calendar">
             <FullCalendar
                 plugins={[
+                    themePlugin,
                     dayGridPlugin,
                     timeGridPlugin,
                     listPlugin
@@ -95,7 +103,7 @@ function SchedulerCalendar({
                     right: 'dayGridMonth,timeGridWeek,listWeek'
                 }}
 
-                locale="ko"
+                locale={koLocale}
 
                 events={events}
                 datesSet={handleDatesSet}
@@ -104,6 +112,8 @@ function SchedulerCalendar({
                 /* Toolbar */
                 headerToolbarClass="scheduler-calendar__toolbar"
                 toolbarTitleClass="scheduler-calendar__toolbar-title"
+
+                buttonGroupClass="scheduler-calendar__button-group"
 
                 buttonClass={(info) => {
                     return info.isSelected
@@ -167,6 +177,26 @@ function SchedulerCalendar({
 
                 /* 일정 */
                 eventClass="scheduler-calendar__event"
+
+                rowEventClass={(info) => {
+                    const classes = [
+                        'scheduler-calendar__row-event'
+                    ];
+
+                    if (!info.isStart) {
+                        classes.push(
+                            'scheduler-calendar__row-event--continued-before'
+                        );
+                    }
+
+                    if (!info.isEnd) {
+                        classes.push(
+                            'scheduler-calendar__row-event--continued-after'
+                        );
+                    }
+
+                    return classes.join(' ');
+                }}
 
                 eventContent={(info) => {
                     const taskTypeLabel =

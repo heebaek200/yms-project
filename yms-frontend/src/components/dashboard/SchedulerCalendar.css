@@ -1,7 +1,12 @@
+/* =========================
+   Scheduler Calendar
+   ========================= */
+
 .scheduler-calendar {
     width: 100%;
 
     color: var(--color-text);
+    font-size: 14px;
 }
 
 
@@ -9,15 +14,25 @@
    Toolbar
    ========================= */
 
-.scheduler-calendar__toolbar {
+.scheduler-calendar .scheduler-calendar__toolbar {
     gap: 12px;
     margin-bottom: 16px;
 }
 
-.scheduler-calendar__toolbar-title {
+.scheduler-calendar .scheduler-calendar__toolbar-title {
     color: var(--color-text);
+
     font-size: 20px;
     font-weight: 700;
+}
+
+/* =========================
+   Toolbar Button Group
+   ========================= */
+
+.scheduler-calendar__button-group {
+    display: flex;
+    align-items: center;
 }
 
 
@@ -25,100 +40,150 @@
    Toolbar Button
    ========================= */
 
-.scheduler-calendar__button {
+.scheduler-calendar .scheduler-calendar__button {
     padding: 7px 12px;
 
-    background: var(--color-background);
+    background-color: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
 
     color: var(--color-text);
+
     font-size: 13px;
     font-weight: 600;
 
     box-shadow: none;
 }
 
-.scheduler-calendar__button:hover {
-    background: var(--color-surface-hover);
+.scheduler-calendar .scheduler-calendar__button:hover:not(:disabled) {
+    background-color: var(--color-surface-hover);
 }
 
-.scheduler-calendar__button:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-}
-
-.scheduler-calendar__button--active {
-    background: var(--color-primary);
+.scheduler-calendar .scheduler-calendar__button--active {
+    background-color: var(--color-primary);
     border-color: var(--color-primary);
 
     color: #fff;
 }
 
-.scheduler-calendar__button--active:hover {
-    background: var(--color-primary-hover);
+.scheduler-calendar .scheduler-calendar__button--active:hover {
     border-color: var(--color-primary-hover);
+}
+
+.scheduler-calendar .scheduler-calendar__button--active:hover:not(:disabled) {
+    background-color: var(--color-primary-hover);
+}
+
+
+.scheduler-calendar .scheduler-calendar__button:disabled {
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+
+    color: var(--color-text-muted);
+
+    opacity: 0.6;
+}
+
+/* 그룹 안에서는 가운데 버튼의 radius 제거 */
+
+.scheduler-calendar__button-group
+.scheduler-calendar__button {
+    margin-left: -1px;
+
+    border-radius: 0;
+}
+
+.scheduler-calendar__button-group
+.scheduler-calendar__button:first-child {
+    margin-left: 0;
+
+    border-top-left-radius: var(--radius-sm);
+    border-bottom-left-radius: var(--radius-sm);
+}
+
+.scheduler-calendar__button-group
+.scheduler-calendar__button:last-child {
+    border-top-right-radius: var(--radius-sm);
+    border-bottom-right-radius: var(--radius-sm);
 }
 
 
 /* =========================
-   Day Header
+   Calendar Header
    ========================= */
 
-.scheduler-calendar__day-header {
-    background: var(--color-surface);
+.scheduler-calendar .scheduler-calendar__day-header {
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
 }
 
-.scheduler-calendar__day-header-inner {
+.scheduler-calendar .scheduler-calendar__day-header-inner {
     display: block;
 
     padding: 8px 4px;
 
-    color: var(--color-text-muted);
+    color: var(--color-text);
+
     font-size: 13px;
     font-weight: 600;
 }
+
 
 /* =========================
    Day Cell
    ========================= */
 
-.scheduler-calendar__day-cell {
-    background: var(--color-background);
+.scheduler-calendar .scheduler-calendar__day-cell {
+    background-color: var(--color-background);
+    border-color: var(--color-border);
 
     transition: background-color 0.15s ease;
 }
 
-.scheduler-calendar__day-cell:hover {
-    background: var(--color-surface-hover);
+.scheduler-calendar .scheduler-calendar__day-cell:hover:not(
+    :has(.scheduler-calendar__event:hover)
+) {
+    background-color: var(--color-surface-hover);
 }
 
-.scheduler-calendar__day-cell--today {
-    background: var(--color-surface-active);
+
+/* 오늘 */
+
+.scheduler-calendar .scheduler-calendar__day-cell--today {
+    background-color: #fff5f5;
 }
 
-.scheduler-calendar__day-cell--today:hover {
-    background: var(--color-surface-active);
+.scheduler-calendar .scheduler-calendar__day-cell--today:hover:not(
+    :has(.scheduler-calendar__event:hover)
+) {
+    background-color: #fff0f0;
 }
 
-.scheduler-calendar__day-cell--other {
-    background: var(--color-surface);
+/* 현재 월 바깥 날짜 */
+
+.scheduler-calendar .scheduler-calendar__day-cell--other {
+    background-color: var(--color-surface);
 }
 
-.scheduler-calendar__day-number {
+
+/* 날짜 숫자 */
+
+.scheduler-calendar .scheduler-calendar__day-number {
     display: block;
 
-    padding: 6px;
+    padding: 7px;
 
     color: var(--color-text);
+
     font-size: 13px;
 }
 
+.scheduler-calendar
 .scheduler-calendar__day-cell--other
 .scheduler-calendar__day-number {
     color: var(--color-text-muted);
 
-    opacity: 0.6;
+    opacity: 0.55;
 }
 
 
@@ -126,20 +191,40 @@
    Event
    ========================= */
 
-.scheduler-calendar__event {
-    background: var(--color-primary);
-    border-radius: var(--radius-sm);
+.scheduler-calendar .scheduler-calendar__event {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
 
-    color: #fff;
+    color: #ffffff;
 
     cursor: pointer;
 
-    transition: background-color 0.15s ease;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
 }
 
-.scheduler-calendar__event:hover {
-    background: var(--color-primary-hover);
+.scheduler-calendar .scheduler-calendar__event:hover {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
 }
+
+.scheduler-calendar__row-event {
+    border-radius: var(--radius-sm);
+}
+
+.scheduler-calendar__row-event--continued-before {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.scheduler-calendar__row-event--continued-after {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+
+/* eventContent 내부 */
 
 .scheduler-calendar__event-content {
     display: flex;
@@ -147,7 +232,8 @@
     gap: 5px;
 
     min-width: 0;
-    padding: 3px 5px;
+
+    padding: 2px 5px;
 
     overflow: hidden;
 }
@@ -163,55 +249,61 @@
     min-width: 0;
 
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+
+    color: #ffffff;
 
     font-size: 12px;
     font-weight: 500;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
+
 /* =========================
-   TimeGrid / Week View
+   Week / TimeGrid
    ========================= */
 
-.scheduler-calendar__slot-header {
+.scheduler-calendar .scheduler-calendar__slot-header {
+    background-color: var(--color-surface);
+
     color: var(--color-text-muted);
 
     font-size: 12px;
 }
 
-.scheduler-calendar__slot-header-inner {
+.scheduler-calendar .scheduler-calendar__slot-header-inner {
     padding: 4px 6px;
 }
 
-.scheduler-calendar__slot-lane {
+.scheduler-calendar .scheduler-calendar__slot-lane {
     border-color: var(--color-border);
 }
 
-.scheduler-calendar__day-lane {
-    background: var(--color-background);
+.scheduler-calendar .scheduler-calendar__day-lane {
+    background-color: var(--color-background);
 
     transition: background-color 0.15s ease;
 }
 
-.scheduler-calendar__day-lane:hover {
-    background: var(--color-surface-hover);
+.scheduler-calendar .scheduler-calendar__day-lane:hover {
+    background-color: var(--color-surface-hover);
 }
 
-.scheduler-calendar__day-lane--today {
-    background: var(--color-surface-active);
+.scheduler-calendar .scheduler-calendar__day-lane--today {
+    background-color: #fffafa;
 }
 
 
 /* All-day */
 
-.scheduler-calendar__all-day-header {
-    background: var(--color-surface);
+.scheduler-calendar .scheduler-calendar__all-day-header {
+    background-color: var(--color-surface);
 
     color: var(--color-text-muted);
 }
 
-.scheduler-calendar__all-day-header-inner {
+.scheduler-calendar .scheduler-calendar__all-day-header-inner {
     padding: 6px;
 
     font-size: 12px;
@@ -223,53 +315,79 @@
    List View
    ========================= */
 
-.scheduler-calendar__list-view {
-    border: 1px solid var(--color-border);
+.scheduler-calendar .scheduler-calendar__list-view {
+    border-color: var(--color-border);
     border-radius: var(--radius-sm);
-
-    overflow: hidden;
 }
 
-.scheduler-calendar__list-day-header {
-    background: var(--color-surface);
+.scheduler-calendar .scheduler-calendar__list-day-header {
+    background-color: var(--color-surface);
 }
 
-.scheduler-calendar__list-day-header-inner {
+.scheduler-calendar .scheduler-calendar__list-day-header-inner {
     padding: 8px 12px;
 
     color: var(--color-text);
+
     font-weight: 600;
 }
 
-.scheduler-calendar__list-event {
+.scheduler-calendar .scheduler-calendar__list-event {
     cursor: pointer;
 
     transition: background-color 0.15s ease;
 }
 
-.scheduler-calendar__list-event:hover {
-    background: var(--color-surface-hover);
+.scheduler-calendar .scheduler-calendar__list-event:hover {
+    background-color: var(--color-primary-hover);
 }
 
 
+/* =========================
+   Mobile
+   ========================= */
 
 @media (max-width: 768px) {
 
-    .scheduler-calendar__slot-header-inner {
-        padding: 3px 4px;
+    .scheduler-calendar .scheduler-calendar__toolbar {
+        flex-wrap: wrap;
 
-        font-size: 11px;
+        gap: 8px;
     }
 
-    .scheduler-calendar__all-day-header-inner {
-        padding: 4px;
-
-        font-size: 11px;
+    .scheduler-calendar .scheduler-calendar__toolbar-title {
+        font-size: 18px;
     }
 
-    .scheduler-calendar__list-day-header-inner {
+    .scheduler-calendar .scheduler-calendar__button {
         padding: 6px 8px;
 
         font-size: 12px;
+    }
+
+    .scheduler-calendar .scheduler-calendar__day-header-inner {
+        padding: 6px 2px;
+
+        font-size: 11px;
+    }
+
+    .scheduler-calendar .scheduler-calendar__day-number {
+        padding: 5px;
+
+        font-size: 12px;
+    }
+
+    .scheduler-calendar__event-content {
+        gap: 3px;
+
+        padding: 2px 3px;
+    }
+
+    .scheduler-calendar__event-task {
+        font-size: 10px;
+    }
+
+    .scheduler-calendar__event-title {
+        font-size: 11px;
     }
 }

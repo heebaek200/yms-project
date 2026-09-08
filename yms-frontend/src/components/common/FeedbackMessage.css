@@ -1,0 +1,153 @@
+.feedback-message {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    margin-bottom: 14px;
+    padding: 12px 14px;
+
+    border: 1px solid var(--color-border);
+    border-left-width: 4px;
+    border-radius: var(--radius-md);
+
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.06);
+
+    font-size: 13px;
+    line-height: 1.5;
+
+    animation: feedback-message-enter 0.22s ease-out;
+}
+
+
+/* 아이콘 */
+
+.feedback-message__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    width: 24px;
+    height: 24px;
+
+    border-radius: 50%;
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+
+/* 본문 */
+
+.feedback-message__text {
+    min-width: 0;
+
+    font-weight: 500;
+}
+
+
+/* =========================
+   Info
+   ========================= */
+
+.feedback-message--info {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    border-left-color: #64748b;
+
+    color: #475569;
+}
+
+.feedback-message--info .feedback-message__icon {
+    background: #e2e8f0;
+
+    color: #475569;
+}
+
+
+/* =========================
+   Success
+   ========================= */
+
+.feedback-message--success {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    border-left-color: #22c55e;
+
+    color: #166534;
+}
+
+.feedback-message--success .feedback-message__icon {
+    background: #dcfce7;
+
+    color: #15803d;
+}
+
+
+/* =========================
+   Warning
+   ========================= */
+
+.feedback-message--warning {
+    background: #fffbeb;
+    border-color: #fde68a;
+    border-left-color: #f59e0b;
+
+    color: #92400e;
+}
+
+.feedback-message--warning .feedback-message__icon {
+    background: #fef3c7;
+
+    color: #b45309;
+}
+
+
+/* =========================
+   Error
+   ========================= */
+
+.feedback-message--error {
+    background: #fff5f5;
+    border-color: #f1c4c6;
+    border-left-color: var(--color-primary);
+
+    color: var(--color-primary-hover);
+}
+
+.feedback-message--error .feedback-message__icon {
+    background: #fde8e9;
+
+    color: var(--color-primary);
+}
+
+
+/* =========================
+   등장 애니메이션
+   ========================= */
+
+@keyframes feedback-message-enter {
+
+    from {
+        opacity: 0;
+
+        transform: translateY(-6px);
+    }
+
+    to {
+        opacity: 1;
+
+        transform: translateY(0);
+    }
+}
+
+
+/* 사용자가 애니메이션 감소를 요청한 환경 대응 */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .feedback-message {
+        animation: none;
+    }
+}
