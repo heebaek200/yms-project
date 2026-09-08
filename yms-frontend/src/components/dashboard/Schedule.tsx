@@ -1,25 +1,16 @@
 import { useEffect, useState } from "react";
-import { getDashboardSchedule, type DashboardScheduleResponse } from "../../api/dashboard/schedule";
+import { getDashboardSchedule, type DashboardScheduleResponse, type ScheduleRoleFilter, type ScheduleStatusFilter } from '../../api/dashboard/schedule';
 import SchedulerCalendar, { type SchedulerDateRange, type SchedulerEventClickData } from './SchedulerCalendar';
 import { toFullCalendarEvents } from './schedulerCalendarAdapter';
 import FeedbackMessage from "../common/FeedbackMessage";
 
-/**
- * 캘린더에서 선택된 작업 일정의 식별자를 전달받습니다.
- * TODO #17 프로젝트 상세 화면 연결
- * 현재 단계에서는 클릭 데이터가 정상 전달되는지만 검증하며,
- * 실제 프로젝트 상세 페이지 이동은 #17 구현 시 연결합니다.
- */
-const handleEventClick = (
-    event: SchedulerEventClickData
-) => {
-    console.log(
-        '[Scheduler Event Click]',
-        event
-    );
+type DashboardScheduleProps = {
+    status: ScheduleStatusFilter;
+    role: ScheduleRoleFilter;
+    keyword: string;
 };
 
-function DashboardSchedule() {
+function DashboardSchedule({status, role, keyword}: DashboardScheduleProps) {
 
     const [isLoading, setIsLoading] = useState(false);       // 초기 호출 동작 중 로딩
     const [mockData, setMockData] = useState<DashboardScheduleResponse | null>(null);
@@ -28,6 +19,21 @@ function DashboardSchedule() {
         useState<SchedulerDateRange | null>(
             null
         );
+
+    /**
+     * 캘린더에서 선택된 작업 일정의 식별자를 전달받습니다.
+     * TODO #17 프로젝트 상세 화면 연결
+     * 현재 단계에서는 클릭 데이터가 정상 전달되는지만 검증하며,
+     * 실제 프로젝트 상세 페이지 이동은 #17 구현 시 연결합니다.
+     */
+    const handleEventClick = (
+        event: SchedulerEventClickData
+    ) => {
+        console.log(
+            '[Scheduler Event Click]',
+            event
+        );
+    };
 
     useEffect(() => {
         if (!dateRange) {
@@ -48,7 +54,10 @@ function DashboardSchedule() {
                 const data =
                     await getDashboardSchedule({
                         startDate: dateRange.startDate,
-                        endDate: dateRange.endDate
+                        endDate: dateRange.endDate,
+                        status,
+                        role,
+                        keyword
                     });
 
                 // 이미 다른 날짜 범위로 이동했다면 이전 응답은 무시합니다.
@@ -84,7 +93,12 @@ function DashboardSchedule() {
             isCurrentRequest = false;
         };
         
-    }, [dateRange]);
+    }, [
+        dateRange,
+        status,
+        role,
+        keyword
+    ]);
 
     const handleRangeChange = (
         range: SchedulerDateRange

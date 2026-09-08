@@ -1,9 +1,33 @@
-import './DashboardPage.css';
+import { useState } from 'react';
 import DashboardSummary from '../components/dashboard/Summary';
 import DashboardSchedule from '../components/dashboard/Schedule';
 import DashboardNotifications from '../components/dashboard/Notifications';
+import type { ScheduleRoleFilter, ScheduleStatusFilter } from '../api/dashboard/schedule';
+import SchedulerFilter from '../components/dashboard/SchedulerFilter';
+
+import './DashboardPage.css';
 
 function DashboardPage() {
+
+    const [status, setStatus] =
+        useState<ScheduleStatusFilter>('ALL');
+
+    const [role, setRole] =
+        useState<ScheduleRoleFilter>('ALL');
+
+    const [keyword, setKeyword] =
+        useState('');
+
+    /**
+     * 스케줄러의 모든 조회 조건을 최초 상태로 되돌립니다.
+     * 프로젝트 상태와 담당 역할은 전체 조회로 변경하고
+     * 프로젝트 검색어는 빈 문자열로 초기화합니다.
+     */
+    const handleFilterReset = () => {
+        setStatus('ALL');
+        setRole('ALL');
+        setKeyword('');
+    };
 
     return (
         <div className="dashboard-page">
@@ -61,7 +85,15 @@ function DashboardPage() {
                 </h2>
 
                 <div className="dashboard-filter__content">
-                    {/* DashboardFilter 컴포넌트 예정 */}
+                    <SchedulerFilter
+                        status={status}
+                        role={role}
+                        keyword={keyword}
+                        onStatusChange={setStatus}
+                        onRoleChange={setRole}
+                        onKeywordChange={setKeyword}
+                        onReset={handleFilterReset}
+                    />
                 </div>
             </section>
 
@@ -82,7 +114,11 @@ function DashboardPage() {
 
                 <div className="dashboard-schedule__content">
                     {/* DashboardSchedule 컴포넌트 */}
-                    <DashboardSchedule />
+                    <DashboardSchedule
+                        status={status}
+                        role={role}
+                        keyword={keyword}
+                    />
                 </div>
             </section>
 

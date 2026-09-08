@@ -76,6 +76,20 @@ export type CalendarEvent = {
     assignmentStatus: AssignmentStatus;
 };
 
+/**
+ * Schedule Mock API 내부에서 필터 조건을 판단하기 위한 일정 타입입니다.
+ * 실제 Dashboard Schedule API 응답에는 포함되지 않는 테스트용 메타데이터를 보관합니다.
+ * 필터링이 끝난 뒤에는 CalendarEvent 형태로 반환합니다.
+ */
+type MockCalendarEvent = CalendarEvent & {
+    projectStatus: ProjectStatus;
+    workerRole: Exclude<
+        ScheduleRoleFilter,
+        'ALL' | 'MY_TASK'
+    >;
+    isMyTask: boolean;
+};
+
 // 우측 마감 업무 피드
 export type TodayDeadline = {
     assignmentId: number;
@@ -116,8 +130,6 @@ export type DashboardScheduleResponse =
 export async function getDashboardSchedule(
     request: DashboardScheduleRequest
 ): Promise<DashboardScheduleResponse> {
-
-    void request;
 
     // TODO:
     // 백엔드 완성 후
@@ -160,79 +172,180 @@ export async function getDashboardSchedule(
         };
     }
 
+    /**
+     * Dashboard Schedule 요청 조건에 맞는 Mock 일정을 추출합니다.
+     * 날짜 범위는 시작일과 종료일을 모두 포함하며,
+     * 상태, 역할, 검색어 조건은 함께 지정된 경우 AND 조건으로 적용합니다.
+     */
+    function filterMockCalendarEvents(
+        events: MockCalendarEvent[],
+        request: DashboardScheduleRequest
+    ): CalendarEvent[] {
+
+        const keyword =
+            request.keyword
+                ?.trim()
+                .toLowerCase()
+            ?? '';
+
+        return events
+            .filter(event => {
+
+                // 조회 기간과 일정 기간이 단 하루라도 겹치는지 확인합니다.
+                const matchesDateRange =
+                    event.startDate <= request.endDate
+                    && event.endDate >= request.startDate;
+
+                if (!matchesDateRange) {
+                    return false;
+                }
+
+                // 프로젝트 상태가 ALL이면 상태 조건을 적용하지 않습니다.
+                if (
+                    request.status
+                    && request.status !== 'ALL'
+                    && event.projectStatus !== request.status
+                ) {
+                    return false;
+                }
+
+                // 역할 필터는 일반 역할과 MY_TASK를 구분하여 처리합니다.
+                if (request.role === 'MY_TASK') {
+                    if (!event.isMyTask) {
+                        return false;
+                    }
+                } else if (
+                    request.role
+                    && request.role !== 'ALL'
+                    && event.workerRole !== request.role
+                ) {
+                    return false;
+                }
+
+                // 검색어는 프로젝트 제목을 기준으로 부분 일치합니다.
+                if (
+                    keyword
+                    && !event.projectTitle
+                        .toLowerCase()
+                        .includes(keyword)
+                ) {
+                    return false;
+                }
+
+                return true;
+            })
+            .map(({
+                projectStatus: _projectStatus,
+                workerRole: _workerRole,
+                isMyTask: _isMyTask,
+                ...event
+            }) => event);
+    }
+
+    const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
+        {
+            assignmentId: 101,
+            projectId: 12,
+            projectTitle: '8월 여름 휴가 브이로그',
+            taskType: 'MAIN_EDIT',
+            workerName: '박편집',
+            startDate: '2026-08-01',
+            endDate: '2026-08-07',
+            cost: 400000,
+            assignmentStatus: 'PROGRESS',
+
+            projectStatus: 'EDITING',
+            workerRole: 'EDITOR',
+            isMyTask: true
+        },
+        {
+            assignmentId: 102,
+            projectId: 12,
+            projectTitle: '8월 여름 휴가 브이로그',
+            taskType: 'THUMBNAIL',
+            workerName: '이디자',
+            startDate: '2026-08-05',
+            endDate: '2026-08-10',
+            cost: 100000,
+            assignmentStatus: 'WAITING',
+
+            projectStatus: 'EDITING',
+            workerRole: 'THUMBNAILER',
+            isMyTask: false
+        },
+        {
+            assignmentId: 103,
+            projectId: 13,
+            projectTitle: '신제품 카메라 리뷰',
+            taskType: 'PRE_EDIT',
+            workerName: '김편집',
+            startDate: '2026-08-11',
+            endDate: '2026-08-13',
+            cost: 150000,
+            assignmentStatus: 'COMPLETED',
+
+            projectStatus: 'REVIEW',
+            workerRole: 'EDITOR',
+            isMyTask: true
+        },
+        {
+            assignmentId: 104,
+            projectId: 13,
+            projectTitle: '신제품 카메라 리뷰',
+            taskType: 'MAIN_EDIT',
+            workerName: '김편집',
+            startDate: '2026-08-14',
+            endDate: '2026-08-21',
+            cost: 500000,
+            assignmentStatus: 'REVIEW',
+
+            projectStatus: 'REVIEW',
+            workerRole: 'EDITOR',
+            isMyTask: true
+        },
+        {
+            assignmentId: 105,
+            projectId: 14,
+            projectTitle: '9월 게임 신작 정리',
+            taskType: 'THUMBNAIL',
+            workerName: '최썸네일',
+            startDate: '2026-08-27',
+            endDate: '2026-08-31',
+            cost: 80000,
+            assignmentStatus: 'PROGRESS',
+
+            projectStatus: 'PLANNING',
+            workerRole: 'THUMBNAILER',
+            isMyTask: false
+        },
+        {
+            assignmentId: 106,
+            projectId: 15,
+            projectTitle: '송년 특집 및 신년 카운트다운',
+            taskType: 'MAIN_EDIT',
+            workerName: '윤편집',
+            startDate: '2026-12-30',
+            endDate: '2027-01-01',
+            cost: 650000,
+            assignmentStatus: 'PROGRESS',
+
+            projectStatus: 'UPLOADED',
+            workerRole: 'CREATOR',
+            isMyTask: true
+        }
+    ];
+
+    const calendarEvents =
+        filterMockCalendarEvents(
+            MOCK_CALENDAR_EVENTS,
+            request
+        );
 
     // 정상 응답
     return {
         success: true,
         data: {
-            calendarEvents: [
-                {
-                    assignmentId: 101,
-                    projectId: 12,
-                    projectTitle: '8월 여름 휴가 브이로그',
-                    taskType: 'MAIN_EDIT',
-                    workerName: '박편집',
-                    startDate: '2026-08-01',
-                    endDate: '2026-08-07',
-                    cost: 400000,
-                    assignmentStatus: 'PROGRESS'
-                },
-                {
-                    assignmentId: 102,
-                    projectId: 12,
-                    projectTitle: '8월 여름 휴가 브이로그',
-                    taskType: 'THUMBNAIL',
-                    workerName: '이디자',
-                    startDate: '2026-08-05',
-                    endDate: '2026-08-10',
-                    cost: 100000,
-                    assignmentStatus: 'WAITING'
-                },
-                {
-                    assignmentId: 103,
-                    projectId: 13,
-                    projectTitle: '신제품 카메라 리뷰',
-                    taskType: 'PRE_EDIT',
-                    workerName: '김편집',
-                    startDate: '2026-08-11',
-                    endDate: '2026-08-13',
-                    cost: 150000,
-                    assignmentStatus: 'COMPLETED'
-                },
-                {
-                    assignmentId: 104,
-                    projectId: 13,
-                    projectTitle: '신제품 카메라 리뷰',
-                    taskType: 'MAIN_EDIT',
-                    workerName: '김편집',
-                    startDate: '2026-08-14',
-                    endDate: '2026-08-21',
-                    cost: 500000,
-                    assignmentStatus: 'REVIEW'
-                },
-                {
-                    assignmentId: 105,
-                    projectId: 14,
-                    projectTitle: '9월 게임 신작 정리',
-                    taskType: 'THUMBNAIL',
-                    workerName: '최썸네일',
-                    startDate: '2026-08-27',
-                    endDate: '2026-08-31',
-                    cost: 80000,
-                    assignmentStatus: 'PROGRESS'
-                },
-                {
-                    assignmentId: 106,
-                    projectId: 15,
-                    projectTitle: '송년 특집 및 신년 카운트다운',
-                    taskType: 'MAIN_EDIT',
-                    workerName: '윤편집',
-                    startDate: '2026-12-30',
-                    endDate: '2027-01-01',
-                    cost: 650000,
-                    assignmentStatus: 'PROGRESS'
-                },
-            ],
+            calendarEvents,
 
             todayDeadlines: [
                 {
