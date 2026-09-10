@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import DashboardSummary from '../components/dashboard/Summary';
 import DashboardSchedule from '../components/dashboard/Schedule';
 import DashboardNotifications from '../components/dashboard/Notifications';
@@ -9,14 +9,31 @@ import './DashboardPage.css';
 
 function DashboardPage() {
 
-    const [status, setStatus] =
-        useState<ScheduleStatusFilter>('ALL');
+    const [status, setStatus] = useState<ScheduleStatusFilter>('ALL');
 
-    const [role, setRole] =
-        useState<ScheduleRoleFilter>('ALL');
+    const [role, setRole] = useState<ScheduleRoleFilter>('ALL');
 
-    const [keyword, setKeyword] =
-        useState('');
+    const [keyword, setKeyword] = useState('');
+
+    const [debouncedKeyword, setDebouncedKeyword] = useState('');
+
+    /**
+     * 프로젝트 검색어 입력이 멈춘 뒤 300ms가 지나면 실제 조회 검색어를 갱신합니다.
+     * 사용자가 연속으로 입력하는 동안에는 이전 타이머를 취소하여
+     * 문자 하나를 입력할 때마다 Schedule API가 호출되는 것을 방지합니다.
+     */
+    useEffect(() => {
+
+        const timerId = window.setTimeout(() => {
+            setDebouncedKeyword(keyword);
+        }, 300);
+
+        // 검색어가 300ms 안에 다시 변경되면 이전 예약을 취소합니다.
+        return () => {
+            window.clearTimeout(timerId);
+        };
+
+    }, [keyword]);
 
     /**
      * 스케줄러의 모든 조회 조건을 최초 상태로 되돌립니다.
@@ -27,6 +44,7 @@ function DashboardPage() {
         setStatus('ALL');
         setRole('ALL');
         setKeyword('');
+        setDebouncedKeyword('');
     };
 
     return (
@@ -117,7 +135,7 @@ function DashboardPage() {
                     <DashboardSchedule
                         status={status}
                         role={role}
-                        keyword={keyword}
+                        keyword={debouncedKeyword}
                     />
                 </div>
             </section>

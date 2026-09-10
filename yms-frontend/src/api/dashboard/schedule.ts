@@ -135,6 +135,7 @@ export async function getDashboardSchedule(
     // 백엔드 완성 후
     // GET /api/dashboard/schedule
     // axios 호출로 교체
+    console.log('[Schedule Request]', request);
 
     await new Promise(resolve =>
         setTimeout(resolve, 500)
