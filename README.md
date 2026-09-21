@@ -4,8 +4,15 @@ YMS(YouTube Management System)는 영상 크리에이터와 편집자의 제작 
 
 ## GitHub Pages
 
+### 설계
+
 - [요구사항](docs/design/요구사항.md) (작성 중)
 - [사용자 시나리오 및 예외사항](docs/design/사용자%20시나리오%20및%20예외사항.md) (작성 중)
 - [화면 설계](docs/design/화면%20설계.md) (작성 중)
 - [데이터베이스 설계 및 ERD](docs/design/데이터베이스%20설계%20및%20ERD.md) (작성 중)
 - [REST API 명세](docs/design/REST%20API%20명세.md) (작성 중)
+
+### 프로젝트 관리
+
+- [GitHub Projects](https://github.com/users/heebaek200/projects)
+- [GitHub Issues](https://github.com/heebaek200/yms-project/issues)
