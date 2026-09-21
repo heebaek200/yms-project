@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-09 실시간 협업 메신저</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+<main class="wireframe-page">
+    <header class="wireframe-header">
+        <h1>SCR-09. 실시간 협업 메신저</h1>
+        <p>접근 권한: 참여 프로젝트의 EDIT / VIEW 사용자</p>
+    </header>
+
+    <div class="chat-layout">
+        <aside class="chat-room-list">
+            <div class="form-group"><input type="search" placeholder="채팅방 검색"></div>
+            <div class="chat-room"><strong>카메라 리뷰</strong><br>가편집 완료했습니다. <span class="badge">2</span></div>
+            <div class="chat-room"><strong>여름 브이로그</strong><br>썸네일 확인 요청</div>
+            <div class="chat-room"><strong>Shorts #1</strong><br>어제</div>
+        </aside>
+
+        <section class="chat-window">
+            <header>
+                <strong>카메라 리뷰</strong>
+                <span class="badge">참여자 4명</span>
+                <button class="small-button" type="button">프로젝트 바로가기</button>
+            </header>
+
+            <div class="chat-messages">
+                <div class="message">김편집 · 10:15<br>가편집 완료했습니다.</div>
+                <div class="message">박관리 · 10:20<br>3분 구간만 한 번 더 확인해주세요.</div>
+                <div class="message">김편집 · 10:22<br>확인했습니다.</div>
+            </div>
+
+            <footer>
+                <div class="row">
+                    <input type="text" style="flex:1; padding:10px;" placeholder="메시지를 입력하세요">
+                    <button class="small-button" type="button">전송</button>
+                </div>
+            </footer>
+        </section>
+    </div>
+</main>
+</body>
+</html>
