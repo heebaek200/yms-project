@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-01 로그인 / 회원가입 와이어프레임</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+    <main class="wireframe-page">
+        <!--
+            SCR-01 로그인 / 회원가입 화면 와이어프레임
+            실제 인증 로직이나 탭 전환 JavaScript는 구현하지 않습니다.
+            로그인 상태와 회원가입 상태를 한 페이지에서 동시에 비교하기 위한 정적 설계도입니다.
+        -->
+        <header class="wireframe-header">
+            <h1>SCR-01. 로그인 / 회원가입</h1>
+            <p>접근 권한: 비인증 사용자</p>
+            <p>목적: 이메일 기반 인증 진입점 제공</p>
+        </header>
+
+        <section class="preview-grid">
+            <!-- 로그인 탭 활성 상태 -->
+            <section class="screen-frame">
+                <div class="screen-label">상태 A — 로그인 탭</div>
+
+                <div class="auth-card">
+                    <div class="brand-box">
+                        <strong>YMS</strong>
+                        <div>YouTube Management System</div>
+                    </div>
+
+                    <nav class="tab-row" aria-label="인증 화면 탭">
+                        <button class="tab is-active" type="button">로그인</button>
+                        <button class="tab" type="button">회원가입</button>
+                    </nav>
+
+                    <form>
+                        <div class="form-group">
+                            <label for="login-email">이메일</label>
+                            <input
+                                id="login-email"
+                                type="email"
+                                placeholder="user@example.com"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="login-password">비밀번호</label>
+                            <input
+                                id="login-password"
+                                type="password"
+                                placeholder="비밀번호"
+                            >
+                            <p class="error-text">오류 메시지 표시 영역</p>
+                        </div>
+
+                        <button class="action-button" type="button">로그인</button>
+                    </form>
+
+                    <div class="divider"><span>또는</span></div>
+
+                    <div class="social-placeholder">
+                        <button type="button" disabled>Google 로그인 — 추후 확장</button>
+                        <button type="button" disabled>기타 소셜 로그인 — 추후 확장</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 회원가입 탭 활성 상태 -->
+            <section class="screen-frame">
+                <div class="screen-label">상태 B — 회원가입 탭</div>
+
+                <div class="auth-card">
+                    <div class="brand-box">
+                        <strong>YMS</strong>
+                        <div>YouTube Management System</div>
+                    </div>
+
+                    <nav class="tab-row" aria-label="인증 화면 탭">
+                        <button class="tab" type="button">로그인</button>
+                        <button class="tab is-active" type="button">회원가입</button>
+                    </nav>
+
+                    <form>
+                        <div class="form-group">
+                            <label for="signup-email">이메일</label>
+                            <input
+                                id="signup-email"
+                                type="email"
+                                placeholder="user@example.com"
+                            >
+                            <p class="help-text">이메일 형식 검증 메시지 영역</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="signup-password">비밀번호</label>
+                            <input
+                                id="signup-password"
+                                type="password"
+                                placeholder="6자 이상"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="signup-password-confirm">비밀번호 확인</label>
+                            <input
+                                id="signup-password-confirm"
+                                type="password"
+                                placeholder="비밀번호 재입력"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="signup-name">이름 / 닉네임</label>
+                            <input
+                                id="signup-name"
+                                type="text"
+                                placeholder="김편집"
+                            >
+                        </div>
+
+                        <button class="action-button" type="button">회원가입</button>
+                    </form>
+
+                    <div class="divider"><span>또는</span></div>
+
+                    <div class="social-placeholder">
+                        <button type="button" disabled>Google 회원가입 — 추후 확장</button>
+                        <button type="button" disabled>기타 소셜 회원가입 — 추후 확장</button>
+                    </div>
+                </div>
+            </section>
+        </section>
+
+        <aside class="note-box">
+            <strong>와이어프레임 검토 포인트</strong>
+            <ul>
+                <li>전문 역할 선택과 조회수 1회당 수익 단가 설정은 SCR-02에서 처리합니다.</li>
+                <li>회원가입 완료 후 SCR-02 프로필 설정으로 이동합니다.</li>
+                <li>실제 인증 API, 탭 전환 JavaScript, 소셜 로그인은 구현하지 않습니다.</li>
+                <li>768px 이하에서는 로그인/회원가입 미리보기 영역이 세로로 배치됩니다.</li>
+            </ul>
+        </aside>
+    </main>
+</body>
+</html>
