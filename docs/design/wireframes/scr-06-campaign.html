@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-06 캠페인 관리</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+<main class="wireframe-page">
+    <header class="wireframe-header">
+        <h1>SCR-06. 캠페인 관리</h1>
+        <p>접근 권한: OWNER / ADMIN</p>
+    </header>
+
+    <div class="toolbar">
+        <select><option>상태: 전체</option></select>
+        <input type="text" placeholder="기간">
+        <input type="search" placeholder="캠페인 검색">
+        <button class="small-button" type="button">+ 새 캠페인</button>
+    </div>
+
+    <div class="grid-2">
+        <section class="screen-frame">
+            <h2 class="section-title">캠페인 목록</h2>
+            <ul class="list">
+                <li class="list-item"><strong>신제품 카메라 협찬</strong><br>ACTIVE · 프로젝트 4개</li>
+                <li class="list-item"><strong>여름 굿즈 프로모션</strong><br>PLANNING · 프로젝트 2개</li>
+                <li class="list-item"><strong>봄 이벤트</strong><br>COMPLETED · 프로젝트 5개</li>
+            </ul>
+        </section>
+
+        <section class="screen-frame">
+            <h2 class="section-title">선택 캠페인 상세</h2>
+            <p><strong>신제품 카메라 협찬</strong> <span class="badge">ACTIVE</span></p>
+            <p>기간: 2026-09-01 ~ 2026-09-30</p>
+
+            <h3>연결 프로젝트</h3>
+            <div class="table-wrap">
+                <table class="table">
+                    <tr><th>프로젝트</th><th>채널</th><th>상태</th></tr>
+                    <tr><td>롱폼 리뷰</td><td>테크 리뷰</td><td>EDITING</td></tr>
+                    <tr><td>Shorts #1</td><td>쇼츠 채널</td><td>UPLOADED</td></tr>
+                </table>
+            </div>
+
+            <div class="grid-2" style="margin-top: 16px;">
+                <div class="card">직접 비용<br><strong>500,000원</strong></div>
+                <div class="card">직접 수익<br><strong>10,000,000원</strong></div>
+            </div>
+        </section>
+    </div>
+</main>
+</body>
+</html>
