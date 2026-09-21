@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-11 작업자 정산</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+<main class="wireframe-page">
+    <header class="wireframe-header">
+        <h1>SCR-11. 작업자 정산</h1>
+        <p>관리: OWNER / ADMIN · 개인 조회: 작업자 본인</p>
+    </header>
+
+    <div class="toolbar">
+        <input type="month">
+        <select><option>상태: 전체</option><option>DRAFT</option><option>CONFIRMED</option><option>PAID</option></select>
+        <button class="small-button" type="button">+ 정산 생성</button>
+    </div>
+
+    <section class="screen-frame">
+        <h2 class="section-title">관리자 정산 목록</h2>
+        <div class="table-wrap">
+            <table class="table">
+                <tr><th>작업자</th><th>Task 수</th><th>금액</th><th>상태</th><th>액션</th></tr>
+                <tr><td>김편집</td><td>5</td><td>1,200,000</td><td>DRAFT</td><td><button class="small-button">재계산</button> <button class="small-button">확정</button></td></tr>
+                <tr><td>이디자</td><td>2</td><td>350,000</td><td>CONFIRMED</td><td><button class="small-button">PAID 처리</button></td></tr>
+                <tr><td>박자막</td><td>3</td><td>420,000</td><td>PAID</td><td>-</td></tr>
+            </table>
+        </div>
+    </section>
+
+    <div class="grid-2" style="margin-top:16px;">
+        <section class="panel">
+            <h2 class="section-title">선택 정산 상세</h2>
+            <ul class="list">
+                <li class="list-item">카메라 리뷰 · 종합 편집 · 300,000원</li>
+                <li class="list-item">여름 브이로그 · 가편집 · 150,000원</li>
+                <li class="list-item">Shorts #1 · 편집 · 100,000원</li>
+            </ul>
+            <p><strong>합계: 550,000원</strong></p>
+        </section>
+
+        <section class="panel">
+            <h2 class="section-title">작업자 개인 화면 예시</h2>
+            <p>2026년 9월</p>
+            <p>확정 금액: 550,000원</p>
+            <p>상태: <span class="badge">CONFIRMED</span></p>
+        </section>
+    </div>
+</main>
+</body>
+</html>
