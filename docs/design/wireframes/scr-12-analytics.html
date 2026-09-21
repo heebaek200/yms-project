@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-12 콘텐츠 성과 및 재무 분석</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+<main class="wireframe-page">
+    <header class="wireframe-header">
+        <h1>SCR-12. 콘텐츠 성과 및 재무 분석</h1>
+        <p>접근 권한: OWNER / ADMIN</p>
+    </header>
+
+    <div class="toolbar">
+        <select><option>분석 단위: Campaign</option><option>Project</option></select>
+        <select><option>신제품 카메라 협찬</option></select>
+        <input type="text" placeholder="기간">
+    </div>
+
+    <section class="grid-4">
+        <article class="card metric-card"><span>실제 비용</span><strong>2,300,000원</strong></article>
+        <article class="card metric-card"><span>실제 수익</span><strong>11,000,000원</strong></article>
+        <article class="card metric-card"><span>손익</span><strong>8,700,000원</strong></article>
+        <article class="card metric-card"><span>ROI</span><strong>378.3%</strong></article>
+    </section>
+
+    <section class="grid-3" style="margin-top:16px;">
+        <div class="fake-chart">
+            <h2 class="section-title">비용 / 수익 비교</h2>
+            <div class="fake-bars">
+                <span style="height:30%;"></span>
+                <span style="height:85%;"></span>
+            </div>
+        </div>
+
+        <div class="fake-chart">
+            <h2 class="section-title">수익 유형 구성</h2>
+            <div class="fake-pie"></div>
+        </div>
+
+        <div class="fake-chart">
+            <h2 class="section-title">Project별 콘텐츠 성과</h2>
+            <div class="fake-bar"><span style="width:70%;"></span></div>
+            <div class="fake-bar"><span style="width:45%;"></span></div>
+            <div class="fake-bar"><span style="width:85%;"></span></div>
+        </div>
+    </section>
+
+    <section class="grid-2" style="margin-top:16px;">
+        <div class="panel">
+            <h2 class="section-title">캠페인 프로젝트</h2>
+            <div class="table-wrap">
+                <table class="table">
+                    <tr><th>Project</th><th>Channel</th><th>비용</th><th>실제 수익</th></tr>
+                    <tr><td>롱폼 리뷰</td><td>테크 리뷰</td><td>1,500,000</td><td>450,000</td></tr>
+                    <tr><td>Shorts #1</td><td>쇼츠 채널</td><td>300,000</td><td>0</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2 class="section-title">콘텐츠 참고 지표</h2>
+            <p>총 조회수: 1,420,000</p>
+            <p>좋아요: 42,000</p>
+            <p>조회수 1회당 단가 기반 예상 플랫폼 수익: 620,000원</p>
+            <p class="help-text">예상 수익은 실제 ROI 계산에 포함하지 않습니다.</p>
+        </div>
+    </section>
+</main>
+</body>
+</html>
