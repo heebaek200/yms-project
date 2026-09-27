@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-05 메인 대시보드 및 스케줄러</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+<main class="wireframe-page">
+    <header class="wireframe-header">
+        <h1>SCR-05. 메인 대시보드 및 스케줄러</h1>
+        <p>접근 권한: 현재 Workspace 멤버</p>
+    </header>
+
+    <div class="topbar">
+        <strong>YMS</strong>
+        <span>Workspace: YMS Media Team</span>
+        <span class="grow"></span>
+        <span>알림 <span class="badge">4</span></span>
+        <span>김편집</span>
+    </div>
+
+    <section class="grid-4">
+        <article class="card metric-card"><span>진행 중 프로젝트</span><strong>8</strong></article>
+        <article class="card metric-card"><span>내 마감 예정 작업</span><strong>3</strong></article>
+        <article class="card metric-card"><span>검수 요청</span><strong>2</strong></article>
+        <article class="card metric-card"><span>마감 임박</span><strong>1</strong></article>
+    </section>
+
+    <div class="toolbar">
+        <select><option>상태: 전체</option></select>
+        <select><option>채널: 전체</option></select>
+        <select><option>역할: 전체</option></select>
+        <select><option>내 작업만</option></select>
+        <input type="search" placeholder="프로젝트 / 작업 검색">
+    </div>
+
+    <div class="main-layout">
+        <section class="fake-calendar">
+            <h2 class="section-title">월간 스케줄러</h2>
+            <div class="table-wrap">
+                <div class="calendar-grid">
+                    <div class="calendar-cell"><strong>1</strong></div>
+                    <div class="calendar-cell"><strong>2</strong><div class="calendar-task">A프로젝트 가편집</div></div>
+                    <div class="calendar-cell"><strong>3</strong></div>
+                    <div class="calendar-cell"><strong>4</strong><div class="calendar-task">B프로젝트 썸네일</div></div>
+                    <div class="calendar-cell"><strong>5</strong></div>
+                    <div class="calendar-cell"><strong>6</strong></div>
+                    <div class="calendar-cell"><strong>7</strong></div>
+                    <div class="calendar-cell"><strong>8</strong></div>
+                    <div class="calendar-cell"><strong>9</strong><div class="calendar-task">A프로젝트 검수</div></div>
+                    <div class="calendar-cell"><strong>10</strong></div>
+                    <div class="calendar-cell"><strong>11</strong></div>
+                    <div class="calendar-cell"><strong>12</strong></div>
+                    <div class="calendar-cell"><strong>13</strong></div>
+                    <div class="calendar-cell"><strong>14</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="stack">
+            <section class="panel">
+                <h2 class="section-title">오늘 마감</h2>
+                <ul class="list">
+                    <li class="list-item">가편집 — 여행 브이로그</li>
+                    <li class="list-item">썸네일 — 테크 리뷰 7화</li>
+                </ul>
+            </section>
+            <section class="panel">
+                <h2 class="section-title">최근 알림</h2>
+                <ul class="list">
+                    <li class="list-item">새 검수 요청</li>
+                    <li class="list-item">새 채팅 메시지</li>
+                    <li class="list-item">정산 확정</li>
+                </ul>
+            </section>
+        </aside>
+    </div>
+</main>
+</body>
+</html>

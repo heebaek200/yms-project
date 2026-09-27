@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-04 워크스페이스 관리</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+<main class="wireframe-page">
+    <header class="wireframe-header">
+        <h1>SCR-04. 워크스페이스 관리</h1>
+        <p>접근 권한: OWNER / ADMIN</p>
+    </header>
+
+    <div class="topbar">
+        <strong>YMS Media Team</strong>
+        <span class="grow"></span>
+        <button class="small-button" type="button">멤버 초대</button>
+        <button class="small-button" type="button">채널 추가</button>
+    </div>
+
+    <nav class="tab-row">
+        <button class="tab is-active" type="button">멤버</button>
+        <button class="tab" type="button">채널</button>
+        <button class="tab" type="button">작업 종류</button>
+    </nav>
+
+    <section class="screen-frame">
+        <h2 class="section-title">멤버 관리</h2>
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr><th>이름</th><th>이메일</th><th>전문 역할</th><th>권한</th><th>관리</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>김대표</td><td>owner@example.com</td><td>CREATOR</td><td>OWNER</td><td>소유자</td></tr>
+                    <tr><td>박관리</td><td>admin@example.com</td><td>CREATOR</td><td>ADMIN</td><td><button class="small-button">권한 변경</button></td></tr>
+                    <tr><td>이편집</td><td>editor@example.com</td><td>EDITOR</td><td>MEMBER</td><td><button class="small-button">제외</button></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="grid-2" style="margin-top: 16px;">
+        <div class="panel">
+            <h2 class="section-title">채널 관리</h2>
+            <ul class="list">
+                <li class="list-item">테크 리뷰 채널 <span class="badge">연동됨</span></li>
+                <li class="list-item">쇼츠 실험 채널 <span class="badge">수동 등록</span></li>
+            </ul>
+        </div>
+
+        <div class="panel">
+            <h2 class="section-title">작업 종류</h2>
+            <ul class="list">
+                <li class="list-item">가편집 <span class="badge">사용</span></li>
+                <li class="list-item">종합 편집 <span class="badge">사용</span></li>
+                <li class="list-item">자막 <span class="badge">사용</span></li>
+                <li class="list-item">썸네일 <span class="badge">사용</span></li>
+            </ul>
+        </div>
+    </section>
+</main>
+</body>
+</html>

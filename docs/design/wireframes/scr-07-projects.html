@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-07 프로젝트 목록 / 생성 / 보관함</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+<main class="wireframe-page">
+    <header class="wireframe-header">
+        <h1>SCR-07. 프로젝트 목록 / 생성 / 보관함</h1>
+        <p>접근 권한: Workspace 멤버</p>
+    </header>
+
+    <div class="row between">
+        <nav class="tab-row" style="margin: 0;">
+            <button class="tab is-active" type="button">진행 프로젝트</button>
+            <button class="tab" type="button">보관함</button>
+        </nav>
+        <button class="small-button" type="button">+ 새 프로젝트</button>
+    </div>
+
+    <div class="toolbar">
+        <select><option>상태: 전체</option></select>
+        <select><option>채널: 전체</option></select>
+        <select><option>캠페인: 전체</option></select>
+        <select><option>참여 여부: 전체</option></select>
+        <input type="search" placeholder="프로젝트 검색">
+    </div>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr><th>프로젝트</th><th>채널</th><th>캠페인</th><th>상태</th><th>제작 마감</th><th>업로드 예정</th><th>진행률</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>여름 휴가 브이로그</td><td>일상 채널</td><td>-</td><td>EDITING</td><td>09-25</td><td>09-28</td><td>60%</td></tr>
+                <tr><td>카메라 리뷰</td><td>테크 리뷰</td><td>신제품 협찬</td><td>REVIEW</td><td>09-22</td><td>09-23</td><td>85%</td></tr>
+                <tr><td>Shorts #1</td><td>쇼츠 채널</td><td>신제품 협찬</td><td>UPLOADED</td><td>09-18</td><td>09-19</td><td>100%</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <section class="modal-box modal-preview" style="margin-top: 24px;">
+        <h2 class="section-title">Project 생성 모달 예시</h2>
+        <div class="form-group"><label>제목</label><input type="text" value="새 영상 프로젝트"></div>
+        <div class="grid-2">
+            <div class="form-group"><label>Channel</label><select><option>테크 리뷰</option></select></div>
+            <div class="form-group"><label>Campaign (선택)</label><select><option>선택 안 함</option><option>신제품 협찬</option></select></div>
+        </div>
+        <div class="grid-2">
+            <div class="form-group"><label>제작 마감일</label><input type="date"></div>
+            <div class="form-group"><label>업로드 예정일</label><input type="date"></div>
+        </div>
+        <button class="action-button" type="button">생성</button>
+    </section>
+</main>
+</body>
+</html>

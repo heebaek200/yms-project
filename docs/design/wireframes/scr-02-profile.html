@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-02 프로필 설정</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+<main class="wireframe-page">
+    <header class="wireframe-header">
+        <h1>SCR-02. 프로필 설정</h1>
+        <p>접근 권한: 인증 사용자 / 본인 프로필</p>
+    </header>
+
+    <section class="screen-frame modal-preview">
+        <h2 class="section-title">기본 프로필</h2>
+
+        <div class="form-group">
+            <label>이메일</label>
+            <input type="text" value="creator@example.com" disabled>
+        </div>
+
+        <div class="form-group">
+            <label>이름 / 닉네임</label>
+            <input type="text" value="김크리에이터">
+        </div>
+
+        <h2 class="section-title">전문 역할</h2>
+        <div class="checkbox-row">
+            <label><input type="checkbox" checked> CREATOR</label>
+            <label><input type="checkbox"> EDITOR</label>
+            <label><input type="checkbox"> THUMBNAILER</label>
+        </div>
+
+        <section class="panel">
+            <h3>CREATOR 기본 수익 단가</h3>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>롱폼 조회수 1회당 수익 단가</label>
+                    <input type="number" value="3">
+                </div>
+                <div class="form-group">
+                    <label>쇼츠 조회수 1회당 수익 단가</label>
+                    <input type="number" value="0.2" step="0.1">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>변경 적용 범위</label>
+                <select>
+                    <option>향후 프로젝트만</option>
+                    <option>기존 미확정 프로젝트에도 적용</option>
+                </select>
+            </div>
+
+            <p class="help-text">프로젝트에는 실제 적용 단가가 별도 스냅샷으로 저장됩니다.</p>
+        </section>
+
+        <button class="action-button" type="button">설정 저장</button>
+    </section>
+</main>
+</body>
+</html>
