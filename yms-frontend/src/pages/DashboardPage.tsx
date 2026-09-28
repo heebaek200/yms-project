@@ -167,6 +167,7 @@ function DashboardPage() {
                 <div className="dashboard-summary__content">
                     {/* DashboardSummary 컴포넌트 */}
                     <DashboardSummary
+                        key={currentWorkspace.workspaceId}
                         workspaceId={currentWorkspace.workspaceId}
                     />
                 </div>

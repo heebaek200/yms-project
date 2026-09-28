@@ -1,0 +1,105 @@
+.dashboard-summary-state {
+    min-width: 0;
+}
+
+.dashboard-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.dashboard-summary-card {
+    position: relative;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 20px;
+
+    min-width: 0;
+    min-height: 128px;
+    padding: 20px;
+
+    overflow: hidden;
+
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.05);
+}
+
+.dashboard-summary-card::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+
+    height: 3px;
+
+    background: var(--color-primary);
+
+    content: '';
+}
+
+.dashboard-summary-card__label {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.dashboard-summary-card__value {
+    color: var(--color-text);
+    font-size: 32px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.dashboard-summary-status {
+    margin: 12px 0 0;
+
+    color: var(--color-text-muted);
+    font-size: 13px;
+    text-align: center;
+}
+
+.dashboard-summary-card--loading::before {
+    background: var(--color-border);
+}
+
+/* 실제 카드와 동일한 크기의 자리 표시자로 로딩 전후 레이아웃 이동을 방지합니다. */
+.dashboard-summary-skeleton {
+    display: block;
+
+    background: var(--color-surface-active);
+    border-radius: var(--radius-sm);
+
+    animation: dashboard-summary-pulse 1.2s ease-in-out infinite;
+}
+
+.dashboard-summary-skeleton--label {
+    width: 70%;
+    height: 18px;
+}
+
+.dashboard-summary-skeleton--value {
+    width: 42px;
+    height: 32px;
+}
+
+@keyframes dashboard-summary-pulse {
+    0%,
+    100% {
+        opacity: 0.55;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dashboard-summary-skeleton {
+        animation: none;
+    }
+}
