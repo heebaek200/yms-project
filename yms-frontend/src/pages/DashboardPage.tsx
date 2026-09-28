@@ -1,9 +1,132 @@
-import './DashboardPage.css';
+import { useEffect, useState } from 'react';
 import DashboardSummary from '../components/dashboard/Summary';
 import DashboardSchedule from '../components/dashboard/Schedule';
 import DashboardNotifications from '../components/dashboard/Notifications';
+import type { ScheduleRoleFilter, ScheduleStatusFilter } from '../api/dashboard/schedule';
+import SchedulerFilter from '../components/dashboard/SchedulerFilter';
+import { getWorkspaceChannels } from '../api/workspaces/channels';
+import { useWorkspace } from '../hooks/useWorkspace';
+import type { ChannelSummary } from '../types/workspace';
+
+import './DashboardPage.css';
 
 function DashboardPage() {
+
+    const {
+        currentWorkspace,
+        isLoading: isWorkspaceLoading,
+        errorMessage: workspaceErrorMessage
+    } = useWorkspace();
+
+    const [status, setStatus] = useState<ScheduleStatusFilter>('ALL');
+
+    const [role, setRole] = useState<ScheduleRoleFilter>('ALL');
+
+    const [channelId, setChannelId] = useState<number | null>(null);
+
+    const [channels, setChannels] = useState<ChannelSummary[]>([]);
+
+    const [channelErrorMessage, setChannelErrorMessage] = useState<string | null>(null);
+
+    const [keyword, setKeyword] = useState('');
+
+    const [debouncedKeyword, setDebouncedKeyword] = useState('');
+
+    /**
+     * 프로젝트 검색어 입력이 멈춘 뒤 300ms가 지나면 실제 조회 검색어를 갱신합니다.
+     * 사용자가 연속으로 입력하는 동안에는 이전 타이머를 취소하여
+     * 문자 하나를 입력할 때마다 Schedule API가 호출되는 것을 방지합니다.
+     */
+    useEffect(() => {
+
+        const timerId = window.setTimeout(() => {
+            setDebouncedKeyword(keyword);
+        }, 300);
+
+        // 검색어가 300ms 안에 다시 변경되면 이전 예약을 취소합니다.
+        return () => {
+            window.clearTimeout(timerId);
+        };
+
+    }, [keyword]);
+
+    /**
+     * Workspace가 변경되면 해당 Workspace의 Channel 목록을 다시 조회합니다.
+     * 이전 Workspace의 필터가 새 Workspace에 섞이지 않도록 모든 필터도 초기화합니다.
+     */
+    useEffect(() => {
+        if (!currentWorkspace) {
+            setChannelId(null);
+            setChannels([]);
+            return;
+        }
+
+        let isCurrentRequest = true;
+
+        const loadChannels = async () => {
+            try {
+                setChannelErrorMessage(null);
+
+                const response = await getWorkspaceChannels(
+                    currentWorkspace.workspaceId
+                );
+
+                if (isCurrentRequest) {
+                    setChannels(response.data);
+                }
+            } catch (error) {
+                if (!isCurrentRequest) {
+                    return;
+                }
+
+                console.error(error);
+                setChannels([]);
+                setChannelErrorMessage('채널 목록을 불러오지 못했습니다.');
+            }
+        };
+
+        setStatus('ALL');
+        setRole('ALL');
+        setChannelId(null);
+        setChannels([]);
+        setKeyword('');
+        setDebouncedKeyword('');
+        loadChannels();
+
+        return () => {
+            isCurrentRequest = false;
+        };
+    }, [currentWorkspace]);
+
+    /**
+     * 스케줄러의 모든 조회 조건을 최초 상태로 되돌립니다.
+     * 프로젝트 상태, 담당 역할과 Channel은 전체 조회로 변경하고
+     * 프로젝트 검색어는 빈 문자열로 초기화합니다.
+     * 현재 Workspace의 Channel 목록 자체는 유지합니다.
+     */
+    const handleFilterReset = () => {
+        setStatus('ALL');
+        setRole('ALL');
+        setChannelId(null);
+        setKeyword('');
+        setDebouncedKeyword('');
+    };
+
+    if (isWorkspaceLoading) {
+        return (
+            <p className="dashboard-loading">
+                워크스페이스를 불러오는 중...
+            </p>
+        );
+    }
+
+    if (workspaceErrorMessage || !currentWorkspace) {
+        return (
+            <p className="dashboard-loading">
+                {workspaceErrorMessage ?? '사용 가능한 워크스페이스가 없습니다.'}
+            </p>
+        );
+    }
 
     return (
         <div className="dashboard-page">
@@ -43,7 +166,9 @@ function DashboardPage() {
 
                 <div className="dashboard-summary__content">
                     {/* DashboardSummary 컴포넌트 */}
-                    <DashboardSummary />
+                    <DashboardSummary
+                        workspaceId={currentWorkspace.workspaceId}
+                    />
                 </div>
             </section>
 
@@ -61,7 +186,24 @@ function DashboardPage() {
                 </h2>
 
                 <div className="dashboard-filter__content">
-                    {/* DashboardFilter 컴포넌트 예정 */}
+                    <SchedulerFilter
+                        status={status}
+                        role={role}
+                        channelId={channelId}
+                        channels={channels}
+                        keyword={keyword}
+                        onStatusChange={setStatus}
+                        onRoleChange={setRole}
+                        onChannelChange={setChannelId}
+                        onKeywordChange={setKeyword}
+                        onReset={handleFilterReset}
+                    />
+
+                    {channelErrorMessage && (
+                        <p className="dashboard-filter-error">
+                            {channelErrorMessage}
+                        </p>
+                    )}
                 </div>
             </section>
 
@@ -82,7 +224,13 @@ function DashboardPage() {
 
                 <div className="dashboard-schedule__content">
                     {/* DashboardSchedule 컴포넌트 */}
-                    <DashboardSchedule />
+                    <DashboardSchedule
+                        workspaceId={currentWorkspace.workspaceId}
+                        status={status}
+                        role={role}
+                        channelId={channelId}
+                        keyword={debouncedKeyword}
+                    />
                 </div>
             </section>
 

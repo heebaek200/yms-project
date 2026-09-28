@@ -1,0 +1,101 @@
+.scheduler-filter {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+
+    width: 100%;
+}
+
+
+.scheduler-filter__group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+
+.scheduler-filter__group--keyword {
+    flex: 1;
+}
+
+
+.scheduler-filter__label {
+    color: var(--color-text-muted);
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+.scheduler-filter__select,
+.scheduler-filter__input {
+    height: 38px;
+    padding: 0 10px;
+
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+
+    color: var(--color-text);
+
+    font-size: 13px;
+}
+
+.scheduler-filter__select:focus-visible,
+.scheduler-filter__input:focus-visible,
+.scheduler-filter__reset:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+
+.scheduler-filter__input {
+    width: 100%;
+}
+
+
+.scheduler-filter__reset {
+    height: 38px;
+    padding: 0 14px;
+
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+
+    color: var(--color-text);
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+
+.scheduler-filter__reset:hover {
+    background: var(--color-surface-hover);
+}
+
+.scheduler-filter__reset:active {
+    background: var(--color-surface-active);
+}
+
+
+@media (max-width: 768px) {
+
+    .scheduler-filter {
+        flex-wrap: wrap;
+    }
+
+    .scheduler-filter__group {
+        min-width: 140px;
+    }
+
+    .scheduler-filter__group--keyword {
+        flex-basis: 100%;
+    }
+
+    /* 좁은 화면에서 초기화 버튼이 다른 입력 요소와 겹치지 않도록 분리합니다. */
+    .scheduler-filter__reset {
+        width: 100%;
+    }
+}

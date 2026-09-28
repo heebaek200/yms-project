@@ -119,7 +119,7 @@ function AppRoutes() {
                 element={<NotFoundPage />}
             />
 
-            {/* SCR-02 프로필 및 채널 수익 설정 */}
+            {/* SCR-02 프로필 설정 */}
             <Route
                 path="/profile-setup"
                 element={

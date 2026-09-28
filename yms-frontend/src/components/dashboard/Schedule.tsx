@@ -1,25 +1,24 @@
 import { useEffect, useState } from "react";
-import { getDashboardSchedule, type DashboardScheduleResponse } from "../../api/dashboard/schedule";
+import { getDashboardSchedule, type DashboardScheduleResponse, type ScheduleRoleFilter, type ScheduleStatusFilter } from '../../api/dashboard/schedule';
 import SchedulerCalendar, { type SchedulerDateRange, type SchedulerEventClickData } from './SchedulerCalendar';
 import { toFullCalendarEvents } from './schedulerCalendarAdapter';
 import FeedbackMessage from "../common/FeedbackMessage";
 
-/**
- * 캘린더에서 선택된 작업 일정의 식별자를 전달받습니다.
- * TODO #17 프로젝트 상세 화면 연결
- * 현재 단계에서는 클릭 데이터가 정상 전달되는지만 검증하며,
- * 실제 프로젝트 상세 페이지 이동은 #17 구현 시 연결합니다.
- */
-const handleEventClick = (
-    event: SchedulerEventClickData
-) => {
-    console.log(
-        '[Scheduler Event Click]',
-        event
-    );
+type DashboardScheduleProps = {
+    workspaceId: number;
+    status: ScheduleStatusFilter;
+    role: ScheduleRoleFilter;
+    channelId: number | null;
+    keyword: string;
 };
 
-function DashboardSchedule() {
+function DashboardSchedule({
+    workspaceId,
+    status,
+    role,
+    channelId,
+    keyword
+}: DashboardScheduleProps) {
 
     const [isLoading, setIsLoading] = useState(false);       // 초기 호출 동작 중 로딩
     const [mockData, setMockData] = useState<DashboardScheduleResponse | null>(null);
@@ -29,6 +28,25 @@ function DashboardSchedule() {
             null
         );
 
+    /**
+     * 캘린더에서 선택된 작업 일정의 식별자를 전달받습니다.
+     * TODO #17 프로젝트 상세 화면 연결
+     * 현재 단계에서는 클릭 데이터가 정상 전달되는지만 검증하며,
+     * 실제 프로젝트 상세 페이지 이동은 #17 구현 시 연결합니다.
+     */
+    const handleEventClick = (
+        event: SchedulerEventClickData
+    ) => {
+        console.log(
+            '[Scheduler Event Click]',
+            event
+        );
+    };
+
+    /**
+     * Workspace, 날짜 범위 또는 필터가 바뀔 때마다 새 조건으로 조회합니다.
+     * Workspace ID는 실제 API URL의 업무 데이터 경계를 결정합니다.
+     */
     useEffect(() => {
         if (!dateRange) {
             return;
@@ -46,12 +64,19 @@ function DashboardSchedule() {
                 setIsLoading(true);
 
                 const data =
-                    await getDashboardSchedule({
-                        startDate: dateRange.startDate,
-                        endDate: dateRange.endDate
-                    });
+                    await getDashboardSchedule(
+                        workspaceId,
+                        {
+                            startDate: dateRange.startDate,
+                            endDate: dateRange.endDate,
+                            status,
+                            role,
+                            channelId: channelId ?? undefined,
+                            keyword
+                        }
+                    );
 
-                // 이미 다른 날짜 범위로 이동했다면 이전 응답은 무시합니다.
+                // Workspace나 필터가 다시 바뀌었다면 이전 요청의 응답은 무시합니다.
                 if (!isCurrentRequest) {
                     return;
                 }
@@ -84,11 +109,19 @@ function DashboardSchedule() {
             isCurrentRequest = false;
         };
         
-    }, [dateRange]);
+    }, [
+        dateRange,
+        workspaceId,
+        status,
+        role,
+        channelId,
+        keyword
+    ]);
 
     const handleRangeChange = (
         range: SchedulerDateRange
     ) => {
+        // FullCalendar가 동일 범위를 다시 전달할 때 불필요한 재조회를 막습니다.
         setDateRange(prev => {
 
             if (

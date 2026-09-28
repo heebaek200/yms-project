@@ -18,7 +18,8 @@
 
     --content-width: 1200px;
 
-    --app-header-height: 64px;
+    /* 전역 컨텍스트 1행 52px + 주요 nav 2행 40px */
+    --app-header-height: 92px;
 
     font-family:
         Inter,
@@ -34,7 +35,8 @@
 
 @media (max-width: 768px) {
     :root {
-        --app-header-height: 56px;
+        /* 모바일 헤더 1행 48px + nav 2행 40px */
+        --app-header-height: 88px;
     }
 }
 

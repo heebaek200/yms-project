@@ -46,13 +46,15 @@ export type DashboardSummaryResponse =
     | DashboardSummaryFailureResponse;
 
 
-// GET /api/dashboard/summary
-export async function getDashboardSummary():
+// GET /api/workspaces/{workspaceId}/dashboard/summary
+export async function getDashboardSummary(
+    workspaceId: number
+):
     Promise<DashboardSummaryResponse> {
 
     // TODO:
     // 백엔드 완성 후
-    // GET /api/dashboard/summary
+    // GET /api/workspaces/{workspaceId}/dashboard/summary
     // axios 호출로 교체
 
     await new Promise(resolve =>
@@ -60,15 +62,20 @@ export async function getDashboardSummary():
     );
 
 
-    // 정상 데이터
+    // Workspace 전환 시 서로 다른 요약이 표시되는지 확인하기 위한 정상 데이터
     if (mockScenario === 'SUCCESS') {
         return {
             success: true,
-            data: {
+            data: workspaceId === 1 ? {
                 progressProjectCount: 4,
                 myDueTaskCount: 7,
                 reviewTaskCount: 2,
                 dueSoonTaskCount: 3
+            } : {
+                progressProjectCount: 1,
+                myDueTaskCount: 1,
+                reviewTaskCount: 0,
+                dueSoonTaskCount: 0
             }
         };
     }
