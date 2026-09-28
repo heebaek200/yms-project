@@ -102,12 +102,12 @@ function DashboardPage() {
      * 스케줄러의 모든 조회 조건을 최초 상태로 되돌립니다.
      * 프로젝트 상태, 담당 역할과 Channel은 전체 조회로 변경하고
      * 프로젝트 검색어는 빈 문자열로 초기화합니다.
+     * 초기화 버튼을 눌렀을 때 채널 목록 자체까지 비우지 않도록 다음 초기화는 행하지 않음: setChannels([]);
      */
     const handleFilterReset = () => {
         setStatus('ALL');
         setRole('ALL');
         setChannelId(null);
-        setChannels([]);
         setKeyword('');
         setDebouncedKeyword('');
     };

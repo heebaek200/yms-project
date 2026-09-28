@@ -138,7 +138,7 @@ function AppRoutes() {
                 }
             >
 
-                {/* SCR-05 메인 대시보드 및 스케줄러 */}
+                {/* SCR-03 메인 대시보드 및 스케줄러 */}
                 <Route
                     path="/dashboard"
                     element={<DashboardPage />}
