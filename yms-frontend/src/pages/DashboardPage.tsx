@@ -56,8 +56,8 @@ function DashboardPage() {
      */
     useEffect(() => {
         if (!currentWorkspace) {
-            setChannels([]);
             setChannelId(null);
+            setChannels([]);
             return;
         }
 
@@ -88,6 +88,7 @@ function DashboardPage() {
         setStatus('ALL');
         setRole('ALL');
         setChannelId(null);
+        setChannels([]);
         setKeyword('');
         setDebouncedKeyword('');
         loadChannels();
@@ -106,6 +107,7 @@ function DashboardPage() {
         setStatus('ALL');
         setRole('ALL');
         setChannelId(null);
+        setChannels([]);
         setKeyword('');
         setDebouncedKeyword('');
     };

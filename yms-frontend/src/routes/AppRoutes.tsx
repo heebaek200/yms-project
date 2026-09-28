@@ -22,7 +22,7 @@ import AppLayout from '../layouts/AppLayout';
 
 
         로그인되어 있음 + roles.length > 0
-        → SCR-05: 메인 대시보드 및 스케줄러 페이지
+        → SCR-03: 메인 대시보드 및 스케줄러 페이지
     
 
     /profile-setup 접근 시
