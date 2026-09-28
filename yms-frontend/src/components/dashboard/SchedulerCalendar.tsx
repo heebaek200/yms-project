@@ -35,7 +35,7 @@ type SchedulerCalendarProps = {
 
 // 이벤트 클릭 시의 데이터 타입
 export type SchedulerEventClickData = {
-    assignmentId: number;
+    taskId: number;
     projectId: number;
 };
 
@@ -67,21 +67,21 @@ function SchedulerCalendar({
     /**
      * FullCalendar에서 클릭된 일정의 YMS 식별자를 추출합니다.
      * FullCalendar 객체 자체를 상위 컴포넌트에 노출하지 않고,
-     * 프로젝트에서 필요한 assignmentId와 projectId만 전달합니다.
+     * 프로젝트에서 필요한 taskId와 projectId만 전달합니다.
      */
     const handleEventClick = (
         info: EventClickInfo
     ) => {
 
         // Adapter에서 저장해 둔 원본 식별자를 꺼냅니다.
-        const assignmentId =
-            Number(info.event.extendedProps.assignmentId);
+        const taskId =
+            Number(info.event.extendedProps.taskId);
 
         const projectId =
             Number(info.event.extendedProps.projectId);
 
         onEventClick({
-            assignmentId,
+            taskId,
             projectId
         });
     };
@@ -199,15 +199,15 @@ function SchedulerCalendar({
                 }}
 
                 eventContent={(info) => {
-                    const taskTypeLabel =
+                    const taskTypeName =
                         String(
-                            info.event.extendedProps.taskTypeLabel ?? ''
+                            info.event.extendedProps.taskTypeName ?? ''
                         );
 
                     return (
                         <div className="scheduler-calendar__event-content">
                             <span className="scheduler-calendar__event-task">
-                                {taskTypeLabel}
+                                {taskTypeName}
                             </span>
 
                             <span className="scheduler-calendar__event-title">

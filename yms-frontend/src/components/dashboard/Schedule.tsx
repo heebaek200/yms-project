@@ -5,12 +5,20 @@ import { toFullCalendarEvents } from './schedulerCalendarAdapter';
 import FeedbackMessage from "../common/FeedbackMessage";
 
 type DashboardScheduleProps = {
+    workspaceId: number;
     status: ScheduleStatusFilter;
     role: ScheduleRoleFilter;
+    channelId: number | null;
     keyword: string;
 };
 
-function DashboardSchedule({status, role, keyword}: DashboardScheduleProps) {
+function DashboardSchedule({
+    workspaceId,
+    status,
+    role,
+    channelId,
+    keyword
+}: DashboardScheduleProps) {
 
     const [isLoading, setIsLoading] = useState(false);       // 초기 호출 동작 중 로딩
     const [mockData, setMockData] = useState<DashboardScheduleResponse | null>(null);
@@ -35,6 +43,10 @@ function DashboardSchedule({status, role, keyword}: DashboardScheduleProps) {
         );
     };
 
+    /**
+     * Workspace, 날짜 범위 또는 필터가 바뀔 때마다 새 조건으로 조회합니다.
+     * Workspace ID는 실제 API URL의 업무 데이터 경계를 결정합니다.
+     */
     useEffect(() => {
         if (!dateRange) {
             return;
@@ -52,15 +64,19 @@ function DashboardSchedule({status, role, keyword}: DashboardScheduleProps) {
                 setIsLoading(true);
 
                 const data =
-                    await getDashboardSchedule({
-                        startDate: dateRange.startDate,
-                        endDate: dateRange.endDate,
-                        status,
-                        role,
-                        keyword
-                    });
+                    await getDashboardSchedule(
+                        workspaceId,
+                        {
+                            startDate: dateRange.startDate,
+                            endDate: dateRange.endDate,
+                            status,
+                            role,
+                            channelId: channelId ?? undefined,
+                            keyword
+                        }
+                    );
 
-                // 이미 다른 날짜 범위로 이동했다면 이전 응답은 무시합니다.
+                // Workspace나 필터가 다시 바뀌었다면 이전 요청의 응답은 무시합니다.
                 if (!isCurrentRequest) {
                     return;
                 }
@@ -95,14 +111,17 @@ function DashboardSchedule({status, role, keyword}: DashboardScheduleProps) {
         
     }, [
         dateRange,
+        workspaceId,
         status,
         role,
+        channelId,
         keyword
     ]);
 
     const handleRangeChange = (
         range: SchedulerDateRange
     ) => {
+        // FullCalendar가 동일 범위를 다시 전달할 때 불필요한 재조회를 막습니다.
         setDateRange(prev => {
 
             if (

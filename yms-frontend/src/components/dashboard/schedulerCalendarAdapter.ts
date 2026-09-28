@@ -4,7 +4,7 @@ import { Temporal } from 'temporal-polyfill';
 
 /*
  FullCalendar 의 인터페이스 id / title / start / end 등
- YMS의 인터페이스 assignmentId / projectId / taskType / workerName / cost / assignmentStatus 등
+ YMS의 인터페이스 taskId / projectId / taskTypeName / workerName / workerAmount / taskStatus 등
  데이터 중간 계층 변환 기능
  */
 
@@ -21,14 +21,6 @@ import { Temporal } from 'temporal-polyfill';
     start = 2026-08-01       ← 포함
     end   = 2026-08-08       ← 제외
  */
-
-// 작업유형
-const TASK_TYPE_LABELS = {
-    PRE_EDIT: '가편집',
-    MAIN_EDIT: '본편집',
-    THUMBNAIL: '썸네일'
-} as const;
-
 
 function toExclusiveEndDate(
     endDate: string
@@ -50,7 +42,7 @@ export function toFullCalendarEvent(
 
     return {
         // 표시용 데이터
-        id: String(event.assignmentId),
+        id: String(event.taskId),
         title: event.projectTitle,
 
         start: event.startDate,
@@ -60,13 +52,13 @@ export function toFullCalendarEvent(
 
         extendedProps: {
             // 원본 데이터
-            assignmentId: event.assignmentId,
+            taskId: event.taskId,
             projectId: event.projectId,
-            taskType: event.taskType,
-            taskTypeLabel: TASK_TYPE_LABELS[event.taskType],
+            taskTypeId: event.taskTypeId,
+            taskTypeName: event.taskTypeName,
             workerName: event.workerName,
-            cost: event.cost,
-            assignmentStatus: event.assignmentStatus,
+            workerAmount: event.workerAmount,
+            taskStatus: event.taskStatus,
 
             startDate: event.startDate,
             endDate: event.endDate

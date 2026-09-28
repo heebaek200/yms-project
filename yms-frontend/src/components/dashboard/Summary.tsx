@@ -2,28 +2,50 @@
 import { useEffect, useState } from 'react';
 import { getDashboardSummary, type DashboardSummaryResponse } from '../../api/dashboard/summary';
 
-function DashboardSummary() {
+type DashboardSummaryProps = {
+    workspaceId: number;
+};
+
+function DashboardSummary({ workspaceId }: DashboardSummaryProps) {
 
     const [isLoading, setIsLoading] = useState(true);       // 초기 호출 동작 중 로딩
     const [mockData, setMockData] = useState<DashboardSummaryResponse | null>(null);
 
+    // Header에서 Workspace를 전환하면 요약 카드도 같은 업무 범위로 다시 조회합니다.
     useEffect(() => {
+        let isCurrentRequest = true;
+
         const loadDashboardSummary = async () => {
             try {
-                const data = await getDashboardSummary();
+                setIsLoading(true);
 
-                setMockData(data);
+                const data = await getDashboardSummary(workspaceId);
+
+                // Workspace가 바뀐 뒤 도착한 이전 응답은 화면에 반영하지 않습니다.
+                if (isCurrentRequest) {
+                    setMockData(data);
+                }
             } catch (error) {
+                if (!isCurrentRequest) {
+                    return;
+                }
+
                 console.error(error);
 
                 // TODO 에러 처리
             } finally {
-                setIsLoading(false);
+                if (isCurrentRequest) {
+                    setIsLoading(false);
+                }
             }
         };
 
         loadDashboardSummary();
-    }, []);
+
+        return () => {
+            isCurrentRequest = false;
+        };
+    }, [workspaceId]);
 
     if (isLoading) {
         return (

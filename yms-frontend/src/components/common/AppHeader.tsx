@@ -2,6 +2,7 @@ import './AppHeader.css';
 import { NavLink, useNavigate } from "react-router";
 import { useAuth } from '../../contexts/AuthContext'
 import { useState } from "react";
+import WorkspaceSwitcher from './WorkspaceSwitcher';
 
 function AppHeader() {
     const { user, signOut } = useAuth();
@@ -19,6 +20,9 @@ function AppHeader() {
                 >
                     YMS
                 </NavLink>
+
+                {/* 모든 Workspace 하위 화면에서 사용할 현재 업무 범위를 선택합니다. */}
+                <WorkspaceSwitcher />
 
                 <nav className="app-nav">
                     <NavLink

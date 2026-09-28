@@ -1,16 +1,28 @@
 .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+
     width: 100%;
 
     background: var(--color-background);
     border-bottom: 1px solid var(--color-border);
 }
 
+/*
+ * 모든 화면 너비에서 동일한 2행 구조를 사용합니다.
+ * 1행은 전역 컨텍스트, 2행은 주요 화면 이동을 담당합니다.
+ */
 .app-header__inner {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: 52px 40px;
+    column-gap: 24px;
+    row-gap: 0;
     align-items: center;
-    gap: 24px;
 
     width: 100%;
+    min-width: 0;
     max-width: var(--content-width);
     height: var(--app-header-height);
     margin: 0 auto;
@@ -18,6 +30,8 @@
 }
 
 .app-header__brand {
+    grid-column: 1;
+    grid-row: 1;
     flex-shrink: 0;
 
     color: var(--color-primary);
@@ -25,17 +39,56 @@
     font-weight: 800;
 }
 
-.app-nav__link {
+.workspace-switcher {
+    grid-column: 2;
+    grid-row: 1;
+
+    min-width: 0;
+}
+
+.app-header__actions {
+    position: relative;
+
+    grid-column: 3;
+    grid-row: 1;
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    min-width: 0;
+}
+
+/* nav는 두 번째 행 전체 너비를 세 메뉴가 동일하게 나누어 사용합니다. */
+.app-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+
+    width: 100%;
+    min-width: 0;
+    border-top: 1px solid var(--color-border);
+}
+
+.app-nav__link,
+.app-nav__link:not(:first-child) {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
 
+    width: 100%;
+    min-width: 0;
     min-height: 40px;
-    padding: 0 10px;
+    margin-left: 0;
+    padding: 0 8px;
 
     color: var(--color-text-muted);
     font-size: 14px;
     font-weight: 600;
+    white-space: nowrap;
 
     border-radius: var(--radius-sm);
 
@@ -54,35 +107,27 @@
     background: var(--color-surface-active);
 }
 
-.app-nav__link:not(:first-child) {
-    margin-left: 10px;
-}
-
 .app-nav__icon {
+    flex-shrink: 0;
     font-size: 16px;
 }
 
 .app-nav__label {
+    overflow: hidden;
+    min-width: 0;
+
+    text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.app-header__actions {
-    position: relative;
-
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    margin-left: auto;
 }
 
 .app-header__user {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
 
-    min-height: 40px;
-    padding: 0 10px;
+    min-height: 36px;
+    padding: 0 8px;
 
     background: transparent;
     border: 0;
@@ -105,7 +150,7 @@
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    z-index: 100;
+    z-index: 110;
 
     min-width: 160px;
     padding: 6px;
@@ -113,6 +158,7 @@
     background: var(--color-background);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
+    box-shadow: 0 12px 32px rgb(24 24 27 / 14%);
 }
 
 .app-user-menu__item {
@@ -143,12 +189,13 @@
 }
 
 
-/* Mobile */
+/* Mobile: 구조는 유지하고 1행 높이와 간격만 줄입니다. */
 @media (max-width: 768px) {
     .app-header__inner {
-        gap: 10px;
+        grid-template-rows: 48px 40px;
+        column-gap: 10px;
 
-        height: 56px;
+        height: 88px;
         padding: 0 16px;
     }
 
@@ -156,14 +203,11 @@
         font-size: 20px;
     }
 
-    .app-nav__link {
-        min-width: 40px;
-        padding: 0 8px;
-        justify-content: center;
-    }
-
-    .app-nav__label {
-        display: none;
+    .app-nav__link,
+    .app-nav__link:not(:first-child) {
+        gap: 4px;
+        padding: 0 6px;
+        font-size: 12px;
     }
 
     .app-nav__icon {
@@ -171,9 +215,9 @@
     }
 
     .app-header__user {
-        min-width: 40px;
-        padding: 0 8px;
-        justify-content: center;
+        min-width: 36px;
+        min-height: 36px;
+        padding: 0 6px;
     }
 
     .app-header__user-name {

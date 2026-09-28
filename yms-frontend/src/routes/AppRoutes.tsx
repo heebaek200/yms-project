@@ -22,7 +22,7 @@ import AppLayout from '../layouts/AppLayout';
 
 
         로그인되어 있음 + roles.length > 0
-        → SCR-03: 메인 대시보드 및 스케줄러 페이지
+        → SCR-05: 메인 대시보드 및 스케줄러 페이지
     
 
     /profile-setup 접근 시
@@ -119,7 +119,7 @@ function AppRoutes() {
                 element={<NotFoundPage />}
             />
 
-            {/* SCR-02 프로필 및 채널 수익 설정 */}
+            {/* SCR-02 프로필 설정 */}
             <Route
                 path="/profile-setup"
                 element={
@@ -138,7 +138,7 @@ function AppRoutes() {
                 }
             >
 
-                {/* SCR-03 메인 대시보드 및 스케줄러 */}
+                {/* SCR-05 메인 대시보드 및 스케줄러 */}
                 <Route
                     path="/dashboard"
                     element={<DashboardPage />}

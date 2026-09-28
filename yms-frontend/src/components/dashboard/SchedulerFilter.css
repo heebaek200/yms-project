@@ -41,6 +41,13 @@
     font-size: 13px;
 }
 
+.scheduler-filter__select:focus-visible,
+.scheduler-filter__input:focus-visible,
+.scheduler-filter__reset:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
 
 .scheduler-filter__input {
     width: 100%;
@@ -68,6 +75,10 @@
     background: var(--color-surface-hover);
 }
 
+.scheduler-filter__reset:active {
+    background: var(--color-surface-active);
+}
+
 
 @media (max-width: 768px) {
 
@@ -81,5 +92,10 @@
 
     .scheduler-filter__group--keyword {
         flex-basis: 100%;
+    }
+
+    /* 좁은 화면에서 초기화 버튼이 다른 입력 요소와 겹치지 않도록 분리합니다. */
+    .scheduler-filter__reset {
+        width: 100%;
     }
 }
