@@ -98,18 +98,6 @@
     }
 }
 
-@media (max-width: 900px) {
-    .dashboard-summary-cards {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 520px) {
-    .dashboard-summary-cards {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
 @media (prefers-reduced-motion: reduce) {
     .dashboard-summary-skeleton {
         animation: none;
