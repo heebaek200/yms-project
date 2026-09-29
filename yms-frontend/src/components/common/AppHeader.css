@@ -5,8 +5,12 @@
 
     width: 100%;
 
-    background: var(--color-background);
-    border-bottom: 1px solid var(--color-border);
+    /* 경계 장식 없이 본문과 이어지면서 스크롤 콘텐츠만 은은하게 비치도록 구성합니다. */
+    background: rgb(255 255 255 / 0.88);
+
+    /* Chromium과 Safari 계열 모두에서 반투명 배경 뒤 콘텐츠를 부드럽게 흐립니다. */
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    backdrop-filter: saturate(180%) blur(12px);
 }
 
 /*

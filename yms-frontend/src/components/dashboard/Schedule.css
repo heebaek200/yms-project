@@ -1,0 +1,18 @@
+/* Calendar와 마감 피드를 하나의 Schedule 응답 영역 안에서 2:1 비율로 배치합니다. */
+.dashboard-schedule-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    align-items: start;
+    gap: 24px;
+}
+
+.dashboard-schedule-calendar {
+    min-width: 0;
+}
+
+/* 좁은 화면에서는 Calendar 다음에 마감 피드가 이어지는 단일 열로 전환합니다. */
+@media (max-width: 900px) {
+    .dashboard-schedule-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

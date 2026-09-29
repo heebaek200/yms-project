@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
-import { getDashboardSchedule, type DashboardScheduleResponse, type ScheduleRoleFilter, type ScheduleStatusFilter } from '../../api/dashboard/schedule';
+import {
+    getDashboardSchedule,
+    type DashboardScheduleResponse,
+    type ScheduleRoleFilter,
+    type ScheduleStatusFilter,
+    type TodayDeadline
+} from '../../api/dashboard/schedule';
 import SchedulerCalendar, { type SchedulerDateRange, type SchedulerEventClickData } from './SchedulerCalendar';
 import { toFullCalendarEvents } from './schedulerCalendarAdapter';
-import FeedbackMessage from "../common/FeedbackMessage";
+import DeadlineFeed from './DeadlineFeed';
+
+import './Schedule.css';
 
 type DashboardScheduleProps = {
     workspaceId: number;
@@ -12,6 +20,11 @@ type DashboardScheduleProps = {
     keyword: string;
 };
 
+/**
+ * 현재 Workspace와 필터에 맞는 Schedule API를 한 번 호출합니다.
+ * 동일한 응답을 Calendar와 오늘 마감 피드로 나누어 전달하고 로딩·오류 상태를 공유하며,
+ * Calendar 범위 또는 필터가 바뀌면 최신 조건으로 데이터를 다시 조회합니다.
+ */
 function DashboardSchedule({
     workspaceId,
     status,
@@ -20,7 +33,7 @@ function DashboardSchedule({
     keyword
 }: DashboardScheduleProps) {
 
-    const [isLoading, setIsLoading] = useState(false);       // 초기 호출 동작 중 로딩
+    const [isLoading, setIsLoading] = useState(true);       // 초기 호출 동작 중 로딩
     const [mockData, setMockData] = useState<DashboardScheduleResponse | null>(null);
 
     const [dateRange, setDateRange] =
@@ -40,6 +53,22 @@ function DashboardSchedule({
         console.log(
             '[Scheduler Event Click]',
             event
+        );
+    };
+
+    /**
+     * TODO #17 SCR-08 프로젝트 상세 라우트가 추가되면 projectId와 taskId로 이동합니다.
+     * 현재는 피드 항목이 상세 화면 식별자를 정상 전달하는 연결 지점만 제공합니다.
+     */
+    const handleDeadlineClick = (
+        deadline: TodayDeadline
+    ) => {
+        console.log(
+            '[Deadline Feed Click]',
+            {
+                projectId: deadline.projectId,
+                taskId: deadline.taskId
+            }
         );
     };
 
@@ -141,32 +170,44 @@ function DashboardSchedule({
         )
         : [];
 
+    const todayDeadlines = mockData?.success
+        ? mockData.data.todayDeadlines
+        : [];
+
     const errorMessage =
         mockData && !mockData.success
             ? mockData.message
             : null;
 
     return (
-        <>
-            {errorMessage && (
-                <FeedbackMessage
-                    type="error"
-                    message={errorMessage}
+        <div className="dashboard-schedule-layout">
+            {/* Calendar는 넓은 주 영역을 사용하고 조회 중임을 별도 상태 문구로 알립니다. */}
+            <div className="dashboard-schedule-calendar">
+                <SchedulerCalendar
+                    events={calendarEvents}
+                    onRangeChange={handleRangeChange}
+                    onEventClick={handleEventClick}
                 />
-            )}
 
-            <SchedulerCalendar
-                events={calendarEvents}
-                onRangeChange={handleRangeChange}
-                onEventClick={handleEventClick}
+                {isLoading && (
+                    <p
+                        className="dashboard-loading"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        일정을 불러오는 중...
+                    </p>
+                )}
+            </div>
+
+            {/* 같은 Schedule 응답의 마감 목록을 우측 피드로 전달해 중복 호출을 방지합니다. */}
+            <DeadlineFeed
+                deadlines={todayDeadlines}
+                isLoading={isLoading}
+                errorMessage={errorMessage}
+                onDeadlineClick={handleDeadlineClick}
             />
-
-            {isLoading && (
-                <p className="dashboard-loading">
-                    일정을 불러오는 중...
-                </p>
-            )}
-        </>
+        </div>
     );
 }
 

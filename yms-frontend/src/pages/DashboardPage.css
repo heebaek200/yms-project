@@ -63,6 +63,8 @@
 
 .dashboard-schedule,
 .dashboard-notifications {
+    /* Schedule 내부에서 Calendar와 피드를 나누므로 페이지 Grid 전체 너비를 사용합니다. */
+    grid-column: 1 / -1;
     min-width: 0;
 }
 

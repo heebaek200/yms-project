@@ -226,6 +226,7 @@ function DashboardPage() {
                 <div className="dashboard-schedule__content">
                     {/* DashboardSchedule 컴포넌트 */}
                     <DashboardSchedule
+                        key={currentWorkspace.workspaceId}
                         workspaceId={currentWorkspace.workspaceId}
                         status={status}
                         role={role}
