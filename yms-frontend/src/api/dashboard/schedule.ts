@@ -421,6 +421,23 @@ const MOCK_TODAY_DEADLINES: MockTodayDeadline[] = [
 ];
 
 /**
+ * Schedule 검색어가 프로젝트 제목 또는 Task Type에 포함되는지 확인합니다.
+ * Calendar와 마감 피드가 같은 검색 규칙을 공유하도록 응답 타입의 공통 필드만 사용하며,
+ * 빈 검색어는 전체 항목을 허용합니다.
+ */
+function matchesScheduleKeyword(
+    item: Pick<CalendarEvent, 'projectTitle' | 'taskTypeName'>,
+    keyword: string
+) {
+    if (!keyword) {
+        return true;
+    }
+
+    return item.projectTitle.toLowerCase().includes(keyword)
+        || item.taskTypeName.toLowerCase().includes(keyword);
+}
+
+/**
  * Dashboard Schedule 요청 조건에 맞는 Mock 일정을 추출합니다.
  * 날짜 범위는 시작일과 종료일을 모두 포함하며,
  * Workspace, 상태, 역할, Channel, 검색어 조건은 함께 지정된 경우 AND로 적용합니다.
@@ -485,11 +502,8 @@ function filterMockCalendarEvents(
                 return false;
             }
 
-            // 검색어는 프로젝트 제목을 기준으로 부분 일치합니다.
-            if (
-                keyword
-                && !event.projectTitle.toLowerCase().includes(keyword)
-            ) {
+            // 프로젝트 제목과 Task Type 중 하나라도 검색어와 일치하면 일정을 유지합니다.
+            if (!matchesScheduleKeyword(event, keyword)) {
                 return false;
             }
 
@@ -559,12 +573,8 @@ function filterMockTodayDeadlines(
                 return false;
             }
 
-            // 검색어는 프로젝트명과 Task Type 양쪽에서 부분 일치하도록 적용합니다.
-            if (
-                keyword
-                && !deadline.projectTitle.toLowerCase().includes(keyword)
-                && !deadline.taskTypeName.toLowerCase().includes(keyword)
-            ) {
+            // Calendar와 동일한 공통 검색 규칙을 적용하여 두 결과의 불일치를 방지합니다.
+            if (!matchesScheduleKeyword(deadline, keyword)) {
                 return false;
             }
 

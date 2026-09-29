@@ -1,4 +1,3 @@
-import FeedbackMessage from '../common/FeedbackMessage';
 import {
     type TaskStatus,
     type TodayDeadline
@@ -9,7 +8,6 @@ import './DeadlineFeed.css';
 type DeadlineFeedProps = {
     deadlines: TodayDeadline[];
     isLoading: boolean;
-    errorMessage: string | null;
     onDeadlineClick: (deadline: TodayDeadline) => void;
 };
 
@@ -57,13 +55,13 @@ function formatDeadlineDate(value: string) {
 
 /**
  * Schedule API의 오늘 마감 항목을 표시합니다.
- * 로딩·오류·빈 결과를 각각 구분하며 정상 데이터는 상태 배지가 포함된 목록으로 구성합니다.
+ * 로딩·빈 결과를 구분하며 정상 데이터는 상태 배지가 포함된 목록으로 구성합니다.
+ * Schedule API 전체 오류는 상위 DashboardSchedule에서 공통으로 처리하고,
  * 항목 클릭 시 원본 식별자를 포함한 TodayDeadline을 전달하여 SCR-08 라우팅을 연결할 수 있습니다.
  */
 function DeadlineFeed({
     deadlines,
     isLoading,
-    errorMessage,
     onDeadlineClick
 }: DeadlineFeedProps) {
     return (
@@ -81,7 +79,7 @@ function DeadlineFeed({
                     오늘 마감
                 </h3>
 
-                {!isLoading && !errorMessage && (
+                {!isLoading && (
                     <span
                         className="deadline-feed__count"
                         aria-label={`${deadlines.length}건`}
@@ -90,14 +88,6 @@ function DeadlineFeed({
                     </span>
                 )}
             </div>
-
-            {/* API 실패 메시지는 공통 FeedbackMessage의 alert 규칙을 재사용합니다. */}
-            {errorMessage && (
-                <FeedbackMessage
-                    type="error"
-                    message={errorMessage}
-                />
-            )}
 
             {/* 실제 항목과 비슷한 높이의 자리 표시자로 로딩 중 레이아웃 이동을 줄입니다. */}
             {isLoading && (
@@ -125,7 +115,7 @@ function DeadlineFeed({
             )}
 
             {/* 조회는 성공했지만 마감 업무가 없는 상태를 오류와 구분해 안내합니다. */}
-            {!isLoading && !errorMessage && deadlines.length === 0 && (
+            {!isLoading && deadlines.length === 0 && (
                 <p
                     className="deadline-feed__empty"
                     role="status"
@@ -135,7 +125,7 @@ function DeadlineFeed({
             )}
 
             {/* 각 행 전체를 버튼으로 만들어 키보드로도 상세 연결 지점을 사용할 수 있습니다. */}
-            {!isLoading && !errorMessage && deadlines.length > 0 && (
+            {!isLoading && deadlines.length > 0 && (
                 <ul className="deadline-feed__list">
                     {deadlines.map(deadline => {
                         // API 상태를 사용자 문구와 상태별 스타일로 변환합니다.

@@ -101,6 +101,11 @@
         background 0.15s ease;
 }
 
+/* 비활성 메뉴는 Header의 반투명 배경을 가리지 않도록 별도 배경을 칠하지 않습니다. */
+.app-nav__link:not(.app-nav__link--active) {
+    background: transparent;
+}
+
 .app-nav__link:hover {
     color: var(--color-text);
     background: var(--color-surface-active);

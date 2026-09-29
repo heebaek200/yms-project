@@ -9,6 +9,7 @@ import {
 import SchedulerCalendar, { type SchedulerDateRange, type SchedulerEventClickData } from './SchedulerCalendar';
 import { toFullCalendarEvents } from './schedulerCalendarAdapter';
 import DeadlineFeed from './DeadlineFeed';
+import FeedbackMessage from '../common/FeedbackMessage';
 
 import './Schedule.css';
 
@@ -91,6 +92,8 @@ function DashboardSchedule({
         const loadDashboardSchedule = async () => {
             try {
                 setIsLoading(true);
+                // 재조회 중 이전 성공 또는 오류 응답이 현재 조건의 결과처럼 남지 않도록 비웁니다.
+                setMockData(null);
 
                 const data =
                     await getDashboardSchedule(
@@ -151,17 +154,17 @@ function DashboardSchedule({
         range: SchedulerDateRange
     ) => {
         // FullCalendar가 동일 범위를 다시 전달할 때 불필요한 재조회를 막습니다.
-        setDateRange(prev => {
+        if (
+            dateRange?.startDate === range.startDate
+            && dateRange?.endDate === range.endDate
+        ) {
+            return;
+        }
 
-            if (
-                prev?.startDate === range.startDate
-                && prev?.endDate === range.endDate
-            ) {
-                return prev;
-            }
-
-            return range;
-        });
+        // View 전환 직후 빈 결과가 먼저 보이지 않도록 범위 변경 시점에 즉시 로딩으로 전환합니다.
+        setIsLoading(true);
+        setMockData(null);
+        setDateRange(range);
     };
 
     const calendarEvents = mockData?.success
@@ -179,32 +182,32 @@ function DashboardSchedule({
             ? mockData.message
             : null;
 
+    // Calendar와 마감 피드가 공유하는 요청 오류는 두 영역보다 상위에서 한 번만 표시합니다.
+    if (errorMessage) {
+        return (
+            <FeedbackMessage
+                type="error"
+                message={errorMessage}
+            />
+        );
+    }
+
     return (
         <div className="dashboard-schedule-layout">
             {/* Calendar는 넓은 주 영역을 사용하고 조회 중임을 별도 상태 문구로 알립니다. */}
             <div className="dashboard-schedule-calendar">
                 <SchedulerCalendar
                     events={calendarEvents}
+                    isLoading={isLoading}
                     onRangeChange={handleRangeChange}
                     onEventClick={handleEventClick}
                 />
-
-                {isLoading && (
-                    <p
-                        className="dashboard-loading"
-                        role="status"
-                        aria-live="polite"
-                    >
-                        일정을 불러오는 중...
-                    </p>
-                )}
             </div>
 
             {/* 같은 Schedule 응답의 마감 목록을 우측 피드로 전달해 중복 호출을 방지합니다. */}
             <DeadlineFeed
                 deadlines={todayDeadlines}
                 isLoading={isLoading}
-                errorMessage={errorMessage}
                 onDeadlineClick={handleDeadlineClick}
             />
         </div>
