@@ -33,7 +33,7 @@ type SchedulerFilterProps = {
 
 /**
  * 대시보드 스케줄러에서 사용할 조회 조건 UI를 제공합니다.
- * 프로젝트 상태, 담당 역할, Channel, 프로젝트 제목 검색어를 입력받고
+ * 프로젝트 상태, 담당 역할, Channel, 프로젝트 및 Task Type 검색어를 입력받고
  * 변경된 값은 상위 컴포넌트로 전달하여 실제 조회 상태에 반영합니다.
  */
 function SchedulerFilter({
@@ -183,7 +183,7 @@ function SchedulerFilter({
                     className="scheduler-filter__label"
                     htmlFor="scheduler-keyword"
                 >
-                    프로젝트 검색
+                    프로젝트 / 작업 검색
                 </label>
 
                 <input
@@ -191,7 +191,7 @@ function SchedulerFilter({
                     className="scheduler-filter__input"
                     type="search"
                     value={keyword}
-                    placeholder="프로젝트 제목 검색"
+                    placeholder="프로젝트 또는 작업 유형 검색"
                     onChange={(event) => {
                         onKeywordChange(
                             event.target.value

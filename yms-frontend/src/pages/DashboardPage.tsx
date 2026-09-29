@@ -33,7 +33,7 @@ function DashboardPage() {
     const [debouncedKeyword, setDebouncedKeyword] = useState('');
 
     /**
-     * 프로젝트 검색어 입력이 멈춘 뒤 300ms가 지나면 실제 조회 검색어를 갱신합니다.
+     * 프로젝트 / 작업 검색어 입력이 멈춘 뒤 300ms가 지나면 실제 조회 검색어를 갱신합니다.
      * 사용자가 연속으로 입력하는 동안에는 이전 타이머를 취소하여
      * 문자 하나를 입력할 때마다 Schedule API가 호출되는 것을 방지합니다.
      */
@@ -101,7 +101,7 @@ function DashboardPage() {
     /**
      * 스케줄러의 모든 조회 조건을 최초 상태로 되돌립니다.
      * 프로젝트 상태, 담당 역할과 Channel은 전체 조회로 변경하고
-     * 프로젝트 검색어는 빈 문자열로 초기화합니다.
+     * 프로젝트 / 작업 검색어는 빈 문자열로 초기화합니다.
      * 현재 Workspace의 Channel 목록 자체는 유지합니다.
      */
     const handleFilterReset = () => {
@@ -226,6 +226,7 @@ function DashboardPage() {
                 <div className="dashboard-schedule__content">
                     {/* DashboardSchedule 컴포넌트 */}
                     <DashboardSchedule
+                        key={currentWorkspace.workspaceId}
                         workspaceId={currentWorkspace.workspaceId}
                         status={status}
                         role={role}

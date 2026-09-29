@@ -23,6 +23,7 @@ export type SchedulerDateRange = {
 
 type SchedulerCalendarProps = {
     events: EventInput[];
+    isLoading: boolean;
 
     onRangeChange: (
         range: SchedulerDateRange
@@ -39,8 +40,14 @@ export type SchedulerEventClickData = {
     projectId: number;
 };
 
+/**
+ * Dashboard Schedule 데이터를 월간·주간·목록 View로 표시합니다.
+ * 모든 View가 동일한 로딩 상태 레이어를 사용하며 목록 View의 빈 문구도 조회 상태와 구분하고,
+ * 날짜 범위 및 일정 클릭 결과는 YMS에서 사용하는 최소 데이터만 상위로 전달합니다.
+ */
 function SchedulerCalendar({
     events,
+    isLoading,
     onRangeChange,
     onEventClick
 }: SchedulerCalendarProps) {
@@ -87,7 +94,10 @@ function SchedulerCalendar({
     };
 
     return (
-        <div className="scheduler-calendar">
+        <div
+            className="scheduler-calendar"
+            aria-busy={isLoading}
+        >
             <FullCalendar
                 plugins={[
                     themePlugin,
@@ -175,6 +185,9 @@ function SchedulerCalendar({
 
                 listItemEventClass="scheduler-calendar__list-event"
 
+                /* 목록 View는 로딩 완료 후에만 실제 빈 결과 문구를 표시합니다. */
+                noEventsContent={isLoading ? '' : '일정이 없습니다.'}
+
                 /* 일정 */
                 eventClass="scheduler-calendar__event"
 
@@ -217,6 +230,17 @@ function SchedulerCalendar({
                     );
                 }}
             />
+
+            {/* FullCalendar의 View 종류와 관계없이 같은 위치와 문구로 로딩 상태를 표시합니다. */}
+            {isLoading && (
+                <div
+                    className="scheduler-calendar__loading"
+                    role="status"
+                    aria-live="polite"
+                >
+                    일정을 불러오는 중입니다.
+                </div>
+            )}
         </div>
     );
 }
