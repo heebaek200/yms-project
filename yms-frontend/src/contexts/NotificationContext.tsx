@@ -26,7 +26,9 @@ type NotificationProviderProps = {
 function NotificationProvider({ children }: NotificationProviderProps) {
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isUpdating, setIsUpdating] = useState(false);
+    const [updatingNotificationIds, setUpdatingNotificationIds] =
+        useState<Set<number>>(() => new Set());
+    const [isReadingAll, setIsReadingAll] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     /**
@@ -66,13 +68,17 @@ function NotificationProvider({ children }: NotificationProviderProps) {
     }, [refreshNotifications]);
 
     /**
-     * 알림 한 건을 서버에 읽음 처리한 뒤 공유 목록을 갱신합니다.
+     * 알림 한 건을 서버에 읽음 처리하고 해당 ID만 처리 중 상태로 관리합니다.
      * 실패 시 목록은 유지하고 오류 메시지를 노출합니다.
-     * 호출부는 반환값으로 관련 화면 이동 여부를 결정할 수 있습니다.
+     * 서로 다른 알림은 독립적으로 조작할 수 있도록 ID 집합을 불변 갱신합니다.
      */
     const readNotification = useCallback(async (notificationId: number) => {
         try {
-            setIsUpdating(true);
+            setUpdatingNotificationIds(currentIds => {
+                const nextIds = new Set(currentIds);
+                nextIds.add(notificationId);
+                return nextIds;
+            });
             setErrorMessage(null);
 
             const response = await markNotificationAsRead(notificationId);
@@ -97,18 +103,23 @@ function NotificationProvider({ children }: NotificationProviderProps) {
             setErrorMessage('알림을 읽음 처리하지 못했습니다.');
             return false;
         } finally {
-            setIsUpdating(false);
+            // 완료된 ID만 제거하여 동시에 처리 중인 다른 알림 상태를 보존합니다.
+            setUpdatingNotificationIds(currentIds => {
+                const nextIds = new Set(currentIds);
+                nextIds.delete(notificationId);
+                return nextIds;
+            });
         }
     }, []);
 
     /**
      * 전체 또는 특정 Workspace의 미확인 알림을 한 번에 읽음 처리합니다.
      * API 범위와 같은 조건으로 로컬 항목을 변경해 응답 직후 배지를 갱신합니다.
-     * 실패 시 기존 읽음 상태를 보존하고 오류 메시지를 제공합니다.
+     * 단건 처리 상태와 분리하여 전체 읽음 버튼과 목록만 필요한 동안 잠급니다.
      */
     const readAllNotifications = useCallback(async (workspaceId?: number) => {
         try {
-            setIsUpdating(true);
+            setIsReadingAll(true);
             setErrorMessage(null);
 
             const response = await markAllNotificationsAsRead(workspaceId);
@@ -136,7 +147,7 @@ function NotificationProvider({ children }: NotificationProviderProps) {
             setErrorMessage('알림을 모두 읽음 처리하지 못했습니다.');
             return false;
         } finally {
-            setIsUpdating(false);
+            setIsReadingAll(false);
         }
     }, []);
 
@@ -152,7 +163,8 @@ function NotificationProvider({ children }: NotificationProviderProps) {
                 notifications,
                 unreadCount,
                 isLoading,
-                isUpdating,
+                updatingNotificationIds,
+                isReadingAll,
                 errorMessage,
                 refreshNotifications,
                 readNotification,

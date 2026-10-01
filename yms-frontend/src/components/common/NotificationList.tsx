@@ -8,7 +8,8 @@ import './NotificationList.css';
 type NotificationListProps = {
     notifications: NotificationItem[];
     isLoading?: boolean;
-    isUpdating?: boolean;
+    updatingNotificationIds?: ReadonlySet<number>;
+    isReadingAll?: boolean;
     errorMessage?: string | null;
     emptyMessage?: string;
     onNotificationSelect: (notification: NotificationItem) => void | Promise<void>;
@@ -41,6 +42,8 @@ const NOTIFICATION_PRESENTATION: Record<
     }
 };
 
+const EMPTY_UPDATING_NOTIFICATION_IDS: ReadonlySet<number> = new Set();
+
 /**
  * API의 ISO 날짜 문자열을 사용자의 로컬 시간대에 맞춰 표시합니다.
  * 최근 날짜는 월·일과 시·분만 보여 목록의 정보 밀도를 낮춥니다.
@@ -69,7 +72,8 @@ function formatNotificationTime(timestamp: string) {
 function NotificationList({
     notifications,
     isLoading = false,
-    isUpdating = false,
+    updatingNotificationIds = EMPTY_UPDATING_NOTIFICATION_IDS,
+    isReadingAll = false,
     errorMessage = null,
     emptyMessage = '표시할 알림이 없습니다.',
     onNotificationSelect
@@ -115,7 +119,10 @@ function NotificationList({
                         <button
                             type="button"
                             className="notification-list__button"
-                            disabled={isUpdating}
+                            disabled={
+                                isReadingAll
+                                || updatingNotificationIds.has(notification.notificationId)
+                            }
                             onClick={() => onNotificationSelect(notification)}
                             aria-label={`${presentation.label}: ${notification.messageSummary}`}
                         >

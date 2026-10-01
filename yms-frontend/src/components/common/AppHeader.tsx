@@ -1,7 +1,7 @@
 import './AppHeader.css';
 import { NavLink, useNavigate } from "react-router";
 import { useAuth } from '../../contexts/AuthContext'
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import NotificationDrawer from './NotificationDrawer';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -18,6 +18,20 @@ function AppHeader() {
 
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
+    const notificationButtonRef = useRef<HTMLButtonElement>(null);
+
+    /**
+     * Drawer의 닫기 버튼, 배경 또는 Escape 입력으로 알림 창을 닫습니다.
+     * Drawer가 DOM에서 제거된 다음 Header 알림 버튼으로 포커스를 복원합니다.
+     * 사용자가 알림 버튼이나 사용자 메뉴를 직접 누른 경우에는 기존 포커스를 유지합니다.
+     */
+    const handleNotificationDrawerClose = useCallback(() => {
+        setIsNotificationDrawerOpen(false);
+
+        window.requestAnimationFrame(() => {
+            notificationButtonRef.current?.focus();
+        });
+    }, []);
 
     return (
         <>
@@ -77,6 +91,7 @@ function AppHeader() {
 
                 <div className="app-header__actions">
                     <button
+                        ref={notificationButtonRef}
                         type="button"
                         className="app-header__notification"
                         onClick={() => {
@@ -146,11 +161,11 @@ function AppHeader() {
             {/* Header의 backdrop-filter가 fixed Drawer의 기준 영역을 제한하지 않도록 형제로 렌더링합니다. */}
             {isNotificationDrawerOpen && (
                 <NotificationDrawer
-                    onClose={() => setIsNotificationDrawerOpen(false)}
+                    onClose={handleNotificationDrawerClose}
                 />
             )}
         </>
     );
-};
+}
 
 export default AppHeader;

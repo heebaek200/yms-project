@@ -6,7 +6,8 @@ export type NotificationContextValue = {
     notifications: NotificationItem[];
     unreadCount: number;
     isLoading: boolean;
-    isUpdating: boolean;
+    updatingNotificationIds: ReadonlySet<number>;
+    isReadingAll: boolean;
     errorMessage: string | null;
     refreshNotifications: () => Promise<void>;
     readNotification: (notificationId: number) => Promise<boolean>;

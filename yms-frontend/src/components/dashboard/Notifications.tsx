@@ -21,7 +21,8 @@ function DashboardNotifications({ workspaceId }: DashboardNotificationsProps) {
     const {
         notifications,
         isLoading,
-        isUpdating,
+        updatingNotificationIds,
+        isReadingAll,
         errorMessage,
         readNotification
     } = useNotifications();
@@ -64,7 +65,8 @@ function DashboardNotifications({ workspaceId }: DashboardNotificationsProps) {
             <NotificationList
                 notifications={visibleNotifications}
                 isLoading={isLoading}
-                isUpdating={isUpdating}
+                updatingNotificationIds={updatingNotificationIds}
+                isReadingAll={isReadingAll}
                 errorMessage={errorMessage}
                 emptyMessage="새로운 알림이 없습니다."
                 onNotificationSelect={handleNotificationSelect}

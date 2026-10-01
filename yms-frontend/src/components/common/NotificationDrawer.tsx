@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { NotificationItem } from '../../api/notifications/notifications';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -22,14 +22,20 @@ function NotificationDrawer({ onClose }: NotificationDrawerProps) {
         notifications,
         unreadCount,
         isLoading,
-        isUpdating,
+        updatingNotificationIds,
+        isReadingAll,
         errorMessage,
         readNotification,
         readAllNotifications
     } = useNotifications();
     const [filter, setFilter] = useState<NotificationFilter>('ALL');
+    const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-    // 키보드 사용자도 Drawer를 즉시 닫을 수 있도록 Escape 입력을 감지합니다.
+    /**
+     * Drawer가 열리면 첫 조작 요소인 닫기 버튼으로 포커스를 이동합니다.
+     * 키보드 사용자가 현재 위치와 닫는 방법을 즉시 인지할 수 있게 합니다.
+     * Escape 입력도 같은 onClose 흐름을 사용해 Header가 포커스를 복원합니다.
+     */
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
@@ -37,6 +43,7 @@ function NotificationDrawer({ onClose }: NotificationDrawerProps) {
             }
         };
 
+        closeButtonRef.current?.focus();
         window.addEventListener('keydown', handleKeyDown);
 
         return () => {
@@ -88,6 +95,7 @@ function NotificationDrawer({ onClose }: NotificationDrawerProps) {
                     </div>
 
                     <button
+                        ref={closeButtonRef}
                         type="button"
                         className="notification-drawer__close"
                         onClick={onClose}
@@ -127,7 +135,11 @@ function NotificationDrawer({ onClose }: NotificationDrawerProps) {
                     <button
                         type="button"
                         className="notification-drawer__read-all"
-                        disabled={unreadCount === 0 || isUpdating}
+                        disabled={
+                            unreadCount === 0
+                            || isReadingAll
+                            || updatingNotificationIds.size > 0
+                        }
                         onClick={() => readAllNotifications()}
                     >
                         모두 읽음
@@ -138,7 +150,8 @@ function NotificationDrawer({ onClose }: NotificationDrawerProps) {
                     <NotificationList
                         notifications={visibleNotifications}
                         isLoading={isLoading}
-                        isUpdating={isUpdating}
+                        updatingNotificationIds={updatingNotificationIds}
+                        isReadingAll={isReadingAll}
                         errorMessage={errorMessage}
                         emptyMessage={filter === 'UNREAD'
                             ? '읽지 않은 알림이 없습니다.'
