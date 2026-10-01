@@ -115,7 +115,7 @@ function DashboardPage() {
     if (isWorkspaceLoading) {
         return (
             <p className="dashboard-loading">
-                워크스페이스를 불러오는 중...
+                제작팀을 불러오는 중...
             </p>
         );
     }
@@ -123,7 +123,7 @@ function DashboardPage() {
     if (workspaceErrorMessage || !currentWorkspace) {
         return (
             <p className="dashboard-loading">
-                {workspaceErrorMessage ?? '사용 가능한 워크스페이스가 없습니다.'}
+                {workspaceErrorMessage ?? '사용 가능한 제작팀이 없습니다.'}
             </p>
         );
     }
@@ -253,7 +253,9 @@ function DashboardPage() {
 
                 <div className="dashboard-notifications__content">
                     {/* DashboardNotifications 컴포넌트 */}
-                    <DashboardNotifications />
+                    <DashboardNotifications
+                        workspaceId={currentWorkspace.workspaceId}
+                    />
                 </div>
             </section>
 

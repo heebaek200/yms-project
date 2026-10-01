@@ -3,16 +3,26 @@ import { NavLink, useNavigate } from "react-router";
 import { useAuth } from '../../contexts/AuthContext'
 import { useState } from "react";
 import WorkspaceSwitcher from './WorkspaceSwitcher';
+import NotificationDrawer from './NotificationDrawer';
+import { useNotifications } from '../../hooks/useNotifications';
 
+/**
+ * 인증 화면의 Workspace 전환, 주요 메뉴와 사용자 동작을 제공하는 공통 Header입니다.
+ * 공통 알림 상태의 미확인 개수를 배지로 표시하고 Drawer 열림 상태를 관리합니다.
+ * 사용자 메뉴와 알림 Drawer는 동시에 열리지 않도록 전환 시 반대쪽을 닫습니다.
+ */
 function AppHeader() {
     const { user, signOut } = useAuth();
+    const { unreadCount } = useNotifications();
     const navigate = useNavigate();
 
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
 
     return (
-        <header className="app-header">
-            <div className="app-header__inner">
+        <>
+            <header className="app-header">
+                <div className="app-header__inner">
 
                 <NavLink
                     to="/dashboard"
@@ -68,8 +78,31 @@ function AppHeader() {
                 <div className="app-header__actions">
                     <button
                         type="button"
+                        className="app-header__notification"
+                        onClick={() => {
+                            setIsUserMenuOpen(false);
+                            setIsNotificationDrawerOpen(prev => !prev);
+                        }}
+                        aria-label={`알림 ${unreadCount}개`}
+                        aria-expanded={isNotificationDrawerOpen}
+                        aria-haspopup="dialog"
+                    >
+                        <span aria-hidden="true">🔔</span>
+
+                        {unreadCount > 0 && (
+                            <span className="app-header__notification-badge">
+                                {unreadCount > 99 ? '99+' : unreadCount}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
                         className="app-header__user"
-                        onClick={() => setIsUserMenuOpen(prev => !prev)}
+                        onClick={() => {
+                            setIsNotificationDrawerOpen(false);
+                            setIsUserMenuOpen(prev => !prev);
+                        }}
                         aria-expanded={isUserMenuOpen}
                         aria-haspopup="menu"
                     >
@@ -107,8 +140,16 @@ function AppHeader() {
 
                 </div>
 
-            </div>
-        </header>
+                </div>
+            </header>
+
+            {/* Header의 backdrop-filter가 fixed Drawer의 기준 영역을 제한하지 않도록 형제로 렌더링합니다. */}
+            {isNotificationDrawerOpen && (
+                <NotificationDrawer
+                    onClose={() => setIsNotificationDrawerOpen(false)}
+                />
+            )}
+        </>
     );
 };
 
