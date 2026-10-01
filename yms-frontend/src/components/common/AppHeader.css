@@ -145,6 +145,53 @@
     color: var(--color-text);
 }
 
+.app-header__notification {
+    position: relative;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 36px;
+    height: 36px;
+    padding: 0;
+
+    font-size: 17px;
+
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+}
+
+.app-header__notification:hover,
+.app-header__notification[aria-expanded="true"] {
+    background: var(--color-surface-hover);
+}
+
+/* 두 자리 이상의 개수도 버튼 바깥으로 넘치지 않도록 최소 너비를 유지합니다. */
+.app-header__notification-badge {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+
+    background: var(--color-primary);
+    border: 2px solid rgb(255 255 255 / 88%);
+    border-radius: 9px;
+}
+
 .app-header__user:hover {
     background: var(--color-surface);
 }

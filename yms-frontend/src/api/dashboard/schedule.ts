@@ -319,7 +319,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
     {
         taskId: 202,
         projectId: 32,
-        projectTitle: '두 번째 Workspace 마감 작업',
+        projectTitle: '두 번째 제작팀 마감 작업',
         taskTypeId: 21,
         taskTypeName: '편집',
         workerName: '테스트 사용자',
@@ -405,7 +405,7 @@ const MOCK_TODAY_DEADLINES: MockTodayDeadline[] = [
     {
         taskId: 202,
         projectId: 32,
-        projectTitle: '두 번째 Workspace 마감 작업',
+        projectTitle: '두 번째 제작팀 마감 작업',
         taskTypeId: 21,
         taskTypeName: '편집',
         workerName: '테스트 사용자',

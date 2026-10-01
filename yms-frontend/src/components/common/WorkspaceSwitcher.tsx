@@ -100,7 +100,7 @@ function WorkspaceSwitcher() {
                 type="button"
                 className="workspace-switcher__trigger"
                 disabled={isLoading || !currentWorkspace}
-                aria-label="현재 워크스페이스 전환"
+                aria-label="현재 제작팀 전환"
                 aria-haspopup="menu"
                 aria-expanded={isOpen}
                 onClick={() => setIsOpen(prev => !prev)}
@@ -115,7 +115,7 @@ function WorkspaceSwitcher() {
                 <span className="workspace-switcher__name">
                     {isLoading
                         ? '불러오는 중...'
-                        : currentWorkspace?.name ?? 'Workspace 없음'}
+                        : currentWorkspace?.name ?? '제작팀 없음'}
                 </span>
 
                 <span
@@ -130,10 +130,10 @@ function WorkspaceSwitcher() {
                 <div
                     className="workspace-switcher__popover"
                     role="menu"
-                    aria-label="워크스페이스 목록"
+                    aria-label="제작팀 목록"
                 >
                     <strong className="workspace-switcher__title">
-                        워크스페이스 전환
+                        제작팀 전환
                     </strong>
 
                     <div className="workspace-switcher__list">

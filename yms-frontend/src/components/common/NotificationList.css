@@ -1,0 +1,177 @@
+.notification-list {
+    display: grid;
+    gap: 1px;
+
+    margin: 0;
+    padding: 0;
+
+    overflow: hidden;
+    list-style: none;
+
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.notification-list__item {
+    min-width: 0;
+    background: var(--color-background);
+}
+
+/* 미확인 알림만 은은한 강조색을 사용해 읽은 항목과 빠르게 구분합니다. */
+.notification-list__item--unread {
+    background: #fff8f8;
+}
+
+.notification-list__item--read {
+    color: var(--color-text-muted);
+}
+
+.notification-list__button {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) 8px;
+    gap: 12px;
+    align-items: flex-start;
+
+    width: 100%;
+    min-width: 0;
+    padding: 14px 16px;
+
+    color: inherit;
+    text-align: left;
+
+    background: transparent;
+    border: 0;
+}
+
+.notification-list__button:hover:not(:disabled) {
+    background: rgb(24 24 27 / 4%);
+}
+
+.notification-list__button:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+.notification-list__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 38px;
+    height: 38px;
+
+    color: var(--color-primary);
+    font-size: 16px;
+    font-weight: 800;
+
+    background: rgb(229 72 77 / 10%);
+    border-radius: 50%;
+}
+
+.notification-list__icon--new_chat {
+    color: #2563eb;
+    background: #eff6ff;
+}
+
+.notification-list__icon--workspace_invitation {
+    color: #7c3aed;
+    background: #f5f3ff;
+}
+
+.notification-list__icon--settlement_update {
+    color: #15803d;
+    background: #f0fdf4;
+}
+
+.notification-list__content {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.notification-list__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.notification-list__type {
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+.notification-list__title,
+.notification-list__message,
+.notification-list__sender {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.notification-list__title {
+    color: var(--color-text);
+    font-size: 14px;
+}
+
+.notification-list__message {
+    color: var(--color-text);
+    font-size: 14px;
+}
+
+.notification-list__item--read .notification-list__message {
+    color: var(--color-text-muted);
+}
+
+.notification-list__sender {
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.notification-list__unread-dot {
+    align-self: center;
+    width: 8px;
+    height: 8px;
+    background: var(--color-primary);
+    border-radius: 50%;
+}
+
+.notification-list__state {
+    margin: 0;
+    padding: 32px 20px;
+
+    color: var(--color-text-muted);
+    font-size: 14px;
+    text-align: center;
+
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.notification-list__state--error {
+    color: var(--color-primary);
+}
+
+@media (max-width: 768px) {
+    .notification-list__button {
+        grid-template-columns: 34px minmax(0, 1fr) 8px;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .notification-list__icon {
+        width: 34px;
+        height: 34px;
+    }
+
+    .notification-list__meta {
+        gap: 8px;
+    }
+}

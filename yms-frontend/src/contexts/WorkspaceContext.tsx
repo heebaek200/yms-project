@@ -84,7 +84,7 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
                 console.error(error);
                 setWorkspaces([]);
                 setCurrentWorkspaceId(null);
-                setErrorMessage('워크스페이스 목록을 불러오지 못했습니다.');
+                setErrorMessage('제작팀 목록을 불러오지 못했습니다.');
             } finally {
                 if (isCurrentRequest) {
                     setIsLoading(false);

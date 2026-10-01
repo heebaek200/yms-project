@@ -1,0 +1,14 @@
+.dashboard-notification-feed {
+    display: grid;
+    gap: 10px;
+}
+
+.dashboard-notification-feed__summary {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.dashboard-notification-feed__summary strong {
+    color: var(--color-primary);
+}
