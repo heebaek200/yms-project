@@ -52,8 +52,25 @@ export class ApiClientError extends Error {
 }
 
 /**
+ * 실패 Envelope의 개별 필드 오류가 설계된 구조와 일치하는지 확인합니다.
+ * field와 reason은 문자열, value는 문자열 또는 null인 경우만 허용합니다.
+ * 서버의 예상하지 못한 중첩 값을 화면 입력 오류로 전달하지 않도록 차단합니다.
+ */
+function isApiFieldError(value: unknown): value is ApiFieldError {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const candidate = value as Partial<ApiFieldError>;
+
+    return typeof candidate.field === 'string'
+        && (candidate.value === null || typeof candidate.value === 'string')
+        && typeof candidate.reason === 'string';
+}
+
+/**
  * 알 수 없는 Axios 응답 body가 공통 실패 Envelope인지 확인합니다.
- * 필수 판별 필드만 검사하고 errors의 세부 타입은 서버 계약을 신뢰합니다.
+ * 최상위 필드와 errors 배열의 개별 필드 오류 구조까지 모두 검증합니다.
  * 일치하지 않는 body는 HTTP 상태 기반의 일반 서버 오류로 처리합니다.
  */
 function isApiFailureResponse(value: unknown): value is ApiFailureResponse {
@@ -63,9 +80,16 @@ function isApiFailureResponse(value: unknown): value is ApiFailureResponse {
 
     const candidate = value as Partial<ApiFailureResponse>;
 
+    const hasValidErrors = candidate.errors === null
+        || (
+            Array.isArray(candidate.errors)
+            && candidate.errors.every(isApiFieldError)
+        );
+
     return candidate.success === false
         && typeof candidate.errorCode === 'string'
-        && typeof candidate.message === 'string';
+        && typeof candidate.message === 'string'
+        && hasValidErrors;
 }
 
 /**

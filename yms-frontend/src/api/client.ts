@@ -45,7 +45,7 @@ apiClient.interceptors.request.use(config => {
 
 /**
  * 서버 Envelope와 통신 오류를 ApiClientError로 통일합니다.
- * 세션 만료 401은 저장소와 React 인증 상태에 전파하되 로그인 실패는 제외합니다.
+ * 설계된 세션 만료 오류만 저장소와 React 인증 상태에 전파합니다.
  * 정규화된 오류는 Promise reject로 유지하여 개별 API가 화면 응답으로 변환할 수 있습니다.
  */
 apiClient.interceptors.response.use(
@@ -55,7 +55,7 @@ apiClient.interceptors.response.use(
 
         if (
             apiError.status === 401
-            && apiError.errorCode !== 'INVALID_CREDENTIALS'
+            && apiError.errorCode === 'UNAUTHORIZED_SESSION'
         ) {
             notifyAuthExpired();
         }
