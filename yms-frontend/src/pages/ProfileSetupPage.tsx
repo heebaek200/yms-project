@@ -2,11 +2,16 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserRole, RateScope } from '../types/auth';
 import { isValidName, validateRate } from '../utils/validation';
-import { formatRate } from '../utils/format';
+import { formatRate, normalizeRateInput } from '../utils/format';
 import './ProfileSetupPage.css';
-import { getProfileSetup, setupProfile } from '../api/auth/profilesetup';
+import { getProfile, updateProfile } from '../api/users/profile';
 import { useNavigate } from 'react-router';
 
+/**
+ * 현재 사용자의 기본 정보, 전문 역할과 CREATOR 기본 수익 단가를 조회하고 수정합니다.
+ * CREATOR 단가 미입력은 문자열 "0"으로 정규화하며 변경 적용 범위를 함께 전달합니다.
+ * 저장 후 인증 사용자 정보를 갱신하고 SCR-03 Workspace 온보딩 진입점으로 이동합니다.
+ */
 function ProfileSetupPage() {
     const { user, updateUser } = useAuth();
     const navigate = useNavigate();
@@ -24,7 +29,7 @@ function ProfileSetupPage() {
 
     const [longFormRate, setLongFormRate] = useState('');
     const [shortFormRate, setShortFormRate] = useState('');
-    const [rateScope, setRateScope] = useState<RateScope>('future');
+    const [rateScope, setRateScope] = useState<RateScope>('FUTURE_ONLY');
 
     const [nameError, setNameError] = useState('');
     const [longFormRateError, setLongFormRateError] = useState('');
@@ -37,9 +42,14 @@ function ProfileSetupPage() {
     const [isLoading, setIsLoading] = useState(true);       // 초기 호출 동작 중 로딩
 
     useEffect(() => {
-        const loadProfileSetup = async () => {
+        /**
+         * Profile API에서 기존 설정을 조회해 각 입력 상태의 초기값으로 반영합니다.
+         * 아직 단가를 설정하지 않은 사용자의 null 값은 빈 입력으로 보여 줍니다.
+         * 조회 실패 시 편집 화면을 유지하면서 공통 오류 메시지를 표시합니다.
+         */
+        const loadProfile = async () => {
             try {
-                const response = await getProfileSetup();
+                const response = await getProfile();
                 const data = response.data;
 
                 setName(data.name);
@@ -64,7 +74,7 @@ function ProfileSetupPage() {
             }
         };
 
-        loadProfileSetup();
+        loadProfile();
     }, []);
     if (isLoading) {
         return (
@@ -76,6 +86,11 @@ function ProfileSetupPage() {
 
     // 역할이 하나라도 부여되어 있는지 체크
     const hasRole = selectedRoles.length > 0;
+    /**
+     * 선택한 전문 역할을 현재 역할 목록에서 추가하거나 제거합니다.
+     * 복수 역할을 허용하되 동일한 역할은 한 번만 포함되도록 토글합니다.
+     * CREATOR 포함 여부는 단가 입력 영역의 표시와 저장 요청 구성에 사용됩니다.
+     */
     const handleRoleChange = (role: UserRole) => {
         setSelectedRoles(prev =>
             prev.includes(role)
@@ -84,6 +99,32 @@ function ProfileSetupPage() {
         );
     };
 
+    /**
+     * 단가 입력란이 포커스를 잃으면 사람이 입력한 원 단위를 API용 문자열로 정리합니다.
+     * 유효한 입력은 콤마와 단위를 제거해 화면에 반영하고 기존 오류를 해제합니다.
+     * 잘못된 입력은 원문을 유지하여 사용자가 직접 수정할 수 있도록 오류만 표시합니다.
+     */
+    const handleRateBlur = (
+        value: string,
+        setValue: (nextValue: string) => void,
+        setError: (message: string) => void
+    ) => {
+        const result = normalizeRateInput(value);
+
+        if (!result.success) {
+            setError(result.message);
+            return;
+        }
+
+        setValue(result.value);
+        setError('');
+    };
+
+    /**
+     * 프로필 입력값을 검증하고 최신 Profile API 계약에 맞춘 요청을 전송합니다.
+     * CREATOR의 빈 단가는 문자열 "0"으로 바꾸고 선택한 적용 범위를 함께 전달합니다.
+     * 성공 시 AuthContext를 갱신한 뒤 Workspace 선택·생성 온보딩으로 이동합니다.
+     */
     const handleSetupSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
 
@@ -103,7 +144,7 @@ function ProfileSetupPage() {
             setNameFlash((prev) => prev + 1);
             hasError = true;
         } else if (!isValidName(name)) {
-            setNameError('이름은 2자 이상 100자 이하로 입력해 주세요.');
+            setNameError('이름은 2자 이상 50자 이하로 입력해 주세요.');
             setNameFlash(prev => prev + 1);
             hasError = true;
         }
@@ -157,7 +198,7 @@ function ProfileSetupPage() {
                 roles: selectedRoles
             };
 
-            const response = await setupProfile(requestField);
+            const response = await updateProfile(requestField);
 
             if (!response.success) {
                 if (
@@ -204,8 +245,8 @@ function ProfileSetupPage() {
                 roles: response.data.roles
             });
 
-            // 설정 저장 후 메인 페이지 재이동
-            navigate('/');
+            // SCR-03 구현 전에도 저장 이후 목적지가 명확하도록 온보딩 경로 계약을 사용합니다.
+            navigate('/workspaces');
         } catch (error) {
             console.error(error);
 
@@ -227,7 +268,7 @@ function ProfileSetupPage() {
                         alt="YMS"
                     />
 
-                    <h1>프로필 및 채널 설정</h1>
+                    <h1>프로필 설정</h1>
                 </header>
 
                 <form className="setup-form" onSubmit={handleSetupSubmit}>
@@ -265,7 +306,7 @@ function ProfileSetupPage() {
                                 value={name}
                                 required
                                 minLength={2}
-                                maxLength={100}
+                                maxLength={50}
                                 onChange={(e) => setName(e.target.value)}
                             />
 
@@ -318,6 +359,17 @@ function ProfileSetupPage() {
                     >
                         <h2>크리에이터 기본 단가 설정</h2>
 
+                        <aside
+                            className="rate-guide"
+                            aria-label="초보자 단가 참고 안내"
+                        >
+                            <p>처음 설정할 때 참고할 수 있는 예시입니다.</p>
+                            <strong>
+                                롱폼 약 3.00원/조회 · 쇼츠 약 0.20원/조회
+                            </strong>
+                            <p>채널과 콘텐츠에 따라 실제 수익은 달라질 수 있습니다.</p>
+                        </aside>
+
                         <div className={`form-field ${longFormRateError
                             ? `form-field--error ${longFormRateFlash % 2 === 0
                                 ? "form-field--flash-a"
@@ -326,7 +378,7 @@ function ProfileSetupPage() {
                             : ""
                             }`}>
                             <label htmlFor="long-form-rate">
-                                롱폼 기본 단가
+                                롱폼 조회수 1회당 기본 수익 단가
                             </label>
 
                             <div className="rate-input">
@@ -336,12 +388,11 @@ function ProfileSetupPage() {
                                     inputMode="decimal"
                                     value={longFormRate}
                                     onChange={(e) => setLongFormRate(e.target.value)}
-                                    onBlur={() => {
-                                        if (!validateRate(longFormRate)) {
-                                            setLongFormRate(formatRate(longFormRate));
-                                        }
-                                    }}
-                                    placeholder="3.00"
+                                    onBlur={() => handleRateBlur(
+                                        longFormRate,
+                                        setLongFormRate,
+                                        setLongFormRateError
+                                    )}
                                     disabled={!isCreator}
                                 />
 
@@ -361,7 +412,7 @@ function ProfileSetupPage() {
                             : ""
                             }`}>
                             <label htmlFor="short-form-rate">
-                                숏폼 기본 단가
+                                쇼츠 조회수 1회당 기본 수익 단가
                             </label>
 
                             <div className="rate-input">
@@ -371,12 +422,11 @@ function ProfileSetupPage() {
                                     inputMode="decimal"
                                     value={shortFormRate}
                                     onChange={(e) => setShortFormRate(e.target.value)}
-                                    onBlur={() => {
-                                        if (!validateRate(shortFormRate)) {
-                                            setShortFormRate(formatRate(shortFormRate));
-                                        }
-                                    }}
-                                    placeholder="0.20"
+                                    onBlur={() => handleRateBlur(
+                                        shortFormRate,
+                                        setShortFormRate,
+                                        setShortFormRateError
+                                    )}
                                     disabled={!isCreator}
                                 />
 
@@ -388,6 +438,10 @@ function ProfileSetupPage() {
                             )}
                         </div>
 
+                        <p className="form-hint">
+                            단가를 입력하지 않으면 0원으로 저장됩니다.
+                        </p>
+
                         <div className="form-field">
                             <span className="form-label">
                                 단가 변경 적용 범위
@@ -397,24 +451,24 @@ function ProfileSetupPage() {
                                 <input
                                     type="radio"
                                     name="rate-scope"
-                                    value="future"
-                                    checked={rateScope === 'future'}
-                                    onChange={() => setRateScope('future')}
+                                    value="FUTURE_ONLY"
+                                    checked={rateScope === 'FUTURE_ONLY'}
+                                    onChange={() => setRateScope('FUTURE_ONLY')}
                                     disabled={!isCreator}
                                 />
-                                앞으로 새롭게 마감/동기화할 프로젝트부터 적용
+                                향후 생성되는 프로젝트에만 적용
                             </label>
 
                             <label className="scope-option">
                                 <input
                                     type="radio"
                                     name="rate-scope"
-                                    value="all"
-                                    checked={rateScope === 'all'}
-                                    onChange={() => setRateScope('all')}
+                                    value="INCLUDE_UNFINALIZED"
+                                    checked={rateScope === 'INCLUDE_UNFINALIZED'}
+                                    onChange={() => setRateScope('INCLUDE_UNFINALIZED')}
                                     disabled={!isCreator}
                                 />
-                                기존 완료 프로젝트까지 새 단가를 소급 적용
+                                기존 미확정 프로젝트에도 적용
                             </label>
                         </div>
                     </section>

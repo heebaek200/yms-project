@@ -255,6 +255,8 @@ PATCH /api/users/me/profile
 
 CREATOR 역할이 포함된 상태에서 단가를 신규 설정하거나 변경할 수 있습니다.
 
+SCR-02에서 CREATOR가 `longFormRate` 또는 `shortFormRate`를 입력하지 않으면 클라이언트는 해당 값을 문자열 `"0"`으로 변환하여 요청합니다. 따라서 프로필 저장 이후 CREATOR의 미입력 단가는 0원으로 취급합니다.
+
 rateScope:
 
 - FUTURE_ONLY: 이후 생성되는 Project의 기본값으로만 사용

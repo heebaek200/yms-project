@@ -110,11 +110,39 @@
 }
 
 .creator-rate-section--open {
-    max-height: 500px;
+    max-height: 700px;
     opacity: 1;
+    /* 열린 뒤에는 입력 포커스 outline이 섹션 경계 밖에서도 잘리지 않게 합니다. */
+    overflow: visible;
     padding-bottom: 16px;
 
     transform: translateY(0);
+}
+
+/* 입력값과 구분된 참고 정보임을 드러내면서 작은 화면에서도 자연스럽게 줄바꿈합니다. */
+.rate-guide {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+}
+
+.rate-guide p {
+    margin: 0;
+
+    color: var(--color-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.rate-guide strong {
+    color: var(--color-text);
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 .role-options {
