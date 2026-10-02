@@ -1,4 +1,10 @@
 import type { UserRole, RateScope } from '../../types/auth';
+import type {
+    ApiFailureResponse,
+    ApiResponse,
+    ApiSuccessResponse
+} from '../types';
+export type { ApiFieldError } from '../types';
 
 // 프로필 및 채널 설정 Mock API
 
@@ -11,6 +17,9 @@ export type ProfileSetupData = {
     longFormRate: string | null;
     shortFormRate: string | null;
 };
+
+export type ProfileSetupDataResponse =
+    ApiSuccessResponse<ProfileSetupData>;
 
 // 설정 저장 요청 (PATCH) 필드
 export type ProfileSetupRequest = {
@@ -32,31 +41,10 @@ export type ProfileSetupSuccessData = {
 };
 
 // 설정 저장 응답 필드
-export type ProfileSetupSuccessResponse = {
-    success: true;
-    message: string;
-    data: ProfileSetupSuccessData;
-};
-
-// 실패 응답 필드.error
-export type ApiFieldError = {
-    field: string;
-    value: string;
-    reason: string;
-};
-
-// 실패 응답 필드
-export type ProfileSetupFailureResponse = {
-    success: false;
-    errorCode: string;
-    message: string;
-    errors: ApiFieldError[] | null;
-};
-
-// 응답 필드
-export type ProfileSetupResponse =
-    | ProfileSetupSuccessResponse
-    | ProfileSetupFailureResponse;
+export type ProfileSetupSuccessResponse =
+    ApiSuccessResponse<ProfileSetupSuccessData>;
+export type ProfileSetupFailureResponse = ApiFailureResponse;
+export type ProfileSetupResponse = ApiResponse<ProfileSetupSuccessData>;
 
 // mock 데이터
 let mockProfile: ProfileSetupData = {
@@ -69,12 +57,15 @@ let mockProfile: ProfileSetupData = {
 };
 
 // GET
-export async function getProfileSetup(): Promise<ProfileSetupData> {
-    // TODO 백엔드 완성 후 GET /api/auth/profile-setup 로 교체
+export async function getProfileSetup(): Promise<ProfileSetupDataResponse> {
+    // TODO 백엔드 완성 후 GET /api/users/me/profile 로 교체
 
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    return { ...mockProfile };
+    return {
+        success: true,
+        data: { ...mockProfile }
+    };
 
 }
 
@@ -83,7 +74,7 @@ export async function setupProfile(
     request: ProfileSetupRequest
 ): Promise<ProfileSetupResponse> {
 
-    // TODO: 백엔드 완성 후 axios PATCH 호출로 교체
+    // TODO: 백엔드 완성 후 PATCH /api/users/me/profile 호출로 교체
 
     await new Promise(resolve => setTimeout(resolve, 500));
 

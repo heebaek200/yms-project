@@ -1,5 +1,11 @@
 // Notifications Mock API
 
+import type {
+    ApiFailureResponse,
+    ApiResponse,
+    ApiSuccessResponse
+} from '../types';
+
 type MockScenario =
     | 'SUCCESS'
     | 'EMPTY'
@@ -42,24 +48,16 @@ export type NotificationsData = {
     notifications: NotificationItem[];
 };
 
-export type NotificationsSuccessResponse = {
-    success: true;
-    data: NotificationsData;
-};
+export type NotificationsSuccessResponse =
+    ApiSuccessResponse<NotificationsData>;
 
 export type NotificationReadSuccessResponse = {
     success: true;
 };
 
-export type NotificationsFailureResponse = {
-    success: false;
-    errorCode: string;
-    message: string;
-};
+export type NotificationsFailureResponse = ApiFailureResponse;
 
-export type NotificationsResponse =
-    | NotificationsSuccessResponse
-    | NotificationsFailureResponse;
+export type NotificationsResponse = ApiResponse<NotificationsData>;
 
 export type NotificationReadResponse =
     | NotificationReadSuccessResponse
@@ -152,8 +150,9 @@ function getScenarioFailure(): NotificationsFailureResponse | null {
     if (mockScenario === 'UNAUTHORIZED') {
         return {
             success: false,
-            errorCode: 'UNAUTHORIZED',
-            message: '로그인 정보가 만료되었습니다. 다시 로그인해 주세요.'
+            errorCode: 'UNAUTHORIZED_SESSION',
+            message: '로그인 정보가 만료되었습니다. 다시 로그인해 주세요.',
+            errors: null
         };
     }
 
@@ -161,7 +160,8 @@ function getScenarioFailure(): NotificationsFailureResponse | null {
         return {
             success: false,
             errorCode: 'INTERNAL_SERVER_ERROR',
-            message: '알림 정보를 처리하는 중 오류가 발생했습니다.'
+            message: '알림 정보를 처리하는 중 오류가 발생했습니다.',
+            errors: null
         };
     }
 
@@ -195,7 +195,8 @@ export async function getNotifications(
         return {
             success: false,
             errorCode: 'INVALID_INPUT_VALUE',
-            message: '알림 조회 개수는 1 이상 100 이하로 입력해 주세요.'
+            message: '알림 조회 개수는 1 이상 100 이하로 입력해 주세요.',
+            errors: null
         };
     }
 
@@ -266,7 +267,8 @@ export async function markNotificationAsRead(
         return {
             success: false,
             errorCode: 'NOT_FOUND',
-            message: '알림을 찾을 수 없습니다.'
+            message: '알림을 찾을 수 없습니다.',
+            errors: null
         };
     }
 

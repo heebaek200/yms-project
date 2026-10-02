@@ -1,9 +1,8 @@
 import type { ChannelSummary } from '../../types/workspace';
+import type { ApiSuccessResponse } from '../types';
 
-export type ChannelListResponse = {
-    success: true;
-    data: ChannelSummary[];
-};
+export type ChannelListResponse =
+    ApiSuccessResponse<ChannelSummary[]>;
 
 // Workspace 경계와 Channel 필터 동작을 확인하기 위한 Mock 데이터
 const MOCK_CHANNELS_BY_WORKSPACE: Record<number, ChannelSummary[]> = {

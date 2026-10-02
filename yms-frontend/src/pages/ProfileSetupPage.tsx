@@ -39,7 +39,8 @@ function ProfileSetupPage() {
     useEffect(() => {
         const loadProfileSetup = async () => {
             try {
-                const data = await getProfileSetup();
+                const response = await getProfileSetup();
+                const data = response.data;
 
                 setName(data.name);
                 setSelectedRoles(data.roles);
