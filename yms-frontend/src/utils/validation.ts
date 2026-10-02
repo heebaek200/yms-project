@@ -1,3 +1,5 @@
+import { normalizeRateInput } from './format';
+
 const isValidEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
@@ -10,28 +12,18 @@ const isValidName = (name: string) => {
     const trimmed = name.trim();
 
     return trimmed.length >= 2
-        && trimmed.length <= 100;
+        && trimmed.length <= 50;
 };
 
-// 단가 validation
+/**
+ * 조회수 1회당 수익 단가가 REST API의 문자열 제약을 충족하는지 확인합니다.
+ * 미입력 값은 저장 시 문자열 "0"으로 정규화하므로 유효한 입력으로 취급합니다.
+ * 입력된 값은 0 이상의 정수 또는 소수점 이하 최대 6자리 숫자여야 합니다.
+ */
 const validateRate = (value: string) => {
-    const trimmed = value.trim();
+    const result = normalizeRateInput(value);
 
-    if (!trimmed) {
-        return '단가를 입력해 주세요.';
-    }
-
-    if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
-        return '단가는 소수점 둘째 자리까지의 숫자로 입력해 주세요.';
-    }
-
-    const number = Number(trimmed);
-
-    if (number < 0 || number > 999.99) {
-        return '단가는 0.00 이상 999.99 이하로 입력해 주세요.';
-    }
-
-    return '';
+    return result.success ? '' : result.message;
 };
 
 export { isValidEmail, isValidPassword, isValidName, validateRate };

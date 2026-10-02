@@ -21,5 +21,5 @@ export type AuthSession = {
 
 // 단가 변경 적용 범위
 export type RateScope =
-    | 'future'
-    | 'all';
+    | 'FUTURE_ONLY'
+    | 'INCLUDE_UNFINALIZED';
