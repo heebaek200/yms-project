@@ -125,7 +125,8 @@ function DashboardSchedule({
                 setMockData({
                     success: false,
                     errorCode: 'UNKNOWN_ERROR',
-                    message: '일정을 불러오지 못했습니다.'
+                    message: '일정을 불러오지 못했습니다.',
+                    errors: null
                 });
 
             } finally {

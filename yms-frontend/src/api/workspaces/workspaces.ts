@@ -1,9 +1,8 @@
 import type { WorkspaceSummary } from '../../types/workspace';
+import type { ApiSuccessResponse } from '../types';
 
-export type WorkspaceListResponse = {
-    success: true;
-    data: WorkspaceSummary[];
-};
+export type WorkspaceListResponse =
+    ApiSuccessResponse<WorkspaceSummary[]>;
 
 // SCR-03 Workspace 선택 화면이 구현되기 전까지 사용할 참여 Workspace Mock 데이터
 const MOCK_WORKSPACES: WorkspaceSummary[] = [

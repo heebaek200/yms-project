@@ -1,5 +1,11 @@
 // Dashboard Schedule Mock API
 
+import type {
+    ApiFailureResponse,
+    ApiResponse,
+    ApiSuccessResponse
+} from '../types';
+
 // Mock 시나리오
 type MockScenario =
     | 'SUCCESS'
@@ -117,22 +123,14 @@ export type DashboardScheduleData = {
 };
 
 // 성공 응답
-export type DashboardScheduleSuccessResponse = {
-    success: true;
-    data: DashboardScheduleData;
-};
+export type DashboardScheduleSuccessResponse =
+    ApiSuccessResponse<DashboardScheduleData>;
 
 // 실패 응답
-export type DashboardScheduleFailureResponse = {
-    success: false;
-    errorCode: string;
-    message: string;
-};
+export type DashboardScheduleFailureResponse = ApiFailureResponse;
 
 // 최종 응답 타입
-export type DashboardScheduleResponse =
-    | DashboardScheduleSuccessResponse
-    | DashboardScheduleFailureResponse;
+export type DashboardScheduleResponse = ApiResponse<DashboardScheduleData>;
 
 // Workspace와 Channel 조건을 함께 검증할 수 있도록 구성한 일정 Mock 데이터
 const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
@@ -614,7 +612,8 @@ export async function getDashboardSchedule(
         return {
             success: false,
             errorCode: 'INVALID_DATE_RANGE',
-            message: '조회 시작일은 종료일보다 이후일 수 없습니다.'
+            message: '조회 시작일은 종료일보다 이후일 수 없습니다.',
+            errors: null
         };
     }
 
@@ -623,7 +622,8 @@ export async function getDashboardSchedule(
         return {
             success: false,
             errorCode: 'UNAUTHORIZED_SESSION',
-            message: '로그인 정보가 만료되었습니다. 다시 로그인해 주세요.'
+            message: '로그인 정보가 만료되었습니다. 다시 로그인해 주세요.',
+            errors: null
         };
     }
 
@@ -632,7 +632,8 @@ export async function getDashboardSchedule(
         return {
             success: false,
             errorCode: 'INTERNAL_SERVER_ERROR',
-            message: '스케줄 정보를 불러오는 중 오류가 발생했습니다.'
+            message: '스케줄 정보를 불러오는 중 오류가 발생했습니다.',
+            errors: null
         };
     }
 

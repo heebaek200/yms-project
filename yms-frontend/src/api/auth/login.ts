@@ -1,4 +1,10 @@
 import type { AuthSession } from '../../types/auth';
+import type {
+    ApiFailureResponse,
+    ApiResponse,
+    ApiSuccessResponse
+} from '../types';
+export type { ApiFieldError } from '../types';
 // 로그인 Mock API
 
 export type LoginSuccessData = AuthSession;
@@ -8,28 +14,9 @@ export type LoginRequest = {
     password: string;
 };
 
-export type LoginSuccessResponse = {
-    success: true;
-    message: string;
-    data: LoginSuccessData;
-};
-
-export type ApiFieldError = {
-    field: string;
-    value: string;
-    reason: string;
-};
-
-export type LoginFailureResponse = {
-    success: false;
-    errorCode: string;
-    message: string;
-    errors: ApiFieldError[] | null;
-};
-
-export type LoginResponse =
-    | LoginSuccessResponse
-    | LoginFailureResponse;
+export type LoginSuccessResponse = ApiSuccessResponse<LoginSuccessData>;
+export type LoginFailureResponse = ApiFailureResponse;
+export type LoginResponse = ApiResponse<LoginSuccessData>;
 
 export async function login(
     request: LoginRequest

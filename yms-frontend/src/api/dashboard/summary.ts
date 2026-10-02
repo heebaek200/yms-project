@@ -1,5 +1,11 @@
 // Dashboard Summary Mock API
 
+import type {
+    ApiFailureResponse,
+    ApiResponse,
+    ApiSuccessResponse
+} from '../types';
+
 // Mock 시나리오 설정
 type MockScenario =
     | 'SUCCESS'
@@ -28,22 +34,14 @@ export type DashboardSummaryData = {
 };
 
 // 성공 응답
-export type DashboardSummarySuccessResponse = {
-    success: true;
-    data: DashboardSummaryData;
-};
+export type DashboardSummarySuccessResponse =
+    ApiSuccessResponse<DashboardSummaryData>;
 
 // 실패 응답
-export type DashboardSummaryFailureResponse = {
-    success: false;
-    errorCode: string;
-    message: string;
-};
+export type DashboardSummaryFailureResponse = ApiFailureResponse;
 
 // 최종 응답 타입
-export type DashboardSummaryResponse =
-    | DashboardSummarySuccessResponse
-    | DashboardSummaryFailureResponse;
+export type DashboardSummaryResponse = ApiResponse<DashboardSummaryData>;
 
 
 // GET /api/workspaces/{workspaceId}/dashboard/summary
@@ -99,9 +97,10 @@ export async function getDashboardSummary(
     if (mockScenario === 'UNAUTHORIZED') {
         return {
             success: false,
-            errorCode: 'UNAUTHORIZED',
+            errorCode: 'UNAUTHORIZED_SESSION',
             message:
-                '로그인 정보가 만료되었습니다. 다시 로그인해 주세요.'
+                '로그인 정보가 만료되었습니다. 다시 로그인해 주세요.',
+            errors: null
         };
     }
 
@@ -111,6 +110,7 @@ export async function getDashboardSummary(
         success: false,
         errorCode: 'INTERNAL_SERVER_ERROR',
         message:
-            '대시보드 정보를 불러오는 중 오류가 발생했습니다.'
+            '대시보드 정보를 불러오는 중 오류가 발생했습니다.',
+        errors: null
     };
 }
