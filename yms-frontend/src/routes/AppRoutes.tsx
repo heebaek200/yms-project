@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import LoginPage from '../pages/LoginPage';
 import ProfileSetupPage from '../pages/ProfileSetupPage';
+import WorkspaceOnboardingPage from '../pages/WorkspaceOnboardingPage';
 import DashboardPage from '../pages/DashboardPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import AppLayout from '../layouts/AppLayout';
@@ -125,6 +126,16 @@ function AppRoutes() {
                 element={
                     <AuthenticatedRoute>
                         <ProfileSetupPage />
+                    </AuthenticatedRoute>
+                }
+            />
+
+            {/* SCR-03 Workspace 선택 / 생성 / 초대 확인 */}
+            <Route
+                path="/workspaces"
+                element={
+                    <AuthenticatedRoute>
+                        <WorkspaceOnboardingPage />
                     </AuthenticatedRoute>
                 }
             />

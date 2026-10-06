@@ -1,6 +1,8 @@
 import {
+    useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type ReactNode
 } from 'react';
@@ -25,79 +27,86 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     const [currentWorkspaceId, setCurrentWorkspaceId] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const workspacesRef = useRef<WorkspaceSummary[]>([]);
+    const latestRequestIdRef = useRef(0);
 
     /**
-     * 로그인한 사용자가 참여 중인 Workspace를 조회합니다.
-     * 이전에 선택한 Workspace가 여전히 유효하면 복원하고,
-     * 그렇지 않으면 첫 번째 Workspace를 기본값으로 사용합니다.
+     * 로그인 사용자의 Workspace 목록을 다시 조회하고 Context 상태를 갱신합니다.
+     * 저장된 선택값이 유효하면 복원하며 현재 #30 적용 전 정책에 따라 첫 항목을 대체값으로 사용합니다.
+     * 생성과 초대 수락 화면에서도 호출할 수 있도록 최신 목록을 반환합니다.
      */
-    useEffect(() => {
+    const refreshWorkspaces = useCallback(async () => {
         if (!isAuthenticated || !user) {
+            latestRequestIdRef.current += 1;
+            workspacesRef.current = [];
             setWorkspaces([]);
             setCurrentWorkspaceId(null);
             setIsLoading(false);
             setErrorMessage(null);
-            return;
+            return [];
         }
 
-        let isCurrentRequest = true;
+        const requestId = latestRequestIdRef.current + 1;
+        latestRequestIdRef.current = requestId;
 
-        const loadWorkspaces = async () => {
-            try {
-                setIsLoading(true);
-                setErrorMessage(null);
+        try {
+            setIsLoading(true);
+            setErrorMessage(null);
 
-                const response = await getWorkspaces();
+            const response = await getWorkspaces();
 
-                if (!isCurrentRequest) {
-                    return;
-                }
-
-                setWorkspaces(response.data);
-
-                // 저장된 선택값이 현재 참여 Workspace 목록에도 존재하는지 확인합니다.
-                const storedId = Number(
-                    sessionStorage.getItem(getStorageKey(user.userId))
-                );
-                const storedWorkspace = response.data.find(
-                    workspace => workspace.workspaceId === storedId
-                );
-
-                const nextWorkspaceId =
-                    storedWorkspace?.workspaceId
-                    ?? response.data[0]?.workspaceId
-                    ?? null;
-
-                setCurrentWorkspaceId(nextWorkspaceId);
-
-                if (nextWorkspaceId !== null) {
-                    sessionStorage.setItem(
-                        getStorageKey(user.userId),
-                        String(nextWorkspaceId)
-                    );
-                }
-            } catch (error) {
-                if (!isCurrentRequest) {
-                    return;
-                }
-
-                console.error(error);
-                setWorkspaces([]);
-                setCurrentWorkspaceId(null);
-                setErrorMessage('제작팀 목록을 불러오지 못했습니다.');
-            } finally {
-                if (isCurrentRequest) {
-                    setIsLoading(false);
-                }
+            if (requestId !== latestRequestIdRef.current) {
+                return response.data;
             }
-        };
 
-        loadWorkspaces();
+            workspacesRef.current = response.data;
+            setWorkspaces(response.data);
 
-        return () => {
-            isCurrentRequest = false;
-        };
+            // 저장된 선택값이 현재 참여 Workspace 목록에도 존재하는지 확인합니다.
+            const storedId = Number(
+                sessionStorage.getItem(getStorageKey(user.userId))
+            );
+            const storedWorkspace = response.data.find(
+                workspace => workspace.workspaceId === storedId
+            );
+
+            const nextWorkspaceId =
+                storedWorkspace?.workspaceId
+                ?? response.data[0]?.workspaceId
+                ?? null;
+
+            setCurrentWorkspaceId(nextWorkspaceId);
+
+            if (nextWorkspaceId !== null) {
+                sessionStorage.setItem(
+                    getStorageKey(user.userId),
+                    String(nextWorkspaceId)
+                );
+            }
+
+            return response.data;
+        } catch (error) {
+            if (requestId !== latestRequestIdRef.current) {
+                return [];
+            }
+
+            console.error(error);
+            workspacesRef.current = [];
+            setWorkspaces([]);
+            setCurrentWorkspaceId(null);
+            setErrorMessage('제작팀 목록을 불러오지 못했습니다.');
+            return [];
+        } finally {
+            if (requestId === latestRequestIdRef.current) {
+                setIsLoading(false);
+            }
+        }
     }, [isAuthenticated, user]);
+
+    // 인증 사용자가 바뀌면 해당 사용자의 Workspace 목록과 저장된 선택값을 복원합니다.
+    useEffect(() => {
+        void refreshWorkspaces();
+    }, [refreshWorkspaces]);
 
     // ID와 목록으로부터 화면에서 사용할 현재 Workspace 객체를 계산합니다.
     const currentWorkspace = useMemo(
@@ -109,7 +118,7 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
 
     // 목록에 존재하는 Workspace만 선택하고 다음 화면 진입을 위해 저장합니다.
     const selectWorkspace = (workspaceId: number) => {
-        if (!user || !workspaces.some(
+        if (!user || !workspacesRef.current.some(
             workspace => workspace.workspaceId === workspaceId
         )) {
             return;
@@ -130,7 +139,8 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
                 currentWorkspace,
                 isLoading,
                 errorMessage,
-                selectWorkspace
+                selectWorkspace,
+                refreshWorkspaces
             }}
         >
             {children}

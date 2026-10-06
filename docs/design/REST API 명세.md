@@ -356,7 +356,43 @@ DELETE /api/workspaces/{workspaceId}/members/{workspaceMemberId}
 
 마지막 OWNER는 제외할 수 없습니다.
 
-## 4.8. 초대 목록
+## 4.8. 내 Workspace 초대 목록
+
+GET /api/workspace-invitations
+
+현재 인증 사용자의 `userId` 또는 정규화된 이메일과 연결된 수신 초대를 조회합니다.
+
+Query:
+
+| 필드 | 필수 | 설명 |
+| --- | --- | --- |
+| status | N | PENDING / ACCEPTED / REJECTED / CANCELLED / ALL, 기본 PENDING |
+
+`status=PENDING` 조회에서는 현재 시각을 기준으로 만료되지 않은 초대만 반환합니다.
+결과는 `sentAt` 내림차순으로 정렬합니다.
+
+응답 예:
+
+~~~json
+{
+  "success": true,
+  "data": [
+    {
+      "invitationId": 41,
+      "workspaceId": 7,
+      "workspaceName": "Game Channel Studio",
+      "inviterName": "박관리자",
+      "status": "PENDING",
+      "sentAt": "2026-10-01T14:30:00+09:00",
+      "expiresAt": "2026-10-08T14:30:00+09:00"
+    }
+  ]
+}
+~~~
+
+SCR-03은 `status=PENDING`으로 호출하며, 가입 전에 이메일로 발송된 초대도 로그인 사용자의 현재 이메일과 일치하면 반환합니다.
+
+## 4.9. Workspace 발송 초대 목록
 
 GET /api/workspaces/{workspaceId}/invitations
 
@@ -372,7 +408,7 @@ Query:
 - page
 - size
 
-## 4.9. Workspace 초대 생성
+## 4.10. Workspace 초대 생성
 
 POST /api/workspaces/{workspaceId}/invitations
 
@@ -391,15 +427,57 @@ POST /api/workspaces/{workspaceId}/invitations
 - ALREADY_WORKSPACE_MEMBER → 409
 - PENDING_INVITATION_EXISTS → 409
 
-## 4.10. Workspace 초대 수락 / 거절
+## 4.11. Workspace 초대 수락 / 거절
 
 POST /api/workspace-invitations/{invitationId}/accept
 
 POST /api/workspace-invitations/{invitationId}/reject
 
-PENDING 상태의 유효한 초대만 처리할 수 있습니다.
+현재 인증 사용자가 수신한 PENDING 상태의 유효한 초대만 처리할 수 있습니다.
 
-## 4.11. Workspace 초대 취소
+수락 응답 예:
+
+~~~json
+{
+  "success": true,
+  "message": "Workspace 초대를 수락했습니다.",
+  "data": {
+    "invitationId": 41,
+    "status": "ACCEPTED",
+    "workspace": {
+      "workspaceId": 7,
+      "name": "Game Channel Studio",
+      "myRole": "MEMBER",
+      "activeProjectCount": 0
+    }
+  }
+}
+~~~
+
+거절 응답 예:
+
+~~~json
+{
+  "success": true,
+  "message": "Workspace 초대를 거절했습니다.",
+  "data": {
+    "invitationId": 41,
+    "status": "REJECTED"
+  }
+}
+~~~
+
+주요 오류:
+
+- WORKSPACE_INVITATION_NOT_FOUND → 404
+- FORBIDDEN_WORKSPACE_INVITATION → 403
+- WORKSPACE_INVITATION_NOT_PENDING → 409
+- WORKSPACE_INVITATION_EXPIRED → 409
+- ALREADY_WORKSPACE_MEMBER → 409
+
+초대 목록을 조회한 뒤 취소 또는 만료될 수 있으므로 수락과 거절 시점에 상태, 수신 사용자와 만료 시각을 서버에서 다시 검증합니다.
+
+## 4.12. Workspace 초대 취소
 
 DELETE /api/workspace-invitations/{invitationId}
 
@@ -1439,6 +1517,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또�
 | UNAUTHORIZED_SESSION | 401 | 인증 누락 / 만료 |
 | FORBIDDEN_WORKSPACE_ACCESS | 403 | Workspace 접근 불가 |
 | FORBIDDEN_WORKSPACE_ADMIN | 403 | Workspace 관리 권한 없음 |
+| FORBIDDEN_WORKSPACE_INVITATION | 403 | 현재 사용자가 수신한 Workspace 초대가 아님 |
 | FORBIDDEN_PROJECT_ACCESS | 403 | Project 접근 불가 |
 | INSUFFICIENT_PROJECT_PERMISSIONS | 403 | Project 수정 권한 없음 |
 | FORBIDDEN_FINANCE_ACCESS | 403 | 재무 정보 접근 권한 없음 |
@@ -1454,6 +1533,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또�
 | RESOURCE_NOT_FOUND | 404 | 일반 리소스 없음 |
 | PROJECT_NOT_FOUND | 404 | Project 없음 |
 | WORKSPACE_NOT_FOUND | 404 | Workspace 없음 |
+| WORKSPACE_INVITATION_NOT_FOUND | 404 | Workspace 초대 없음 |
 | CAMPAIGN_NOT_FOUND | 404 | Campaign 없음 |
 | CHANNEL_NOT_FOUND | 404 | Channel 없음 |
 
@@ -1464,6 +1544,8 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또�
 | DUPLICATE_EMAIL | 409 | 이메일 중복 |
 | ALREADY_WORKSPACE_MEMBER | 409 | 이미 Workspace 멤버 |
 | PENDING_INVITATION_EXISTS | 409 | 대기 초대 중복 |
+| WORKSPACE_INVITATION_NOT_PENDING | 409 | 처리할 수 없는 Workspace 초대 상태 |
+| WORKSPACE_INVITATION_EXPIRED | 409 | 만료된 Workspace 초대 |
 | ALREADY_PROJECT_MEMBER | 409 | 이미 Project 참여자 |
 | LAST_OWNER_REQUIRED | 409 | 마지막 Workspace OWNER 변경 불가 |
 | PROJECT_OWNER_CANNOT_BE_REMOVED | 409 | 현재 Project Owner 제거 불가 |
@@ -1495,6 +1577,7 @@ PATCH /api/users/me/profile
 ~~~text
 GET  /api/workspaces
 POST /api/workspaces
+GET  /api/workspace-invitations?status=PENDING
 POST /api/workspace-invitations/{id}/accept
 POST /api/workspace-invitations/{id}/reject
 ~~~
