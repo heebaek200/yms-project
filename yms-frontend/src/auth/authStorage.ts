@@ -8,7 +8,7 @@ export type StoredAuth = {
 
 export const AUTH_EXPIRED_EVENT = 'yms:auth-expired';
 
-const AUTH_STORAGE_KEY = 'yms-auth';
+export const AUTH_STORAGE_KEY = 'yms-auth';
 
 /**
  * 저장된 값이 Axios Authorization에 사용할 수 있는 인증 세션인지 확인합니다.
@@ -27,16 +27,21 @@ function isStoredAuth(value: unknown): value is StoredAuth {
         && typeof candidate.tokenType === 'string'
         && candidate.tokenType.length > 0
         && !!candidate.user
-        && typeof candidate.user.userId === 'number';
+        && typeof candidate.user.userId === 'number'
+        && typeof candidate.user.email === 'string'
+        && typeof candidate.user.name === 'string'
+        && Array.isArray(candidate.user.roles)
+        && typeof candidate.user.profileSetupRequired === 'boolean';
 }
 
 /**
- * sessionStorage에서 현재 로그인 세션을 조회합니다.
- * JSON 파싱 또는 구조 검증에 실패하면 잘못된 값을 즉시 제거합니다.
- * 저장된 인증이 없으면 null을 반환하여 비로그인 상태로 판단하게 합니다.
+ * 브라우저 공용 저장소에서 현재 로그인 세션을 조회합니다.
+ * 필수 판정값이 없는 이전 형식이나 손상된 값은 제거하여 재로그인을 요구합니다.
+ * 기존 탭 전용 저장값도 함께 정리하여 인증 저장소가 중복되지 않게 합니다.
  */
 export function loadStoredAuth(): StoredAuth | null {
-    const storedValue = sessionStorage.getItem(AUTH_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    const storedValue = localStorage.getItem(AUTH_STORAGE_KEY);
 
     if (!storedValue) {
         return null;
@@ -57,23 +62,24 @@ export function loadStoredAuth(): StoredAuth | null {
 }
 
 /**
- * 로그인 또는 프로필 변경 후 최신 인증 세션을 저장합니다.
- * AuthContext와 Axios 인터셉터가 동일한 저장 형식을 사용하게 합니다.
- * 토큰은 현재 설계에 따라 브라우저 탭 수명의 sessionStorage에만 유지합니다.
+ * 로그인 또는 프로필 변경 후 최신 인증 세션을 브라우저 공용으로 저장합니다.
+ * localStorage 변경 이벤트를 통해 다른 탭의 AuthContext도 같은 계정을 사용합니다.
+ * 실제 API의 토큰 만료 또는 명시적 로그아웃 전까지 브라우저 재시작 후에도 복원합니다.
  */
 export function saveStoredAuth(storedAuth: StoredAuth) {
-    sessionStorage.setItem(
+    localStorage.setItem(
         AUTH_STORAGE_KEY,
         JSON.stringify(storedAuth)
     );
 }
 
 /**
- * 로그아웃 또는 인증 만료 시 저장된 인증 세션을 제거합니다.
- * React 상태 변경은 AuthContext가 담당하므로 저장소 책임만 수행합니다.
+ * 로그아웃 또는 인증 만료 시 브라우저 공용 인증 세션을 제거합니다.
+ * localStorage 변경은 다른 탭에도 전달되며 이전 sessionStorage 값도 함께 정리합니다.
  * 값이 이미 없더라도 동일하게 완료되는 멱등 동작입니다.
  */
 export function clearStoredAuth() {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
     sessionStorage.removeItem(AUTH_STORAGE_KEY);
 }
 

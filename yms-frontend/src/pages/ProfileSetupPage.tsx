@@ -242,7 +242,8 @@ function ProfileSetupPage() {
             // 설정 저장 성공 시 계정 관련 정보 갱신
             updateUser({
                 name: response.data.name,
-                roles: response.data.roles
+                roles: response.data.roles,
+                profileSetupRequired: false
             });
 
             // SCR-03 구현 전에도 저장 이후 목적지가 명확하도록 온보딩 경로 계약을 사용합니다.

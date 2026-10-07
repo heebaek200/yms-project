@@ -69,6 +69,7 @@ export async function signup(
             name: request.name,
             roles: [],
             //roles: ["CREATOR", "EDITOR"],
+            profileSetupRequired: true,
             accessToken: 'mock-access-token',
             tokenType: 'Bearer'
         }

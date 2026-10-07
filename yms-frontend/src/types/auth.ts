@@ -9,12 +9,14 @@ export type AuthUser = {
     email: string;
     name: string;
     roles: UserRole[];
+    profileSetupRequired: boolean;
 };
 export type AuthSession = {
     userId: number;
     email: string;
     name: string;
     roles: UserRole[];
+    profileSetupRequired: boolean;
     accessToken: string;
     tokenType: string;
 };

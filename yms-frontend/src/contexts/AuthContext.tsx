@@ -11,10 +11,12 @@ import type {
     AuthUser
 } from '../types/auth';
 import {
+    AUTH_STORAGE_KEY,
     AUTH_EXPIRED_EVENT,
     clearStoredAuth,
     loadStoredAuth,
-    saveStoredAuth
+    saveStoredAuth,
+    type StoredAuth
 } from '../auth/authStorage';
 
 type AuthContextValue = {
@@ -73,7 +75,8 @@ function AuthProvider({
             userId: data.userId,
             email: data.email,
             name: data.name,
-            roles: data.roles
+            roles: data.roles,
+            profileSetupRequired: data.profileSetupRequired
         };
 
         setUser(authUser);
@@ -126,21 +129,41 @@ function AuthProvider({
     }
 
     /**
+     * 브라우저 공용 저장소에서 전달된 인증 세션을 현재 탭의 React 상태에 반영합니다.
+     * 다른 탭의 로그인과 프로필 변경은 새 세션으로 교체하고 로그아웃은 모두 비웁니다.
+     * 저장값 검증은 loadStoredAuth에 위임하여 손상된 세션을 사용하지 않습니다.
+     */
+    function applyStoredAuth(storedSession: StoredAuth | null) {
+        setUser(storedSession?.user ?? null);
+        setAccessToken(storedSession?.accessToken ?? null);
+        setTokenType(storedSession?.tokenType ?? null);
+    }
+
+    /**
      * Axios 인터셉터가 알린 인증 만료를 React 인증 상태에 반영합니다.
      * 저장소는 인터셉터에서 먼저 정리되므로 Context의 메모리 상태만 초기화합니다.
      * Provider가 사라질 때 이벤트 Listener를 제거해 중복 처리를 방지합니다.
      */
     useEffect(() => {
         const handleAuthExpired = () => {
-            setUser(null);
-            setAccessToken(null);
-            setTokenType(null);
+            applyStoredAuth(null);
+        };
+
+        // localStorage의 인증 변경을 받아 모든 탭에서 하나의 로그인 계정을 유지합니다.
+        const handleStoredAuthChange = (event: StorageEvent) => {
+            if (event.key !== AUTH_STORAGE_KEY && event.key !== null) {
+                return;
+            }
+
+            applyStoredAuth(loadStoredAuth());
         };
 
         window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+        window.addEventListener('storage', handleStoredAuthChange);
 
         return () => {
             window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+            window.removeEventListener('storage', handleStoredAuthChange);
         };
     }, []);
 

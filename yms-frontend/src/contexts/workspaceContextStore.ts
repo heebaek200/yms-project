@@ -6,6 +6,7 @@ export type WorkspaceContextValue = {
     workspaces: WorkspaceSummary[];
     currentWorkspace: WorkspaceSummary | null;
     isLoading: boolean;
+    isInitialized: boolean;
     errorMessage: string | null;
     selectWorkspace: (workspaceId: number) => void;
     refreshWorkspaces: () => Promise<WorkspaceSummary[]>;
