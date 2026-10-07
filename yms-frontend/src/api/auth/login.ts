@@ -38,6 +38,7 @@ export async function login(
                 name: '테스트 사용자',
                 //roles: [],
                 roles: ["CREATOR", "EDITOR"],
+                profileSetupRequired: false,
                 accessToken: 'mock-access-token',
                 tokenType: 'Bearer'
             }

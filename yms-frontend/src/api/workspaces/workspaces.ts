@@ -40,6 +40,14 @@ let nextWorkspaceId = 3;
 export async function getWorkspaces(): Promise<WorkspaceListResponse> {
     await new Promise(resolve => setTimeout(resolve, 200));
 
+    // #30 Workspace 조회 실패 수동 테스트용 — 테스트 후 제거
+    if (
+        sessionStorage.getItem('yms-test-workspace-failure')
+        === 'true'
+    ) {
+        throw new Error('Workspace 조회 실패 테스트');
+    }
+
     return {
         success: true,
         data: mockWorkspaces.map(workspace => ({ ...workspace }))

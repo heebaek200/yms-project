@@ -1,0 +1,96 @@
+.workspace-route-status {
+    display: grid;
+    min-height: 100vh;
+    padding: 24px;
+    place-items: center;
+    background:
+        radial-gradient(circle at top, rgb(229 72 77 / 10%), transparent 38%),
+        var(--color-surface);
+}
+
+.workspace-route-status__panel {
+    display: flex;
+    width: min(100%, 460px);
+    padding: 40px 32px;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    align-items: center;
+    flex-direction: column;
+    background: var(--color-background);
+    box-shadow: 0 18px 50px rgb(24 24 27 / 10%);
+    text-align: center;
+}
+
+.workspace-route-status__panel img {
+    width: 54px;
+    height: 54px;
+    margin-bottom: 22px;
+}
+
+.workspace-route-status__spinner {
+    width: 34px;
+    height: 34px;
+    margin-bottom: 20px;
+    border: 4px solid rgb(229 72 77 / 18%);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: workspace-route-status-spin 0.8s linear infinite;
+}
+
+.workspace-route-status__panel h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    line-height: 1.4;
+}
+
+.workspace-route-status__panel p {
+    margin: 12px 0 0;
+    color: var(--color-text-muted);
+    line-height: 1.65;
+}
+
+.workspace-route-status__panel button {
+    min-width: 132px;
+    margin-top: 24px;
+    padding: 11px 18px;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: var(--color-background);
+    font-weight: 700;
+}
+
+.workspace-route-status__panel button:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+}
+
+.workspace-route-status__panel button:focus-visible {
+    outline: 3px solid rgb(229 72 77 / 28%);
+    outline-offset: 3px;
+}
+
+.workspace-route-status__panel button:disabled {
+    opacity: 0.65;
+}
+
+@keyframes workspace-route-status-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .workspace-route-status__spinner {
+        animation-duration: 1.8s;
+    }
+}
+
+@media (max-width: 480px) {
+    .workspace-route-status {
+        padding: 16px;
+    }
+
+    .workspace-route-status__panel {
+        padding: 32px 22px;
+    }
+}
