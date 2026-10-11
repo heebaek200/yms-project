@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 
 import { useWorkspace } from '../../hooks/useWorkspace';
+import { getWorkspaceSwitchDestination } from '../../routes/navigation';
 import type { WorkspaceRole } from '../../types/workspace';
+import {
+    WORKSPACE_SWITCHER_OPEN_EVENT
+} from '../../workspace/workspaceSwitcherEvents';
 
 import './WorkspaceSwitcher.css';
 
@@ -23,8 +28,11 @@ function WorkspaceSwitcher() {
         isLoading,
         selectWorkspace
     } = useWorkspace();
+    const location = useLocation();
+    const navigate = useNavigate();
 
     const containerRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
     const announcementTimerRef = useRef<number | null>(null);
     const [isOpen, setIsOpen] = useState(false);
     const [announcement, setAnnouncement] = useState<string | null>(null);
@@ -68,6 +76,33 @@ function WorkspaceSwitcher() {
         };
     }, []);
 
+    // 공통 접근 상태의 제작팀 전환 버튼이 Header Popover를 열 수 있게 연결합니다.
+    useEffect(() => {
+        const handleOpenRequest = () => {
+            setIsOpen(true);
+            window.requestAnimationFrame(() => {
+                triggerRef.current?.focus();
+            });
+        };
+
+        window.addEventListener(
+            WORKSPACE_SWITCHER_OPEN_EVENT,
+            handleOpenRequest
+        );
+
+        return () => {
+            window.removeEventListener(
+                WORKSPACE_SWITCHER_OPEN_EVENT,
+                handleOpenRequest
+            );
+        };
+    }, []);
+
+    /**
+     * 선택한 Workspace를 현재 탭에 저장하고 같은 업무 흐름의 안전한 Route를 유지합니다.
+     * 상세 Route는 새 Workspace의 목록으로 정규화하고 역할별 다른 기능은 자동 전환하지 않습니다.
+     * 완료 안내에는 전환 사실만 표시하여 권한 또는 리소스 상태를 추측하지 않습니다.
+     */
     const handleWorkspaceSelect = (workspaceId: number) => {
         const nextWorkspace = workspaces.find(
             workspace => workspace.workspaceId === workspaceId
@@ -78,9 +113,15 @@ function WorkspaceSwitcher() {
             return;
         }
 
+        const destination = getWorkspaceSwitchDestination(location.pathname);
+
         selectWorkspace(workspaceId);
         setIsOpen(false);
-        setAnnouncement(`${nextWorkspace.name}으로 전환했습니다.`);
+        setAnnouncement(`${nextWorkspace.name} 제작팀으로 전환했습니다.`);
+
+        if (destination !== location.pathname) {
+            navigate(destination, { replace: true });
+        }
 
         if (announcementTimerRef.current !== null) {
             window.clearTimeout(announcementTimerRef.current);
@@ -97,6 +138,7 @@ function WorkspaceSwitcher() {
             className="workspace-switcher"
         >
             <button
+                ref={triggerRef}
                 type="button"
                 className="workspace-switcher__trigger"
                 disabled={isLoading || !currentWorkspace}
@@ -173,6 +215,21 @@ function WorkspaceSwitcher() {
                                 </button>
                             );
                         })}
+                    </div>
+
+                    <div className="workspace-switcher__footer">
+                        <button
+                            type="button"
+                            className="workspace-switcher__all"
+                            role="menuitem"
+                            onClick={() => {
+                                setIsOpen(false);
+                                navigate('/workspaces');
+                            }}
+                        >
+                            <span aria-hidden="true">▦</span>
+                            전체 제작팀 보기
+                        </button>
                     </div>
                 </div>
             )}
