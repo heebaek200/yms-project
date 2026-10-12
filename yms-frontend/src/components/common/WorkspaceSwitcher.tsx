@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
 import { useWorkspace } from '../../hooks/useWorkspace';
@@ -15,6 +15,8 @@ const WORKSPACE_ROLE_LABELS: Record<WorkspaceRole, string> = {
     ADMIN: '관리자',
     MEMBER: '멤버'
 };
+
+const WORKSPACE_SWITCHER_POPOVER_ID = 'workspace-switcher-popover';
 
 /**
  * 현재 업무 범위를 명확하게 표시하고 다른 Workspace로 전환합니다.
@@ -37,6 +39,18 @@ function WorkspaceSwitcher() {
     const [isOpen, setIsOpen] = useState(false);
     const [announcement, setAnnouncement] = useState<string | null>(null);
 
+    /**
+     * Popover를 닫은 다음 제작팀 전환 Trigger로 키보드 포커스를 복귀시킵니다.
+     * 내부 버튼이 DOM에서 제거된 뒤 포커스가 문서 본문으로 유실되지 않게 합니다.
+     */
+    const closeAndFocusTrigger = useCallback(() => {
+        setIsOpen(false);
+
+        window.requestAnimationFrame(() => {
+            triggerRef.current?.focus();
+        });
+    }, []);
+
     // Popover 바깥을 클릭하거나 Escape를 누르면 전환 목록을 닫습니다.
     useEffect(() => {
         if (!isOpen) {
@@ -54,7 +68,8 @@ function WorkspaceSwitcher() {
 
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
-                setIsOpen(false);
+                event.preventDefault();
+                closeAndFocusTrigger();
             }
         };
 
@@ -65,7 +80,7 @@ function WorkspaceSwitcher() {
             document.removeEventListener('pointerdown', handlePointerDown);
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isOpen]);
+    }, [closeAndFocusTrigger, isOpen]);
 
     // 화면을 떠날 때 전환 완료 안내 타이머를 정리합니다.
     useEffect(() => {
@@ -109,14 +124,14 @@ function WorkspaceSwitcher() {
         );
 
         if (!nextWorkspace || nextWorkspace.workspaceId === currentWorkspace?.workspaceId) {
-            setIsOpen(false);
+            closeAndFocusTrigger();
             return;
         }
 
         const destination = getWorkspaceSwitchDestination(location.pathname);
 
         selectWorkspace(workspaceId);
-        setIsOpen(false);
+        closeAndFocusTrigger();
         setAnnouncement(`${nextWorkspace.name} 제작팀으로 전환했습니다.`);
 
         if (destination !== location.pathname) {
@@ -143,7 +158,7 @@ function WorkspaceSwitcher() {
                 className="workspace-switcher__trigger"
                 disabled={isLoading || !currentWorkspace}
                 aria-label="현재 제작팀 전환"
-                aria-haspopup="menu"
+                aria-controls={WORKSPACE_SWITCHER_POPOVER_ID}
                 aria-expanded={isOpen}
                 onClick={() => setIsOpen(prev => !prev)}
             >
@@ -170,9 +185,10 @@ function WorkspaceSwitcher() {
 
             {isOpen && (
                 <div
+                    id={WORKSPACE_SWITCHER_POPOVER_ID}
                     className="workspace-switcher__popover"
-                    role="menu"
-                    aria-label="제작팀 목록"
+                    role="group"
+                    aria-label="제작팀 전환"
                 >
                     <strong className="workspace-switcher__title">
                         제작팀 전환
@@ -192,8 +208,7 @@ function WorkspaceSwitcher() {
                                             ? 'workspace-switcher__item workspace-switcher__item--current'
                                             : 'workspace-switcher__item'
                                     }
-                                    role="menuitemradio"
-                                    aria-checked={isCurrent}
+                                    aria-current={isCurrent ? 'true' : undefined}
                                     onClick={() => {
                                         handleWorkspaceSelect(workspace.workspaceId);
                                     }}
@@ -221,7 +236,6 @@ function WorkspaceSwitcher() {
                         <button
                             type="button"
                             className="workspace-switcher__all"
-                            role="menuitem"
                             onClick={() => {
                                 setIsOpen(false);
                                 navigate('/workspaces');

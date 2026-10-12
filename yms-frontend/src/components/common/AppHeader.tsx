@@ -55,9 +55,13 @@ function AppHeader() {
         const activeLink = navigationRef.current?.querySelector<HTMLElement>(
             '[aria-current="page"]'
         );
+        const prefersReducedMotion = window.matchMedia(
+            '(prefers-reduced-motion: reduce)'
+        ).matches;
 
+        // 동작 감소 환경에서는 메뉴 위치만 즉시 보정하고 스크롤 애니메이션은 생략합니다.
         activeLink?.scrollIntoView({
-            behavior: 'smooth',
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
             block: 'nearest',
             inline: 'nearest'
         });
