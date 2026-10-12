@@ -8,8 +8,13 @@ import ProfileSetupPage from '../pages/ProfileSetupPage';
 import WorkspaceOnboardingPage from '../pages/WorkspaceOnboardingPage';
 import DashboardPage from '../pages/DashboardPage';
 import NotFoundPage from '../pages/NotFoundPage';
+import ComingSoonPage from '../pages/ComingSoonPage';
 import AppLayout from '../layouts/AppLayout';
 import WorkspaceRouteStatus from '../components/routing/WorkspaceRouteStatus';
+import WorkspaceRoleRoute from '../components/routing/WorkspaceRoleRoute';
+import { WORKSPACE_ADMIN_ROLES } from './navigation';
+
+const MEMBER_ONLY_ROLES = ['MEMBER'] as const;
 
 /**
  * 루트 접근을 인증, 프로필 설정, Workspace 복원 순서로 판정합니다.
@@ -199,10 +204,77 @@ function AppRoutes() {
                     element={<DashboardPage />}
                 />
 
-                {/* 향후 공통 레이아웃을 사용하는 화면 라우터 설정 */}
+                {/* SCR-06 캠페인 관리 예정 Route */}
+                <Route
+                    path="/campaigns"
+                    element={
+                        <WorkspaceRoleRoute allowedRoles={WORKSPACE_ADMIN_ROLES}>
+                            <ComingSoonPage featureName="캠페인" />
+                        </WorkspaceRoleRoute>
+                    }
+                />
 
+                {/* SCR-07 프로젝트 목록 예정 Route */}
+                <Route
+                    path="/projects"
+                    element={<ComingSoonPage featureName="프로젝트" />}
+                />
 
+                {/* SCR-09 메신저 예정 Route */}
+                <Route
+                    path="/messenger"
+                    element={<ComingSoonPage featureName="메신저" />}
+                />
 
+                {/* SCR-11A 제작팀 정산 관리 예정 Route */}
+                <Route
+                    path="/workspace/settlements"
+                    element={
+                        <WorkspaceRoleRoute allowedRoles={WORKSPACE_ADMIN_ROLES}>
+                            <ComingSoonPage featureName="정산 관리" />
+                        </WorkspaceRoleRoute>
+                    }
+                />
+
+                {/* SCR-11B 개인 정산 예정 Route */}
+                <Route
+                    path="/my/settlements"
+                    element={
+                        <WorkspaceRoleRoute allowedRoles={MEMBER_ONLY_ROLES}>
+                            <ComingSoonPage featureName="내 정산" />
+                        </WorkspaceRoleRoute>
+                    }
+                />
+
+                {/* SCR-12 콘텐츠 및 재무 분석 예정 Route */}
+                <Route
+                    path="/analytics"
+                    element={
+                        <WorkspaceRoleRoute allowedRoles={WORKSPACE_ADMIN_ROLES}>
+                            <ComingSoonPage featureName="분석" />
+                        </WorkspaceRoleRoute>
+                    }
+                />
+
+                {/* SCR-10 비용·수익 관리 예정 Route */}
+                <Route
+                    path="/finance"
+                    element={
+                        <WorkspaceRoleRoute allowedRoles={WORKSPACE_ADMIN_ROLES}>
+                            <ComingSoonPage featureName="비용·수익" />
+                        </WorkspaceRoleRoute>
+                    }
+                />
+
+                {/* SCR-04 현재 제작팀 관리 예정 Route */}
+                <Route
+                    path="/workspace/settings"
+                    element={
+                        <WorkspaceRoleRoute allowedRoles={WORKSPACE_ADMIN_ROLES}>
+                            <ComingSoonPage featureName="제작팀 관리" />
+                        </WorkspaceRoleRoute>
+                    }
+                />
             </Route>
         </Routes>
     );

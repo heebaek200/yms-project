@@ -126,6 +126,42 @@
     white-space: nowrap;
 }
 
+/* 빠른 전환 목록과 제작팀 선택·생성 화면으로 가는 진입점을 시각적으로 구분합니다. */
+.workspace-switcher__footer {
+    margin-top: 8px;
+    padding-top: 8px;
+
+    border-top: 1px solid var(--color-border);
+}
+
+.workspace-switcher__all {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+
+    color: var(--color-primary);
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+}
+
+.workspace-switcher__all:hover {
+    background: #fff4f4;
+}
+
+.workspace-switcher__all:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
 .workspace-switcher__toast {
     position: fixed;
     right: 24px;

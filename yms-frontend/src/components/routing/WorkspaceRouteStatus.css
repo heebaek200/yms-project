@@ -81,7 +81,8 @@
 
 @media (prefers-reduced-motion: reduce) {
     .workspace-route-status__spinner {
-        animation-duration: 1.8s;
+        /* 진행 문구와 aria-busy는 유지하고 지속적으로 회전하는 시각 동작만 제거합니다. */
+        animation: none;
     }
 }
 

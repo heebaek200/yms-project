@@ -1650,10 +1650,15 @@ Expense API
 Revenue API
 ~~~
 
-## SCR-11 작업자 정산
+## SCR-11A 제작팀 정산 관리
 
 ~~~text
 Workspace Settlement API
+~~~
+
+## SCR-11B 내 정산
+
+~~~text
 GET /api/users/me/settlements
 ~~~
 

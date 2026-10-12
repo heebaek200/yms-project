@@ -1,10 +1,12 @@
 import './AppHeader.css';
-import { NavLink, useNavigate } from "react-router";
+import { NavLink, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext'
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from 'react';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import NotificationDrawer from './NotificationDrawer';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useWorkspace } from '../../hooks/useWorkspace';
+import { getNavigationItems } from '../../routes/navigation';
 
 /**
  * 인증 화면의 Workspace 전환, 주요 메뉴와 사용자 동작을 제공하는 공통 Header입니다.
@@ -14,11 +16,56 @@ import { useNotifications } from '../../hooks/useNotifications';
 function AppHeader() {
     const { user, signOut } = useAuth();
     const { unreadCount } = useNotifications();
+    const { currentWorkspace } = useWorkspace();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
     const notificationButtonRef = useRef<HTMLButtonElement>(null);
+    const navigationRef = useRef<HTMLElement>(null);
+    const navigationItems = currentWorkspace
+        ? getNavigationItems(currentWorkspace.myRole)
+        : [];
+    const workNavigationItems = navigationItems.filter(
+        item => item.section === 'work'
+    );
+    const managementNavigationItems = navigationItems.filter(
+        item => item.section === 'management'
+    );
+    const navigationGroups = [
+        {
+            key: 'work',
+            label: '업무 메뉴',
+            items: workNavigationItems
+        },
+        {
+            key: 'management',
+            label: '관리 메뉴',
+            items: managementNavigationItems
+        }
+    ].filter(group => group.items.length > 0);
+
+    /**
+     * Route가 바뀌면 현재 활성 메뉴를 가로 내비게이션의 보이는 영역에 배치합니다.
+     * 모바일에서 메뉴 순서와 직접 선택 방식을 유지하면서도 현재 위치를 놓치지 않게 합니다.
+     * 이미 보이는 항목은 nearest 옵션으로 불필요한 스크롤 이동을 만들지 않습니다.
+     */
+    useEffect(() => {
+        const activeLink = navigationRef.current?.querySelector<HTMLElement>(
+            '[aria-current="page"]'
+        );
+        const prefersReducedMotion = window.matchMedia(
+            '(prefers-reduced-motion: reduce)'
+        ).matches;
+
+        // 동작 감소 환경에서는 메뉴 위치만 즉시 보정하고 스크롤 애니메이션은 생략합니다.
+        activeLink?.scrollIntoView({
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
+            block: 'nearest',
+            inline: 'nearest'
+        });
+    }, [location.pathname]);
 
     /**
      * Drawer의 닫기 버튼, 배경 또는 Escape 입력으로 알림 창을 닫습니다.
@@ -48,45 +95,43 @@ function AppHeader() {
                 {/* 모든 Workspace 하위 화면에서 사용할 현재 업무 범위를 선택합니다. */}
                 <WorkspaceSwitcher />
 
-                <nav className="app-nav">
-                    <NavLink
-                        to="/dashboard"
-                        className={({ isActive }) =>
-                            isActive
-                                ? 'app-nav__link app-nav__link--active'
-                                : 'app-nav__link'
-                        }>
-                        <span className="app-nav__icon">🗓️</span>
-                        <span className="app-nav__label">
-                            스케줄러
-                        </span>
-                    </NavLink>
-
-                    <NavLink
-                        to="/"
-                        className={({ isActive }) =>
-                            isActive
-                                ? 'app-nav__link app-nav__link--active'
-                                : 'app-nav__link'
-                        }>
-                        <span className="app-nav__icon">📊</span>
-                        <span className="app-nav__label">
-                            분석 리포트
-                        </span>
-                    </NavLink>
-
-                    <NavLink
-                        to="/"
-                        className={({ isActive }) =>
-                            isActive
-                                ? 'app-nav__link app-nav__link--active'
-                                : 'app-nav__link'
-                        }>
-                        <span className="app-nav__icon">💬</span>
-                        <span className="app-nav__label">
-                            메신저
-                        </span>
-                    </NavLink>
+                <nav
+                    ref={navigationRef}
+                    className="app-nav"
+                    aria-label="주요 메뉴"
+                >
+                    {navigationGroups.map(group => (
+                        <div
+                            key={group.key}
+                            className={
+                                `app-nav__group app-nav__group--${group.key}`
+                            }
+                            role="group"
+                            aria-label={group.label}
+                        >
+                            {group.items.map(item => (
+                                <NavLink
+                                    key={item.key}
+                                    to={item.path}
+                                    end={item.path === '/dashboard'}
+                                    className={({ isActive }) => [
+                                        'app-nav__link',
+                                        isActive ? 'app-nav__link--active' : ''
+                                    ].filter(Boolean).join(' ')}
+                                >
+                                    <span
+                                        className="app-nav__icon"
+                                        aria-hidden="true"
+                                    >
+                                        {item.icon}
+                                    </span>
+                                    <span className="app-nav__label">
+                                        {item.label}
+                                    </span>
+                                </NavLink>
+                            ))}
+                        </div>
+                    ))}
                 </nav>
 
                 <div className="app-header__actions">
