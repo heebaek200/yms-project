@@ -7,6 +7,7 @@ import type { WorkspaceRole } from '../../types/workspace';
 import {
     WORKSPACE_SWITCHER_OPEN_EVENT
 } from '../../workspace/workspaceSwitcherEvents';
+import { confirmUnsavedChanges } from '../../navigation/unsavedChangesGuard';
 
 import './WorkspaceSwitcher.css';
 
@@ -125,6 +126,11 @@ function WorkspaceSwitcher() {
 
         if (!nextWorkspace || nextWorkspace.workspaceId === currentWorkspace?.workspaceId) {
             closeAndFocusTrigger();
+            return;
+        }
+
+        // 열린 관리 폼의 미저장 값이 있으면 사용자가 폐기를 승인한 뒤에만 전환합니다.
+        if (!confirmUnsavedChanges()) {
             return;
         }
 

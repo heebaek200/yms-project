@@ -7,6 +7,7 @@ import NotificationDrawer from './NotificationDrawer';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { getNavigationItems } from '../../routes/navigation';
+import { confirmUnsavedChanges } from '../../navigation/unsavedChangesGuard';
 
 /**
  * 인증 화면의 Workspace 전환, 주요 메뉴와 사용자 동작을 제공하는 공통 Header입니다.
@@ -181,7 +182,9 @@ function AppHeader() {
                             <button
                                 type="button"
                                 className="app-user-menu__item"
-                                onClick={() => navigate('/profile-setup')}
+                                onClick={() => {
+                                    navigate('/profile-setup');
+                                }}
                             >
                                 프로필 설정
                             </button>
@@ -191,7 +194,11 @@ function AppHeader() {
                             <button
                                 type="button"
                                 className="app-user-menu__item app-user-menu__item--danger"
-                                onClick={signOut}
+                                onClick={() => {
+                                    if (confirmUnsavedChanges()) {
+                                        signOut();
+                                    }
+                                }}
                             >
                                 로그아웃
                             </button>

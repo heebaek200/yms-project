@@ -1,4 +1,10 @@
-import { Navigate, Route, Routes } from 'react-router';
+import {
+    createBrowserRouter,
+    createRoutesFromElements,
+    Navigate,
+    Route,
+    RouterProvider
+} from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../hooks/useWorkspace';
 import type { ReactNode } from 'react';
@@ -9,6 +15,7 @@ import WorkspaceOnboardingPage from '../pages/WorkspaceOnboardingPage';
 import DashboardPage from '../pages/DashboardPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import ComingSoonPage from '../pages/ComingSoonPage';
+import WorkspaceSettingsPage from '../pages/WorkspaceSettingsPage';
 import AppLayout from '../layouts/AppLayout';
 import WorkspaceRouteStatus from '../components/routing/WorkspaceRouteStatus';
 import WorkspaceRoleRoute from '../components/routing/WorkspaceRoleRoute';
@@ -149,14 +156,10 @@ function WorkspaceRequiredRoute({
 }
 
 
-/**
- * 존재하는 화면별로 필요한 인증·프로필·Workspace Guard를 조합합니다.
- * 와일드카드 Route는 Guard 밖에 두어 알 수 없는 URL을 즉시 404로 처리합니다.
- * Workspace 하위 화면은 공통 레이아웃보다 먼저 통합 Guard를 통과합니다.
- */
-function AppRoutes() {
-    return (
-        <Routes>
+// 미저장 폼의 브라우저 뒤로·앞으로 이동까지 차단할 수 있도록 Data Router를 사용합니다.
+const router = createBrowserRouter(
+    createRoutesFromElements(
+        <>
             {/* SCR-01 인증 및 회원관리 화면 */}
             <Route
                 path="/"
@@ -266,18 +269,27 @@ function AppRoutes() {
                     }
                 />
 
-                {/* SCR-04 현재 제작팀 관리 예정 Route */}
+                {/* SCR-04 현재 제작팀 관리 Route */}
                 <Route
                     path="/workspace/settings"
                     element={
                         <WorkspaceRoleRoute allowedRoles={WORKSPACE_ADMIN_ROLES}>
-                            <ComingSoonPage featureName="제작팀 관리" />
+                            <WorkspaceSettingsPage />
                         </WorkspaceRoleRoute>
                     }
                 />
             </Route>
-        </Routes>
-    );
+        </>
+    )
+);
+
+/**
+ * 존재하는 화면별로 필요한 인증·프로필·Workspace Guard를 조합합니다.
+ * 와일드카드 Route는 Guard 밖에 두어 알 수 없는 URL을 즉시 404로 처리합니다.
+ * Workspace 하위 화면은 공통 레이아웃보다 먼저 통합 Guard를 통과합니다.
+ */
+function AppRoutes() {
+    return <RouterProvider router={router} />;
 }
 
 export default AppRoutes;

@@ -72,6 +72,10 @@ function DashboardPage() {
                 );
 
                 if (isCurrentRequest) {
+                    if (!response.success) {
+                        throw new Error(response.message);
+                    }
+
                     setChannels(response.data);
                 }
             } catch (error) {
