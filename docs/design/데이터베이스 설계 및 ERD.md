@@ -288,7 +288,10 @@ Workspace에서 관리하는 YouTube 채널입니다.
 제약:
 
 - `UNIQUE(workspace_id, youtube_channel_id)` 적용을 기본으로 합니다.
-- 기존 Project가 연결된 Channel은 물리 삭제보다 비활성화를 우선합니다.
+- 채널명만 필수이며 `youtube_channel_id`, `youtube_channel_url`과 `description`은 입력하지 않을 수 있습니다.
+- ID나 URL을 참고 정보로 입력했더라도 실제 연동 절차가 완료되지 않았으면 `integration_status=MANUAL`을 유지합니다.
+- Project와 Channel을 직접 참조하는 비용·수익 등 업무 데이터에서 사용하지 않는 Channel만 물리 삭제할 수 있습니다.
+- 업무 데이터가 연결된 Channel은 삭제하지 않고 비활성화하며 기존 이력을 유지합니다.
 - 수익 기본 단가는 Channel이 아니라 CREATOR 프로필 설정에 둡니다.
 
 ---
@@ -392,7 +395,7 @@ Workspace별 확장 가능한 작업 종류입니다.
 | task_type_id | BIGINT | PK | 작업 종류 ID |
 | workspace_id | BIGINT | FK → workspaces | 소속 Workspace |
 | name | VARCHAR(100) | NOT NULL | 가편집, 종합 편집, 자막, 썸네일 등 |
-| is_active | BOOLEAN | NOT NULL | 신규 Task에서 선택 가능 여부 |
+| is_active | BOOLEAN | NOT NULL | 신규 작업에서 선택 가능 여부 |
 | created_by | BIGINT | NULL | 등록 사용자 |
 | created_at | DATETIME | NOT NULL | 등록 시각 |
 | updated_by | BIGINT | NULL | 수정 사용자 |
@@ -401,7 +404,12 @@ Workspace별 확장 가능한 작업 종류입니다.
 제약:
 
 - `UNIQUE(workspace_id, name)`
-- 사용된 작업 종류는 삭제하지 않고 비활성화합니다.
+- 애플리케이션에서는 이름의 앞뒤 공백을 제거하고 영문 대소문자를 구분하지 않은 값으로 중복을 검증합니다.
+- 같은 이름의 비활성 작업 종류가 있으면 새 행을 생성하지 않고 기존 행의 재활성화를 안내합니다.
+- 기본 제공 작업 종류도 사용자 정의 작업 종류와 동일하게 이름 수정, 비활성화와 재활성화가 가능합니다.
+- `project_tasks`에서 참조하지 않는 작업 종류만 물리 삭제할 수 있습니다.
+- 사용된 작업 종류는 삭제하지 않고 비활성화하며 기존 작업 이력을 유지합니다.
+- `project_tasks.task_type_id` 외래 키는 작업 종류 참조 중 삭제를 제한합니다.
 
 ## 7.2. project_tasks
 
@@ -710,7 +718,7 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 
 대표 원칙:
 
-- Project가 연결된 Channel은 물리 삭제하지 않고 비활성화합니다.
+- Project나 채널 귀속 업무 데이터가 연결된 Channel은 물리 삭제하지 않고 비활성화합니다. 연결 이력이 없는 Channel은 관리 화면에서 삭제할 수 있습니다.
 - Project가 연결된 Campaign은 상태를 COMPLETED / CANCELLED로 변경하고 즉시 물리 삭제하지 않습니다.
 - Settlement Item이 연결된 Task는 물리 삭제하지 않습니다.
 - Project는 Task, Chat, Expense, Revenue 이력을 보존하기 위해 논리 삭제합니다.

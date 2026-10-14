@@ -504,6 +504,17 @@ Query:
 - activeOnly: 기본 true
 - keyword
 
+관리 화면은 비활성 Channel도 함께 표시하기 위해 `activeOnly=false`로 조회합니다. Project 생성과 일반 선택 UI는 기본값인 `activeOnly=true`를 사용합니다.
+
+Channel의 `integrationStatus`는 다음 값을 사용합니다.
+
+- `MANUAL`: 실제 YouTube 연동 없이 등록
+- `CONNECTED`: YouTube 연동과 검증 완료
+- `DISCONNECTED`: 기존 연동이 해제됨
+- `ERROR`: 연동 또는 동기화 오류
+
+#36 Mock 데이터는 화면 표시 검증을 위해 `MANUAL`, `CONNECTED`, `ERROR` 상태를 모두 포함합니다.
+
 ## 5.2. Channel 생성
 
 POST /api/workspaces/{workspaceId}/channels
@@ -519,6 +530,13 @@ POST /api/workspaces/{workspaceId}/channels
 }
 ~~~
 
+- `name`: 필수
+- `youtubeChannelId`: 선택, null 허용
+- `youtubeChannelUrl`: 선택, null 허용
+- `description`: 선택, null 허용
+
+이름만으로 생성할 수 있으며 생성 시 실제 연동 절차를 거치지 않았으면 `integrationStatus=MANUAL`로 저장합니다. YouTube 채널 ID나 URL이 입력됐다는 이유만으로 `CONNECTED`로 변경하지 않습니다.
+
 권한:
 
 - OWNER
@@ -526,7 +544,7 @@ POST /api/workspaces/{workspaceId}/channels
 
 응답: 201 Created
 
-## 5.3. Channel 수정 / 비활성화
+## 5.3. Channel 수정 / 비활성화 / 재활성화
 
 PATCH /api/workspaces/{workspaceId}/channels/{channelId}
 
@@ -538,9 +556,17 @@ PATCH /api/workspaces/{workspaceId}/channels/{channelId}
 - description
 - active
 
-Project가 연결된 Channel은 물리 삭제하지 않습니다.
+비활성 Channel은 `active=true`로 다시 활성화할 수 있습니다. `integrationStatus`는 별도의 실제 YouTube 연동 흐름에서 관리하며 일반 정보 수정 요청이 임의로 변경하지 않습니다.
 
-## 5.4. Task Type 목록
+## 5.4. Channel 삭제
+
+DELETE /api/workspaces/{workspaceId}/channels/{channelId}
+
+서버는 삭제 요청 시점에 Project와 Channel을 직접 참조하는 비용·수익 등 업무 데이터의 연결 여부를 최종 확인하며, 연결 이력이 없을 때만 Channel을 물리 삭제합니다.
+
+기존 Project나 업무 데이터에서 사용 중이면 삭제하지 않고 `409 CHANNEL_IN_USE`를 반환합니다. 화면은 삭제 불가 사유와 함께 더 이상 새 Project에서 사용하지 않으려면 비활성화하도록 안내합니다. 연결 여부 확인과 삭제는 하나의 트랜잭션에서 처리하고, 데이터베이스 외래 키도 참조 중 삭제를 제한합니다.
+
+## 5.5. Task Type 목록
 
 GET /api/workspaces/{workspaceId}/task-types
 
@@ -548,7 +574,9 @@ Query:
 
 - activeOnly: 기본 true
 
-## 5.5. Task Type 생성
+관리 화면은 비활성 Task Type도 함께 표시하기 위해 `activeOnly=false`로 조회합니다. 신규 작업 생성 UI는 기본값인 `activeOnly=true`를 사용합니다.
+
+## 5.6. Task Type 생성
 
 POST /api/workspaces/{workspaceId}/task-types
 
@@ -560,13 +588,21 @@ POST /api/workspaces/{workspaceId}/task-types
 }
 ~~~
 
-Workspace 내 동일 이름은 중복 생성할 수 없습니다.
+Workspace 내 동일 이름은 중복 생성할 수 없습니다. 비교 전 앞뒤 공백을 제거하고 영문 대소문자를 구분하지 않습니다. 같은 이름의 비활성 Task Type이 있으면 중복 생성 오류와 함께 기존 항목 재활성화를 안내합니다.
 
-## 5.6. Task Type 수정 / 비활성화
+## 5.7. Task Type 수정 / 비활성화 / 재활성화
 
 PATCH /api/workspaces/{workspaceId}/task-types/{taskTypeId}
 
-이미 사용된 Task Type은 삭제하지 않고 active=false로 전환합니다.
+기본 제공 Task Type과 사용자 정의 Task Type은 모두 이름 수정, 비활성화와 재활성화가 가능합니다. 비활성 Task Type은 기존 작업 응답에서 유지하지만 신규 작업 생성 후보에서는 제외합니다.
+
+## 5.8. Task Type 삭제
+
+DELETE /api/workspaces/{workspaceId}/task-types/{taskTypeId}
+
+기본 제공 Task Type과 사용자 정의 Task Type에 같은 삭제 규칙을 적용합니다. 서버는 삭제 요청 시점에 `project_tasks` 참조 여부를 최종 확인하며, 참조가 없을 때만 물리 삭제합니다.
+
+기존 작업에서 사용 중이면 삭제하지 않고 `409 TASK_TYPE_IN_USE`를 반환합니다. 화면은 삭제 불가 사유와 함께 더 이상 새 작업에서 사용하지 않으려면 비활성화하도록 안내합니다. 사용 여부 확인과 삭제는 동시 요청으로 참조가 생기는 상황을 막을 수 있도록 하나의 트랜잭션에서 처리하고, 데이터베이스 외래 키도 참조 중 삭제를 제한합니다.
 
 ---
 
@@ -1554,8 +1590,10 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또�
 | LAST_OWNER_REQUIRED | 409 | 마지막 Workspace OWNER 변경 불가 |
 | PROJECT_OWNER_CANNOT_BE_REMOVED | 409 | 현재 Project Owner 제거 불가 |
 | DUPLICATE_YOUTUBE_VIDEO | 409 | Workspace 내 YouTube 영상 중복 |
+| CHANNEL_IN_USE | 409 | 기존 Project나 업무 데이터에서 사용 중인 Channel 삭제 불가 |
 | INVALID_TASK_STATUS_TRANSITION | 409 | 잘못된 Task 상태 전이 |
 | TASK_ALREADY_SETTLED | 409 | 이미 정산된 Task |
+| TASK_TYPE_IN_USE | 409 | 기존 작업에서 사용 중인 작업 종류 삭제 불가 |
 | INVALID_RESOURCE_STATE | 409 | 현재 상태에서 수행할 수 없는 동작 |
 
 ---
@@ -1591,8 +1629,8 @@ POST /api/workspace-invitations/{id}/reject
 ~~~text
 GET/PATCH/DELETE Workspace Member API
 GET/POST/DELETE Invitation API
-GET/POST/PATCH Channel API
-GET/POST/PATCH Task Type API
+GET/POST/PATCH/DELETE Channel API
+GET/POST/PATCH/DELETE Task Type API
 ~~~
 
 ## SCR-05 Dashboard / Scheduler

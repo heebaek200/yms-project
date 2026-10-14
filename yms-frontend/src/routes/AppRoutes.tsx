@@ -9,6 +9,7 @@ import WorkspaceOnboardingPage from '../pages/WorkspaceOnboardingPage';
 import DashboardPage from '../pages/DashboardPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import ComingSoonPage from '../pages/ComingSoonPage';
+import WorkspaceSettingsPage from '../pages/WorkspaceSettingsPage';
 import AppLayout from '../layouts/AppLayout';
 import WorkspaceRouteStatus from '../components/routing/WorkspaceRouteStatus';
 import WorkspaceRoleRoute from '../components/routing/WorkspaceRoleRoute';
@@ -266,12 +267,12 @@ function AppRoutes() {
                     }
                 />
 
-                {/* SCR-04 현재 제작팀 관리 예정 Route */}
+                {/* SCR-04 현재 제작팀 관리 Route */}
                 <Route
                     path="/workspace/settings"
                     element={
                         <WorkspaceRoleRoute allowedRoles={WORKSPACE_ADMIN_ROLES}>
-                            <ComingSoonPage featureName="제작팀 관리" />
+                            <WorkspaceSettingsPage />
                         </WorkspaceRoleRoute>
                     }
                 />

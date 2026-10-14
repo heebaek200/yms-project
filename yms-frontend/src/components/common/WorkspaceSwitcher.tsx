@@ -7,6 +7,7 @@ import type { WorkspaceRole } from '../../types/workspace';
 import {
     WORKSPACE_SWITCHER_OPEN_EVENT
 } from '../../workspace/workspaceSwitcherEvents';
+import { confirmUnsavedChanges } from '../../navigation/unsavedChangesGuard';
 
 import './WorkspaceSwitcher.css';
 
@@ -128,6 +129,11 @@ function WorkspaceSwitcher() {
             return;
         }
 
+        // 열린 관리 폼의 미저장 값이 있으면 사용자가 폐기를 승인한 뒤에만 전환합니다.
+        if (!confirmUnsavedChanges()) {
+            return;
+        }
+
         const destination = getWorkspaceSwitchDestination(location.pathname);
 
         selectWorkspace(workspaceId);
@@ -237,6 +243,10 @@ function WorkspaceSwitcher() {
                             type="button"
                             className="workspace-switcher__all"
                             onClick={() => {
+                                if (!confirmUnsavedChanges()) {
+                                    return;
+                                }
+
                                 setIsOpen(false);
                                 navigate('/workspaces');
                             }}

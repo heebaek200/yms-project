@@ -7,6 +7,7 @@ import NotificationDrawer from './NotificationDrawer';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { getNavigationItems } from '../../routes/navigation';
+import { confirmUnsavedChanges } from '../../navigation/unsavedChangesGuard';
 
 /**
  * 인증 화면의 Workspace 전환, 주요 메뉴와 사용자 동작을 제공하는 공통 Header입니다.
@@ -88,6 +89,15 @@ function AppHeader() {
                 <NavLink
                     to="/dashboard"
                     className="app-header__brand"
+                    onClick={event => {
+                        // 실제로 화면을 벗어날 때만 미저장 변경 확인을 요청합니다.
+                        if (
+                            location.pathname !== '/dashboard'
+                            && !confirmUnsavedChanges()
+                        ) {
+                            event.preventDefault();
+                        }
+                    }}
                 >
                     YMS
                 </NavLink>
@@ -118,6 +128,15 @@ function AppHeader() {
                                         'app-nav__link',
                                         isActive ? 'app-nav__link--active' : ''
                                     ].filter(Boolean).join(' ')}
+                                    onClick={event => {
+                                        // 현재 메뉴 재선택은 이동이 아니므로 입력 흐름을 방해하지 않습니다.
+                                        if (
+                                            location.pathname !== item.path
+                                            && !confirmUnsavedChanges()
+                                        ) {
+                                            event.preventDefault();
+                                        }
+                                    }}
                                 >
                                     <span
                                         className="app-nav__icon"
@@ -181,7 +200,11 @@ function AppHeader() {
                             <button
                                 type="button"
                                 className="app-user-menu__item"
-                                onClick={() => navigate('/profile-setup')}
+                                onClick={() => {
+                                    if (confirmUnsavedChanges()) {
+                                        navigate('/profile-setup');
+                                    }
+                                }}
                             >
                                 프로필 설정
                             </button>
@@ -191,7 +214,11 @@ function AppHeader() {
                             <button
                                 type="button"
                                 className="app-user-menu__item app-user-menu__item--danger"
-                                onClick={signOut}
+                                onClick={() => {
+                                    if (confirmUnsavedChanges()) {
+                                        signOut();
+                                    }
+                                }}
                             >
                                 로그아웃
                             </button>
