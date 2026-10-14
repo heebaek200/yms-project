@@ -243,10 +243,6 @@ function WorkspaceSwitcher() {
                             type="button"
                             className="workspace-switcher__all"
                             onClick={() => {
-                                if (!confirmUnsavedChanges()) {
-                                    return;
-                                }
-
                                 setIsOpen(false);
                                 navigate('/workspaces');
                             }}

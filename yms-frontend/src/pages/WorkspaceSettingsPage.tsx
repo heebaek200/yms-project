@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { Link, useBlocker, useSearchParams } from 'react-router';
 
 import ChannelManagement from '../components/workspace-settings/ChannelManagement';
 import TaskTypeManagement from '../components/workspace-settings/TaskTypeManagement';
@@ -39,6 +39,13 @@ function WorkspaceSettingsPage() {
     const [isFormDirty, setIsFormDirty] = useState(false);
     const rawTab = searchParams.get('tab');
     const activeTab = parseSettingsTab(rawTab);
+    const blocker = useBlocker(({ currentLocation, nextLocation }) => (
+        isFormDirty
+        && (
+            currentLocation.pathname !== nextLocation.pathname
+            || currentLocation.search !== nextLocation.search
+        )
+    ));
 
     // Query가 없거나 알 수 없는 경우 canonical Channel 탭 URL로 교체합니다.
     useEffect(() => {
@@ -53,10 +60,36 @@ function WorkspaceSettingsPage() {
             return;
         }
 
-        return registerUnsavedChangesGuard(() => window.confirm(
-            '저장하지 않은 변경사항이 있습니다. 변경사항을 버리고 이동할까요?'
-        ));
+        return registerUnsavedChangesGuard(() => {
+            const shouldDiscard = window.confirm(
+                '저장하지 않은 변경사항이 있습니다. 변경사항을 버리고 이동할까요?'
+            );
+
+            // 제작팀 전환·로그아웃처럼 Route 밖의 상태 변경도 승인 뒤 중복 경고 없이 진행합니다.
+            if (shouldDiscard) {
+                setIsFormDirty(false);
+            }
+
+            return shouldDiscard;
+        });
     }, [isFormDirty]);
+
+    // Link와 브라우저 뒤로·앞으로 이동을 동일하게 차단하고 사용자 선택대로 재개합니다.
+    useEffect(() => {
+        if (blocker.state !== 'blocked') {
+            return;
+        }
+
+        if (window.confirm(
+            '저장하지 않은 변경사항이 있습니다. 변경사항을 버리고 이동할까요?'
+        )) {
+            setIsFormDirty(false);
+            window.setTimeout(blocker.proceed, 0);
+            return;
+        }
+
+        blocker.reset();
+    }, [blocker]);
 
     // 브라우저 새로고침이나 탭 닫기도 미저장 입력이 있을 때 기본 경고를 표시합니다.
     useEffect(() => {
@@ -77,23 +110,6 @@ function WorkspaceSettingsPage() {
         setIsFormDirty(false);
     }, [currentWorkspace?.workspaceId]);
 
-    /** 미저장 확인을 통과한 경우에만 URL의 활성 관리 탭을 변경합니다. */
-    const handleTabChange = useCallback((tab: SettingsTab) => {
-        if (tab === activeTab) {
-            return;
-        }
-
-        // 입력 직후의 빠른 클릭도 Effect 등록 시점과 무관하게 현재 Dirty 상태로 차단합니다.
-        if (isFormDirty && !window.confirm(
-            '저장하지 않은 변경사항이 있습니다. 변경사항을 버리고 이동할까요?'
-        )) {
-            return;
-        }
-
-        setIsFormDirty(false);
-        setSearchParams({ tab });
-    }, [activeTab, isFormDirty, setSearchParams]);
-
     if (!currentWorkspace) {
         return null;
     }
@@ -108,26 +124,24 @@ function WorkspaceSettingsPage() {
                 </p>
             </header>
 
-            <nav className="workspace-settings-tabs" role="tablist" aria-label="제작팀 관리 메뉴">
+            <nav className="workspace-settings-tabs" aria-label="제작팀 관리 메뉴">
                 {SETTINGS_TABS.map(tab => (
-                    <button
+                    <Link
                         key={tab.key}
-                        type="button"
-                        role="tab"
-                        aria-selected={activeTab === tab.key}
+                        to={`/workspace/settings?tab=${tab.key}`}
+                        aria-current={activeTab === tab.key ? 'page' : undefined}
                         className={activeTab === tab.key
                             ? 'workspace-settings-tab workspace-settings-tab--active'
                             : 'workspace-settings-tab'
                         }
-                        onClick={() => handleTabChange(tab.key)}
                     >
                         <span aria-hidden="true">{tab.icon}</span>
                         {tab.label}
-                    </button>
+                    </Link>
                 ))}
             </nav>
 
-            <div className="workspace-settings-content" role="tabpanel">
+            <div className="workspace-settings-content">
                 {activeTab === 'channels' && (
                     <ChannelManagement
                         key={`channels-${currentWorkspace.workspaceId}`}

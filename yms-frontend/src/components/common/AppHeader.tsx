@@ -89,15 +89,6 @@ function AppHeader() {
                 <NavLink
                     to="/dashboard"
                     className="app-header__brand"
-                    onClick={event => {
-                        // 실제로 화면을 벗어날 때만 미저장 변경 확인을 요청합니다.
-                        if (
-                            location.pathname !== '/dashboard'
-                            && !confirmUnsavedChanges()
-                        ) {
-                            event.preventDefault();
-                        }
-                    }}
                 >
                     YMS
                 </NavLink>
@@ -128,15 +119,6 @@ function AppHeader() {
                                         'app-nav__link',
                                         isActive ? 'app-nav__link--active' : ''
                                     ].filter(Boolean).join(' ')}
-                                    onClick={event => {
-                                        // 현재 메뉴 재선택은 이동이 아니므로 입력 흐름을 방해하지 않습니다.
-                                        if (
-                                            location.pathname !== item.path
-                                            && !confirmUnsavedChanges()
-                                        ) {
-                                            event.preventDefault();
-                                        }
-                                    }}
                                 >
                                     <span
                                         className="app-nav__icon"
@@ -201,9 +183,7 @@ function AppHeader() {
                                 type="button"
                                 className="app-user-menu__item"
                                 onClick={() => {
-                                    if (confirmUnsavedChanges()) {
-                                        navigate('/profile-setup');
-                                    }
+                                    navigate('/profile-setup');
                                 }}
                             >
                                 프로필 설정
