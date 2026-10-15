@@ -151,6 +151,14 @@
     gap: 8px;
 }
 
+/* 크리에이터만 제공하는 단가 기능을 역할 선택 시점에 짧게 안내합니다. */
+.setup-role-guide {
+    margin: 4px 0 0;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
 .role-option,
 .scope-option {
     display: flex;

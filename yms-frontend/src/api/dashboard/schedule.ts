@@ -5,6 +5,7 @@ import type {
     ApiResponse,
     ApiSuccessResponse
 } from '../types';
+import type { UserRole } from '../../types/auth';
 
 // Mock 시나리오
 type MockScenario =
@@ -44,9 +45,7 @@ export type TaskStatus =
 export type ScheduleRoleFilter =
     | 'ALL'
     | 'MY_TASK'
-    | 'CREATOR'
-    | 'EDITOR'
-    | 'THUMBNAILER';
+    | UserRole;
 
 // 프로젝트 상태 필터
 export type ScheduleStatusFilter =

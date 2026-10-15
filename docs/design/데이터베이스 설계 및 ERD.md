@@ -118,7 +118,7 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | 도메인 | 테이블 | 설명 |
 | --- | --- | --- |
 | 사용자 | users | 사용자 계정 및 기본 프로필 |
-| 사용자 | user_roles | CREATOR / EDITOR / THUMBNAILER 다중 역할 |
+| 사용자 | user_roles | 전역 고정 전문 역할의 사용자별 다중 매핑 |
 | 사용자 | creator_revenue_settings | CREATOR의 기본 조회수 1회당 수익 단가 |
 | Workspace | workspaces | 조직 / 팀 단위 최상위 업무 영역 |
 | Workspace | workspace_members | Workspace 참여자 및 권한 |
@@ -169,7 +169,7 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | --- | --- | --- | --- |
 | user_role_id | BIGINT | PK | 역할 매핑 ID |
 | user_id | BIGINT | FK → users | 사용자 |
-| role_name | VARCHAR(30) | NOT NULL | CREATOR / EDITOR / THUMBNAILER |
+| role_name | VARCHAR(30) | NOT NULL | CREATOR / PLANNER / WRITER / VIDEOGRAPHER / EDITOR / THUMBNAILER |
 | is_active | BOOLEAN | NOT NULL | 현재 사용 여부 |
 | created_by | BIGINT | NULL | 등록 사용자 |
 | created_at | DATETIME | NOT NULL | 등록 시각 |
@@ -181,6 +181,8 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 - `UNIQUE(user_id, role_name)`
 - 역할을 다시 선택하는 경우 새 행을 만들기보다 `is_active`를 재활성화합니다.
 - 역할명은 애플리케이션 Enum으로 관리합니다.
+- CREATOR는 조회수 기반 예상 수익 기본 단가 기능을 제공하는 기능 역할이며 나머지 전문 역할은 담당자 검색과 필터에 사용합니다.
+- 세부 업무 종류는 `task_types`에서 Workspace별로 확장하며 전문 역할을 사용자 정의하지 않습니다.
 
 ## 4.3. creator_revenue_settings
 
@@ -246,7 +248,11 @@ Workspace 삭제 시 하위 업무 이력까지 즉시 물리 삭제하지 않�
 
 - `UNIQUE(workspace_id, user_id)`
 - Workspace에는 항상 최소 한 명의 ACTIVE OWNER가 존재해야 합니다.
-- 재참여 시 중복 행을 만들지 않고 기존 멤버 상태를 ACTIVE로 변경합니다.
+- 복수 OWNER를 허용하며 OWNER만 다른 ACTIVE 멤버에게 OWNER 권한을 부여할 수 있습니다.
+- OWNER는 다른 ACTIVE OWNER가 있을 때만 자신의 권한을 ADMIN 또는 MEMBER로 변경할 수 있습니다.
+- ADMIN은 일반 MEMBER만 제외할 수 있으며 OWNER·ADMIN 권한 변경과 제외는 허용하지 않습니다.
+- 재참여 시 중복 행을 만들지 않고 기존 멤버 상태를 ACTIVE, Workspace 권한을 MEMBER로 변경합니다.
+- 자기 자신을 제외하는 제작팀 나가기 기능은 현재 범위에 포함하지 않습니다.
 
 ## 5.3. workspace_invitations
 
@@ -264,7 +270,9 @@ Workspace 초대 흐름을 기록합니다.
 | expires_at | DATETIME | NULL | 초대 만료 시각 |
 | responded_at | DATETIME | NULL | 수락 / 거절 시각 |
 
-동일 Workspace / 이메일에 PENDING 초대가 중복 생성되지 않도록 애플리케이션에서 검증합니다.
+동일 Workspace / 정규화 이메일에 유효한 PENDING 초대가 중복 생성되지 않도록 애플리케이션에서 검증합니다. 만료 여부는 `status=PENDING`과 `expires_at`을 함께 사용해 판정하며 별도 EXPIRED 상태를 저장하지 않습니다.
+
+ACTIVE 멤버에게는 초대를 생성할 수 없지만 LEFT 또는 REMOVED 멤버는 다시 초대할 수 있습니다. 초대 수락 시 기존 `workspace_members` 행을 ACTIVE·MEMBER 상태로 복구합니다.
 
 ## 5.4. channels
 

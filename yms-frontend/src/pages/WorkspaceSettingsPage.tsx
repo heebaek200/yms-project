@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import { Link, useBlocker, useSearchParams } from 'react-router';
 
 import ChannelManagement from '../components/workspace-settings/ChannelManagement';
+import MemberManagement from '../components/workspace-settings/MemberManagement';
 import TaskTypeManagement from '../components/workspace-settings/TaskTypeManagement';
 import { useWorkspace } from '../hooks/useWorkspace';
 import {
@@ -31,7 +32,7 @@ function parseSettingsTab(value: string | null): SettingsTab {
 
 /**
  * SCR-04 제작팀 관리의 공통 Header와 URL 기반 탭을 제공합니다.
- * Channel·Task Type 기능은 현재 이슈에서, 멤버 기능은 #35의 연결 위치로 분리합니다.
+ * Channel·작업 종류·멤버 관리 기능을 URL 기반 탭에서 같은 조작 순서로 제공합니다.
  */
 function WorkspaceSettingsPage() {
     const { currentWorkspace } = useWorkspace();
@@ -159,11 +160,11 @@ function WorkspaceSettingsPage() {
                 )}
 
                 {activeTab === 'members' && (
-                    <section className="settings-members-preview" aria-labelledby="members-preview-title">
-                        <span aria-hidden="true">🪄</span>
-                        <h2 id="members-preview-title">멤버 관리도 곧 합류해요</h2>
-                        <p>#35에서 멤버와 초대 관리 기능을 이 자리에 이어 붙일 예정입니다.</p>
-                    </section>
+                    <MemberManagement
+                        key={`members-${currentWorkspace.workspaceId}`}
+                        workspaceId={currentWorkspace.workspaceId}
+                        onDirtyChange={setIsFormDirty}
+                    />
                 )}
             </div>
         </section>

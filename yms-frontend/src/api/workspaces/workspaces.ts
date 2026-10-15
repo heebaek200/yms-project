@@ -1,4 +1,5 @@
 import type { WorkspaceSummary } from '../../types/workspace';
+import type { WorkspaceRole } from '../../types/workspace';
 import type {
     ApiResponse,
     ApiSuccessResponse
@@ -113,4 +114,19 @@ export function addMockWorkspaceMembership(workspace: WorkspaceSummary) {
     }
 
     mockWorkspaces = [...mockWorkspaces, { ...workspace }];
+}
+
+/**
+ * 멤버 관리 Mock에서 현재 사용자의 제작팀 권한 변경을 목록 저장소에 반영합니다.
+ * Context는 이후 목록을 재조회하여 Route Guard와 Header에 최신 권한을 전달합니다.
+ */
+export function updateMockWorkspaceRole(
+    workspaceId: number,
+    workspaceRole: WorkspaceRole
+) {
+    mockWorkspaces = mockWorkspaces.map(workspace => (
+        workspace.workspaceId === workspaceId
+            ? { ...workspace, myRole: workspaceRole }
+            : workspace
+    ));
 }
