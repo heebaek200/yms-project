@@ -29,7 +29,7 @@ YMS는 Workspace를 업무 데이터의 최상위 경계로 사용합니다.
 
 - REST API는 화면의 모양보다 도메인 리소스를 기준으로 설계합니다.
 - PROJECT / CAMPAIGN / CHANNEL 등 Workspace 하위 리소스는 다른 Workspace와 섞이지 않도록 서버에서 다시 검증합니다.
-- CREATOR / EDITOR / THUMBNAILER 전문 역할과 OWNER / ADMIN / MEMBER Workspace 권한을 분리합니다.
+- CREATOR / PLANNER / WRITER / VIDEOGRAPHER / EDITOR / THUMBNAILER 전문 역할과 OWNER / ADMIN / MEMBER Workspace 권한을 분리합니다.
 - Project의 EDIT / VIEW 권한은 Workspace 전체 재무 정보 접근 권한을 의미하지 않습니다.
 - 금액과 조회수 1회당 수익 단가처럼 BigDecimal 성격의 값은 JSON에서 String으로 전달합니다.
 - 실제 Revenue와 조회수 기반 예상 수익을 구분합니다.
@@ -252,12 +252,12 @@ PATCH /api/users/me/profile
 | 필드 | 타입 | 필수 | 제약 |
 | --- | --- | --- | --- |
 | name | String | N | 2~50자 |
-| roles | Array(String) | N | CREATOR / EDITOR / THUMBNAILER, 최소 1개 |
+| roles | Array(String) | N | CREATOR / PLANNER / WRITER / VIDEOGRAPHER / EDITOR / THUMBNAILER, 최소 1개 |
 | longFormRate | String | N | 0 이상, 소수 6자리 이내 |
 | shortFormRate | String | N | 0 이상, 소수 6자리 이내 |
 | rateScope | String | N | FUTURE_ONLY / INCLUDE_UNFINALIZED |
 
-CREATOR 역할이 포함된 상태에서 단가를 신규 설정하거나 변경할 수 있습니다.
+전문 역할은 전역 고정 Enum으로 관리합니다. CREATOR 역할이 포함된 상태에서만 단가를 신규 설정하거나 변경할 수 있으며, 클라이언트는 역할 선택 영역에서 이 기능 차이를 안내합니다.
 
 SCR-02에서 CREATOR가 `longFormRate` 또는 `shortFormRate`를 입력하지 않으면 클라이언트는 해당 값을 문자열 `"0"`으로 변환하여 요청합니다. 따라서 프로필 저장 이후 CREATOR의 미입력 단가는 0원으로 취급합니다.
 
@@ -328,10 +328,26 @@ GET /api/workspaces/{workspaceId}/members
 
 Query:
 
-- status: ACTIVE / LEFT / REMOVED / ALL
-- keyword
-- page
-- size
+- `status`: ACTIVE / LEFT / REMOVED / ALL, 기본 ACTIVE
+- `keyword`: 이름·이메일 검색
+- `professionalRole`: ALL / CREATOR / PLANNER / WRITER / VIDEOGRAPHER / EDITOR / THUMBNAILER
+- `workspaceRole`: ALL / OWNER / ADMIN / MEMBER
+- `page`
+- `size`
+
+여러 검색 조건은 AND로 결합하고 `professionalRole`은 사용자의 활성 전문 역할 중 하나라도 일치하면 포함합니다.
+
+멤버 응답 항목:
+
+- workspaceMemberId
+- userId
+- name
+- email
+- professionalRoles
+- workspaceRole
+- status
+- joinedAt
+- leftAt
 
 ## 4.6. Workspace 멤버 권한 변경
 
@@ -348,9 +364,14 @@ PATCH /api/workspaces/{workspaceId}/members/{workspaceMemberId}
 주요 오류:
 
 - LAST_OWNER_REQUIRED → 409
-- FORBIDDEN_WORKSPACE_ADMIN → 403
+- FORBIDDEN_WORKSPACE_MEMBER_MANAGEMENT → 403
+- WORKSPACE_MEMBER_NOT_FOUND → 404
 
-마지막 ACTIVE OWNER를 MEMBER 또는 ADMIN으로 내릴 수 없습니다.
+OWNER만 ACTIVE 멤버의 Workspace Role을 변경할 수 있습니다. OWNER 승격을 포함해 복수 OWNER를 허용하지만 마지막 ACTIVE OWNER를 MEMBER 또는 ADMIN으로 내릴 수 없습니다.
+
+OWNER는 다른 ACTIVE OWNER가 있을 때만 자신의 권한을 ADMIN 또는 MEMBER로 낮출 수 있습니다. 현재 사용자가 MEMBER로 변경된 이후 관리 API와 SCR-04 접근은 403으로 처리합니다.
+
+SCR-04는 마지막 OWNER에게 불필요한 이메일 확인 절차를 요구하지 않도록 기존 4.5 멤버 목록 API를 `status=ACTIVE&workspaceRole=OWNER` 조건으로 호출해 사전 확인합니다. 별도 사전 검증 API는 추가하지 않으며, 조회와 변경 사이의 경합에 대비해 이 PATCH 요청이 `LAST_OWNER_REQUIRED`를 최종 검증합니다.
 
 ## 4.7. Workspace 멤버 제외
 
@@ -358,7 +379,13 @@ DELETE /api/workspaces/{workspaceId}/members/{workspaceMemberId}
 
 실제 row 물리 삭제가 아니라 status를 REMOVED로 변경합니다.
 
-마지막 OWNER는 제외할 수 없습니다.
+권한 규칙:
+
+- OWNER: 자기 자신을 제외할 수 없고 마지막 ACTIVE OWNER를 제외할 수 없으며, 그 외 ACTIVE 멤버를 제외할 수 있음
+- ADMIN: 일반 MEMBER만 제외할 수 있음
+- MEMBER: 제외 API 사용 불가
+
+LEFT 또는 REMOVED 멤버에는 제외 요청을 보내지 않습니다. 자기 자신을 제외하는 제작팀 나가기는 별도 기능으로 두고 이 API의 현재 범위에 포함하지 않습니다.
 
 ## 4.8. 내 Workspace 초대 목록
 
@@ -407,10 +434,22 @@ GET /api/workspaces/{workspaceId}/invitations
 
 Query:
 
+- `status`: PENDING / ACCEPTED / REJECTED / CANCELLED / EXPIRED / ALL, 기본 PENDING
+- `keyword`: 초대 이메일 검색
+- `page`
+- `size`
+
+`PENDING`은 현재 시각 기준으로 만료되지 않은 초대만 반환합니다. `EXPIRED`는 DB 상태를 추가하지 않고 `status=PENDING AND expiresAt <= now` 조건으로 조회하는 파생 필터입니다. 결과는 `sentAt` 내림차순으로 정렬합니다.
+
+응답 항목:
+
+- invitationId
+- email
+- inviterName
 - status
-- keyword
-- page
-- size
+- sentAt
+- expiresAt
+- respondedAt
 
 ## 4.10. Workspace 초대 생성
 
@@ -426,6 +465,10 @@ POST /api/workspaces/{workspaceId}/invitations
 
 가입 여부와 관계없이 초대할 수 있습니다.
 
+초대 요청에는 Workspace Role을 포함하지 않으며 수락 시 항상 MEMBER로 참여합니다. ACTIVE 멤버는 초대할 수 없지만 LEFT 또는 REMOVED 멤버는 다시 초대할 수 있습니다. 재참여 수락 시 기존 Workspace Member 행을 ACTIVE로 복구하고 Workspace Role을 MEMBER로 초기화합니다.
+
+재전송 전용 API는 제공하지 않습니다. 기존 유효한 PENDING 초대가 없을 때 같은 생성 API로 새 초대를 발송합니다.
+
 주요 오류:
 
 - ALREADY_WORKSPACE_MEMBER → 409
@@ -438,6 +481,8 @@ POST /api/workspace-invitations/{invitationId}/accept
 POST /api/workspace-invitations/{invitationId}/reject
 
 현재 인증 사용자가 수신한 PENDING 상태의 유효한 초대만 처리할 수 있습니다.
+
+초대 수락 시 ACTIVE 멤버가 새로 중복 생성되지 않도록 다시 검증합니다. 기존 Workspace Member가 LEFT 또는 REMOVED 상태라면 새 행을 만들지 않고 ACTIVE로 복구하며 Workspace Role은 MEMBER로 설정합니다.
 
 수락 응답 예:
 
@@ -489,7 +534,7 @@ DELETE /api/workspace-invitations/{invitationId}
 
 - 해당 Workspace OWNER / ADMIN
 
-PENDING 초대를 CANCELLED로 변경합니다.
+현재 시각 기준으로 유효한 PENDING 초대를 CANCELLED로 변경합니다. OWNER와 ADMIN 모두 취소할 수 있으며 이미 처리되거나 만료된 초대는 변경하지 않습니다.
 
 ---
 
@@ -641,7 +686,7 @@ Query:
 | startDate | Y | YYYY-MM-DD |
 | endDate | Y | YYYY-MM-DD |
 | status | N | ALL / PLANNING / EDITING / REVIEW / UPLOADED / CANCELLED |
-| role | N | ALL / MY_TASK / CREATOR / EDITOR / THUMBNAILER |
+| role | N | ALL / MY_TASK / CREATOR / PLANNER / WRITER / VIDEOGRAPHER / EDITOR / THUMBNAILER |
 | channelId | N | Channel 필터 |
 | keyword | N | Project / Task 검색, 최대 50자 |
 
@@ -1557,6 +1602,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또�
 | UNAUTHORIZED_SESSION | 401 | 인증 누락 / 만료 |
 | FORBIDDEN_WORKSPACE_ACCESS | 403 | Workspace 접근 불가 |
 | FORBIDDEN_WORKSPACE_ADMIN | 403 | Workspace 관리 권한 없음 |
+| FORBIDDEN_WORKSPACE_MEMBER_MANAGEMENT | 403 | Workspace 멤버 권한 변경 또는 제외 권한 없음 |
 | FORBIDDEN_WORKSPACE_INVITATION | 403 | 현재 사용자가 수신한 Workspace 초대가 아님 |
 | FORBIDDEN_PROJECT_ACCESS | 403 | Project 접근 불가 |
 | INSUFFICIENT_PROJECT_PERMISSIONS | 403 | Project 수정 권한 없음 |
@@ -1573,6 +1619,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또�
 | RESOURCE_NOT_FOUND | 404 | 일반 리소스 없음 |
 | PROJECT_NOT_FOUND | 404 | Project 없음 |
 | WORKSPACE_NOT_FOUND | 404 | Workspace 없음 |
+| WORKSPACE_MEMBER_NOT_FOUND | 404 | Workspace 멤버 없음 |
 | WORKSPACE_INVITATION_NOT_FOUND | 404 | Workspace 초대 없음 |
 | CAMPAIGN_NOT_FOUND | 404 | Campaign 없음 |
 | CHANNEL_NOT_FOUND | 404 | Channel 없음 |
@@ -1582,7 +1629,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또�
 | errorCode | HTTP | 설명 |
 | --- | --- | --- |
 | DUPLICATE_EMAIL | 409 | 이메일 중복 |
-| ALREADY_WORKSPACE_MEMBER | 409 | 이미 Workspace 멤버 |
+| ALREADY_WORKSPACE_MEMBER | 409 | 이미 ACTIVE 상태인 Workspace 멤버 |
 | PENDING_INVITATION_EXISTS | 409 | 대기 초대 중복 |
 | WORKSPACE_INVITATION_NOT_PENDING | 409 | 처리할 수 없는 Workspace 초대 상태 |
 | WORKSPACE_INVITATION_EXPIRED | 409 | 만료된 Workspace 초대 |

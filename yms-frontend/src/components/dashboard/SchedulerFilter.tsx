@@ -1,5 +1,6 @@
 import type { ScheduleRoleFilter, ScheduleStatusFilter } from '../../api/dashboard/schedule';
 import type { ChannelSummary } from '../../types/workspace';
+import { PROFESSIONAL_ROLE_OPTIONS } from '../../professionalRoles';
 
 import './SchedulerFilter.css';
 
@@ -125,17 +126,11 @@ function SchedulerFilter({
                         내 작업
                     </option>
 
-                    <option value="CREATOR">
-                        크리에이터
-                    </option>
-
-                    <option value="EDITOR">
-                        편집자
-                    </option>
-
-                    <option value="THUMBNAILER">
-                        썸네일러
-                    </option>
+                    {PROFESSIONAL_ROLE_OPTIONS.map(roleOption => (
+                        <option key={roleOption.value} value={roleOption.value}>
+                            {roleOption.label}
+                        </option>
+                    ))}
                 </select>
             </div>
 

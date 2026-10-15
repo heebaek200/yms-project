@@ -1,6 +1,9 @@
 // 유저 역할 범위
 export type UserRole =
     | 'CREATOR'
+    | 'PLANNER'
+    | 'WRITER'
+    | 'VIDEOGRAPHER'
     | 'EDITOR'
     | 'THUMBNAILER';
 

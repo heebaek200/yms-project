@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserRole, RateScope } from '../types/auth';
+import { PROFESSIONAL_ROLE_OPTIONS } from '../professionalRoles';
 import { isValidName, validateRate } from '../utils/validation';
 import { formatRate, normalizeRateInput } from '../utils/format';
 import './ProfileSetupPage.css';
@@ -321,35 +322,21 @@ function ProfileSetupPage() {
                         <h2>전문 역할 설정</h2>
 
                         <div className="role-options">
-
-                            <label className="role-option">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedRoles.includes('CREATOR')}
-                                    onChange={() => handleRoleChange('CREATOR')}
-                                />
-                                <span>크리에이터</span>
-                            </label>
-
-                            <label className="role-option">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedRoles.includes('EDITOR')}
-                                    onChange={() => handleRoleChange('EDITOR')}
-                                />
-                                <span>영상 편집자</span>
-                            </label>
-
-                            <label className="role-option">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedRoles.includes('THUMBNAILER')}
-                                    onChange={() => handleRoleChange('THUMBNAILER')}
-                                />
-                                <span>섬네일 디자이너</span>
-                            </label>
-
+                            {PROFESSIONAL_ROLE_OPTIONS.map(role => (
+                                <label key={role.value} className="role-option">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedRoles.includes(role.value)}
+                                        onChange={() => handleRoleChange(role.value)}
+                                    />
+                                    <span>{role.label}</span>
+                                </label>
+                            ))}
                         </div>
+
+                        <p className="setup-role-guide">
+                            크리에이터를 선택하면 조회수 기반 예상 수익 계산에 사용할 롱폼·쇼츠 기본 단가를 설정할 수 있습니다.
+                        </p>
                     </section>
 
                     <section

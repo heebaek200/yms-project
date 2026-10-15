@@ -17,51 +17,89 @@
         <strong>YMS Media Team</strong>
         <span class="grow"></span>
         <button class="small-button" type="button">멤버 초대</button>
-        <button class="small-button" type="button">채널 추가</button>
     </div>
 
-    <nav class="tab-row">
-        <button class="tab is-active" type="button">멤버</button>
-        <button class="tab" type="button">채널</button>
-        <button class="tab" type="button">작업 종류</button>
+    <nav class="tab-row" aria-label="제작팀 관리 메뉴">
+        <a class="tab is-active" href="?tab=members" aria-current="page">멤버</a>
+        <a class="tab" href="?tab=channels">채널</a>
+        <a class="tab" href="?tab=task-types">작업 종류</a>
     </nav>
 
     <section class="screen-frame">
         <h2 class="section-title">멤버 관리</h2>
+        <div class="toolbar">
+            <input type="search" aria-label="이름 또는 이메일 검색" placeholder="이름 또는 이메일 검색">
+            <select aria-label="멤버 상태"><option>활동 중</option><option>전체</option><option>탈퇴</option><option>제외됨</option></select>
+            <select aria-label="전문 역할"><option>전체 전문 역할</option><option>크리에이터</option><option>콘텐츠 기획자</option><option>작가</option><option>촬영 담당</option><option>영상 편집자</option><option>썸네일 디자이너</option></select>
+            <select aria-label="제작팀 권한"><option>전체 제작팀 권한</option><option>소유자</option><option>관리자</option><option>멤버</option></select>
+        </div>
         <div class="table-wrap">
             <table class="table">
                 <thead>
-                    <tr><th>이름</th><th>이메일</th><th>전문 역할</th><th>권한</th><th>관리</th></tr>
+                    <tr><th>이름</th><th>이메일</th><th>전문 역할</th><th>제작팀 권한</th><th>상태</th><th>관리</th></tr>
                 </thead>
                 <tbody>
-                    <tr><td>김대표</td><td>owner@example.com</td><td>CREATOR</td><td>OWNER</td><td>소유자</td></tr>
-                    <tr><td>박관리</td><td>admin@example.com</td><td>CREATOR</td><td>ADMIN</td><td><button class="small-button">권한 변경</button></td></tr>
-                    <tr><td>이편집</td><td>editor@example.com</td><td>EDITOR</td><td>MEMBER</td><td><button class="small-button">제외</button></td></tr>
+                    <tr><td>김대표 (나)</td><td>owner@example.com</td><td><span class="badge">크리에이터</span> <span class="badge">콘텐츠 기획자</span></td><td><span class="badge">소유자</span></td><td>활동 중</td><td><button class="small-button">권한 변경</button></td></tr>
+                    <tr><td>박관리</td><td>admin@example.com</td><td><span class="badge">작가</span></td><td><span class="badge">관리자</span></td><td>활동 중</td><td><button class="small-button">권한 변경</button> <button class="small-button">제외</button></td></tr>
+                    <tr><td>이편집</td><td>editor@example.com</td><td><span class="badge">영상 편집자</span> <span class="badge">촬영 담당</span></td><td><span class="badge">멤버</span></td><td>활동 중</td><td><button class="small-button">권한 변경</button> <button class="small-button">제외</button></td></tr>
                 </tbody>
             </table>
         </div>
     </section>
 
-    <section class="grid-2" style="margin-top: 16px;">
-        <div class="panel">
-            <h2 class="section-title">채널 관리</h2>
-            <ul class="list">
-                <li class="list-item">테크 리뷰 채널 <span class="badge">연동됨</span></li>
-                <li class="list-item">쇼츠 실험 채널 <span class="badge">수동 등록</span></li>
-                <li class="list-item">여행 기록 채널 <span class="badge">연동 오류</span></li>
-            </ul>
-        </div>
-
-        <div class="panel">
-            <h2 class="section-title">작업 종류</h2>
-            <ul class="list">
-                <li class="list-item">가편집 <span class="badge">사용</span></li>
-                <li class="list-item">종합 편집 <span class="badge">사용</span></li>
-                <li class="list-item">자막 <span class="badge">사용</span></li>
-                <li class="list-item">썸네일 <span class="badge">사용</span></li>
-            </ul>
+    <section class="modal-preview" style="margin-top: 24px;">
+        <div class="screen-label">소유자 권한 변경 2단계 확인 모달 예시</div>
+        <div class="modal-box">
+            <h2 class="section-title">소유자 권한을 부여할까요?</h2>
+            <p><strong>관리자 → 소유자</strong></p>
+            <p class="help-text">박관리 님은 다른 멤버의 권한 변경과 소유자 지정 등 제작팀의 모든 관리 권한을 갖게 됩니다.</p>
+            <div class="form-group">
+                <label for="owner-confirm-email">확인을 위해 admin@example.com을 입력해 주세요.</label>
+                <input id="owner-confirm-email" type="email" placeholder="admin@example.com">
+            </div>
+            <div class="row"><button class="small-button" type="button">돌아가기</button><button class="small-button" type="button">소유자로 변경</button></div>
+            <p class="help-text">OWNER 강등은 붉은색 경고 스타일과 `소유자 권한 해제` 버튼을 사용합니다. 자기 강등 시 다른 소유자만 권한을 복구할 수 있음을 추가로 표시합니다. 다른 OWNER 제외도 `소유자 → 제외됨`과 대상 이메일 재입력을 요구하는 같은 수준의 위험 확인을 사용합니다.</p>
         </div>
     </section>
+
+    <section class="screen-frame" style="margin-top: 16px;">
+        <div class="row between wrap">
+            <h2 class="section-title">초대 내역</h2>
+            <button class="small-button" type="button">멤버 초대</button>
+        </div>
+        <div class="toolbar">
+            <input type="search" aria-label="초대 이메일 검색" placeholder="초대 이메일 검색">
+            <select aria-label="초대 상태"><option>대기 중</option><option>전체</option><option>수락</option><option>거절</option><option>취소</option><option>만료됨</option></select>
+        </div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr><th>이메일</th><th>초대한 사람</th><th>발송 시각</th><th>만료 시각</th><th>상태</th><th>관리</th></tr></thead>
+                <tbody><tr><td>new-editor@example.com</td><td>김대표</td><td>2026-10-15 10:00</td><td>2026-10-22 10:00</td><td><span class="badge">대기 중</span></td><td><button class="small-button">초대 취소</button></td></tr></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="modal-preview" style="margin-top: 24px;">
+        <div class="screen-label">멤버 초대 모달 예시</div>
+        <div class="modal-box">
+            <h2 class="section-title">멤버 초대</h2>
+            <div class="form-group"><label for="invite-email">이메일</label><input id="invite-email" type="email" placeholder="member@example.com"></div>
+            <p class="help-text">초대를 수락하면 멤버 권한으로 참여합니다.</p>
+            <div class="row"><button class="small-button" type="button">취소</button><button class="small-button" type="button">초대 보내기</button></div>
+        </div>
+    </section>
+
+    <aside class="note-box">
+        <strong>권한 규칙</strong>
+        <ul>
+            <li>소유자만 권한을 변경하고 다른 사용자를 소유자로 지정할 수 있습니다.</li>
+            <li>관리자는 일반 멤버 초대와 제외만 할 수 있습니다.</li>
+            <li>마지막 활동 중 소유자는 강등하거나 제외할 수 없습니다.</li>
+            <li>소유자 승격·강등은 대상 이메일을 재입력하는 2단계 확인을 거칩니다.</li>
+            <li>다른 소유자를 제작팀에서 제외할 때도 대상 이메일을 다시 입력해야 합니다.</li>
+            <li>탈퇴·제외 멤버는 다시 초대할 수 있으며 수락 시 멤버로 복구됩니다.</li>
+        </ul>
+    </aside>
 </main>
 </body>
 </html>
