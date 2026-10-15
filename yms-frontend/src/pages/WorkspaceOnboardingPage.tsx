@@ -16,6 +16,7 @@ import FeedbackMessage, {
 import WorkspaceCard from '../components/workspace/WorkspaceCard';
 import WorkspaceCreateForm from '../components/workspace/WorkspaceCreateForm';
 import WorkspaceInvitationList from '../components/workspace/WorkspaceInvitationList';
+import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../hooks/useWorkspace';
 import type { WorkspaceInvitation } from '../types/workspace';
 
@@ -43,6 +44,7 @@ const EMPTY_CREATE_FIELD_ERRORS: CreateFieldErrors = {
  */
 function WorkspaceOnboardingPage() {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const {
         workspaces,
         currentWorkspace,
@@ -73,11 +75,17 @@ function WorkspaceOnboardingPage() {
      * 조회 실패 시 기존 목록을 비우고 해당 영역에 재시도 가능한 오류를 표시합니다.
      */
     const loadInvitations = useCallback(async () => {
+        if (!user) {
+            setInvitations([]);
+            setIsInvitationLoading(false);
+            return;
+        }
+
         try {
             setIsInvitationLoading(true);
             setInvitationLoadError('');
 
-            const response = await getPendingWorkspaceInvitations();
+            const response = await getPendingWorkspaceInvitations(user.email);
             setInvitations(response.data);
         } catch (error) {
             console.error(error);
@@ -86,7 +94,7 @@ function WorkspaceOnboardingPage() {
         } finally {
             setIsInvitationLoading(false);
         }
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         void loadInvitations();
@@ -194,7 +202,7 @@ function WorkspaceOnboardingPage() {
      * 수락만으로 자동 입장하지 않고 사용자가 새 카드에서 명시적으로 선택하도록 유지합니다.
      */
     const handleInvitationAccept = async (invitationId: number) => {
-        if (processingInvitationIds.has(invitationId)) {
+        if (!user || processingInvitationIds.has(invitationId)) {
             return;
         }
 
@@ -202,7 +210,7 @@ function WorkspaceOnboardingPage() {
             setInvitationProcessing(invitationId, true);
             setFeedback(null);
 
-            const response = await acceptWorkspaceInvitation(invitationId);
+            const response = await acceptWorkspaceInvitation(invitationId, user);
 
             if (!response.success) {
                 setFeedback({ type: 'error', message: response.message });
@@ -232,7 +240,7 @@ function WorkspaceOnboardingPage() {
      * 처리 중에는 해당 초대의 수락과 거절 버튼만 비활성화합니다.
      */
     const handleInvitationReject = async (invitationId: number) => {
-        if (processingInvitationIds.has(invitationId)) {
+        if (!user || processingInvitationIds.has(invitationId)) {
             return;
         }
 
@@ -240,7 +248,10 @@ function WorkspaceOnboardingPage() {
             setInvitationProcessing(invitationId, true);
             setFeedback(null);
 
-            const response = await rejectWorkspaceInvitation(invitationId);
+            const response = await rejectWorkspaceInvitation(
+                invitationId,
+                user.email
+            );
 
             if (!response.success) {
                 setFeedback({ type: 'error', message: response.message });

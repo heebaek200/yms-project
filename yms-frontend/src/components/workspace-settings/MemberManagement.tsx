@@ -450,6 +450,8 @@ function MemberManagement({
             setModalError(null);
             const response = await createWorkspaceMemberInvitation(
                 workspaceId,
+                currentWorkspace?.name ?? '',
+                currentWorkspace?.activeProjectCount ?? 0,
                 inviteEmail,
                 user.name,
                 actorRole

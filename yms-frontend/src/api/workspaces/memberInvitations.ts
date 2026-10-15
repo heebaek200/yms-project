@@ -5,6 +5,11 @@ import type {
 import type { WorkspaceRole } from '../../types/workspace';
 import type { ApiResponse, ApiSuccessResponse } from '../types';
 import { findMockWorkspaceMemberByEmail } from './members';
+import {
+    addMockWorkspaceInvitation,
+    getMockWorkspaceInvitationStore,
+    type MockWorkspaceInvitationRecord
+} from './workspaceInvitationStore';
 
 export type WorkspaceInvitationListRequest = {
     keyword?: string;
@@ -16,65 +21,9 @@ export type WorkspaceSentInvitationListResponse =
 export type WorkspaceSentInvitationResponse =
     ApiResponse<WorkspaceSentInvitation>;
 
-let nextInvitationId = 306;
-
-// 유효 대기, 처리 완료와 만료 파생 상태를 모두 확인할 수 있는 발송 초대 Mock입니다.
-let mockSentInvitations: WorkspaceSentInvitation[] = [
-    {
-        invitationId: 301,
-        workspaceId: 1,
-        email: 'pending@yms.test',
-        inviterName: '테스트 사용자',
-        status: 'PENDING',
-        sentAt: '2026-10-14T10:00:00+09:00',
-        expiresAt: '2099-10-21T10:00:00+09:00',
-        respondedAt: null
-    },
-    {
-        invitationId: 302,
-        workspaceId: 1,
-        email: 'expired@yms.test',
-        inviterName: '테스트 사용자',
-        status: 'PENDING',
-        sentAt: '2026-09-01T10:00:00+09:00',
-        expiresAt: '2026-09-08T10:00:00+09:00',
-        respondedAt: null
-    },
-    {
-        invitationId: 303,
-        workspaceId: 1,
-        email: 'accepted@yms.test',
-        inviterName: '테스트 사용자',
-        status: 'ACCEPTED',
-        sentAt: '2026-09-20T10:00:00+09:00',
-        expiresAt: '2026-09-27T10:00:00+09:00',
-        respondedAt: '2026-09-21T08:30:00+09:00'
-    },
-    {
-        invitationId: 304,
-        workspaceId: 1,
-        email: 'rejected@yms.test',
-        inviterName: '테스트 사용자',
-        status: 'REJECTED',
-        sentAt: '2026-09-22T10:00:00+09:00',
-        expiresAt: '2026-09-29T10:00:00+09:00',
-        respondedAt: '2026-09-23T08:30:00+09:00'
-    },
-    {
-        invitationId: 305,
-        workspaceId: 1,
-        email: 'cancelled@yms.test',
-        inviterName: '테스트 사용자',
-        status: 'CANCELLED',
-        sentAt: '2026-09-24T10:00:00+09:00',
-        expiresAt: '2026-10-01T10:00:00+09:00',
-        respondedAt: '2026-09-25T08:30:00+09:00'
-    }
-];
-
 /** PENDING 초대의 현재 만료 여부를 서버와 같은 시점 기준으로 판정합니다. */
 export function isWorkspaceInvitationExpired(
-    invitation: WorkspaceSentInvitation
+    invitation: Pick<WorkspaceSentInvitation, 'status' | 'expiresAt'>
 ) {
     return invitation.status === 'PENDING'
         && Date.parse(invitation.expiresAt) <= Date.now();
@@ -92,7 +41,7 @@ export async function getWorkspaceSentInvitations(
 
     const keyword = request.keyword?.trim().toLocaleLowerCase() ?? '';
     const status = request.status ?? 'PENDING';
-    const invitations = mockSentInvitations
+    const invitations = getMockWorkspaceInvitationStore()
         .filter(invitation => invitation.workspaceId === workspaceId)
         .filter(invitation => !keyword
             || invitation.email.toLocaleLowerCase().includes(keyword)
@@ -115,7 +64,23 @@ export async function getWorkspaceSentInvitations(
         })
         .sort((left, right) => Date.parse(right.sentAt) - Date.parse(left.sentAt));
 
-    return { success: true, data: invitations.map(invitation => ({ ...invitation })) };
+    return { success: true, data: invitations.map(toWorkspaceSentInvitation) };
+}
+
+/** 공용 내부 초대 레코드에서 관리 화면에 필요한 발송 초대 필드만 반환합니다. */
+function toWorkspaceSentInvitation(
+    invitation: MockWorkspaceInvitationRecord
+): WorkspaceSentInvitation {
+    return {
+        invitationId: invitation.invitationId,
+        workspaceId: invitation.workspaceId,
+        email: invitation.email,
+        inviterName: invitation.inviterName,
+        status: invitation.status,
+        sentAt: invitation.sentAt,
+        expiresAt: invitation.expiresAt,
+        respondedAt: invitation.respondedAt
+    };
 }
 
 /**
@@ -124,6 +89,8 @@ export async function getWorkspaceSentInvitations(
  */
 export async function createWorkspaceMemberInvitation(
     workspaceId: number,
+    workspaceName: string,
+    activeProjectCount: number,
     emailValue: string,
     inviterName: string,
     actorRole: WorkspaceRole
@@ -165,7 +132,7 @@ export async function createWorkspaceMemberInvitation(
         };
     }
 
-    const hasPendingInvitation = mockSentInvitations.some(invitation => (
+    const hasPendingInvitation = getMockWorkspaceInvitationStore().some(invitation => (
         invitation.workspaceId === workspaceId
         && invitation.email.toLocaleLowerCase() === email
         && invitation.status === 'PENDING'
@@ -184,24 +151,22 @@ export async function createWorkspaceMemberInvitation(
     const sentAt = new Date();
     const expiresAt = new Date(sentAt);
     expiresAt.setDate(expiresAt.getDate() + 7);
-    const invitation: WorkspaceSentInvitation = {
-        invitationId: nextInvitationId,
+    const invitation = addMockWorkspaceInvitation({
         workspaceId,
+        workspaceName,
+        activeProjectCount,
         email,
         inviterName,
         status: 'PENDING',
         sentAt: sentAt.toISOString(),
         expiresAt: expiresAt.toISOString(),
         respondedAt: null
-    };
-
-    nextInvitationId += 1;
-    mockSentInvitations = [invitation, ...mockSentInvitations];
+    });
 
     return {
         success: true,
         message: `${email} 주소로 멤버 초대를 보냈습니다.`,
-        data: { ...invitation }
+        data: toWorkspaceSentInvitation(invitation)
     };
 }
 
@@ -222,7 +187,7 @@ export async function cancelWorkspaceMemberInvitation(
         };
     }
 
-    const invitation = mockSentInvitations.find(item => (
+    const invitation = getMockWorkspaceInvitationStore().find(item => (
         item.workspaceId === workspaceId
         && item.invitationId === invitationId
     ));
@@ -251,6 +216,6 @@ export async function cancelWorkspaceMemberInvitation(
     return {
         success: true,
         message: '멤버 초대를 취소했습니다.',
-        data: { ...invitation }
+        data: toWorkspaceSentInvitation(invitation)
     };
 }

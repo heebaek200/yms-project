@@ -1,4 +1,4 @@
-import type { UserRole } from '../../types/auth';
+import type { AuthUser, UserRole } from '../../types/auth';
 import type { WorkspaceRole } from '../../types/workspace';
 import type {
     WorkspaceMember,
@@ -87,8 +87,23 @@ let mockMembers: Record<number, WorkspaceMember[]> = {
             joinedAt: '2026-05-01T11:00:00+09:00',
             leftAt: '2026-09-15T11:00:00+09:00'
         }
+    ],
+    7: [
+        {
+            workspaceMemberId: 701,
+            userId: 24601,
+            name: '테스트 사용자',
+            email: 'test@test.com',
+            professionalRoles: ['CREATOR', 'EDITOR'],
+            workspaceRole: 'ADMIN',
+            status: 'LEFT',
+            joinedAt: '2026-04-01T10:00:00+09:00',
+            leftAt: '2026-09-10T16:00:00+09:00'
+        }
     ]
 };
+
+let nextWorkspaceMemberId = 702;
 
 /** 전달받은 제작팀의 Mock 멤버 배열을 초기화 없이 안전하게 반환합니다. */
 function getMemberStore(workspaceId: number) {
@@ -142,6 +157,67 @@ export function findMockWorkspaceMemberByEmail(
     return getMemberStore(workspaceId).find(
         member => member.email.toLocaleLowerCase() === normalizedEmail
     );
+}
+
+/**
+ * 초대 수락 사용자를 기존 비활성 멤버 행으로 복구하거나 신규 MEMBER로 생성합니다.
+ * ACTIVE 중복은 거부하고 재참여 시 권한과 이탈 시각을 설계 규칙대로 초기화합니다.
+ */
+export function activateMockWorkspaceMember(
+    workspaceId: number,
+    user: AuthUser
+): WorkspaceMemberResponse {
+    const members = getMemberStore(workspaceId);
+    const existingMember = findMockWorkspaceMemberByEmail(
+        workspaceId,
+        user.email
+    );
+
+    if (existingMember?.status === 'ACTIVE') {
+        return {
+            success: false,
+            errorCode: 'WORKSPACE_MEMBER_ALREADY_ACTIVE',
+            message: '이미 활동 중인 제작팀 멤버입니다.',
+            errors: null
+        };
+    }
+
+    if (existingMember) {
+        // 같은 계정의 최신 프로필을 반영하되 최초 참여일과 기존 작업 연결 행은 유지합니다.
+        existingMember.userId = user.userId;
+        existingMember.name = user.name;
+        existingMember.professionalRoles = [...user.roles];
+        existingMember.workspaceRole = 'MEMBER';
+        existingMember.status = 'ACTIVE';
+        existingMember.leftAt = null;
+
+        return {
+            success: true,
+            message: '기존 제작팀 멤버십을 다시 활성화했습니다.',
+            data: { ...existingMember }
+        };
+    }
+
+    const member: WorkspaceMember = {
+        workspaceMemberId: nextWorkspaceMemberId,
+        userId: user.userId,
+        name: user.name,
+        email: user.email.trim().toLocaleLowerCase(),
+        professionalRoles: [...user.roles],
+        workspaceRole: 'MEMBER',
+        status: 'ACTIVE',
+        joinedAt: new Date().toISOString(),
+        leftAt: null
+    };
+
+    nextWorkspaceMemberId += 1;
+    members.push(member);
+
+    return {
+        success: true,
+        message: '제작팀 멤버십을 생성했습니다.',
+        data: { ...member }
+    };
 }
 
 /**
