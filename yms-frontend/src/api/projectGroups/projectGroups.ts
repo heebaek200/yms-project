@@ -17,6 +17,11 @@ import {
     replaceProjectGroup,
     type StoredProjectGroup
 } from './projectGroupStore';
+import {
+    calculateRoi,
+    subtractMoney,
+    sumMoney
+} from '../../utils/decimal';
 
 export type ProjectGroupListRequest = {
     status?: ProjectGroupStatus | 'ALL';
@@ -84,13 +89,18 @@ function toProjectGroupDetail(group: StoredProjectGroup): ProjectGroupDetail {
     const directRevenues = group.directRevenues.filter(entry => entry.status === 'ACTIVE');
 
     // 무효 항목은 이력 목록에는 남기되 실제 재무 합계에서는 제외합니다.
-    const actualCost = directExpenses.reduce((sum, entry) => sum + entry.amount, 0)
-        + projects.reduce((sum, project) => (
-            sum + project.workerAmount + project.directExpenseAmount
-        ), 0);
-    const actualRevenue = directRevenues.reduce((sum, entry) => sum + entry.amount, 0)
-        + projects.reduce((sum, project) => sum + project.directRevenueAmount, 0);
-    const profit = actualRevenue - actualCost;
+    const actualCost = sumMoney([
+        ...directExpenses.map(entry => entry.amount),
+        ...projects.flatMap(project => [
+            project.workerAmount,
+            project.directExpenseAmount
+        ])
+    ]);
+    const actualRevenue = sumMoney([
+        ...directRevenues.map(entry => entry.amount),
+        ...projects.map(project => project.directRevenueAmount)
+    ]);
+    const profit = subtractMoney(actualRevenue, actualCost);
 
     return {
         ...group,
@@ -101,7 +111,7 @@ function toProjectGroupDetail(group: StoredProjectGroup): ProjectGroupDetail {
         actualCost,
         actualRevenue,
         profit,
-        roi: actualCost === 0 ? null : profit / actualCost * 100
+        roi: calculateRoi(profit, actualCost)
     };
 }
 

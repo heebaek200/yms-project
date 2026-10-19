@@ -43,6 +43,11 @@ import type {
     ProjectGroupStatus,
     ProjectGroupSummary
 } from '../types/projectGroup';
+import {
+    formatMoney,
+    getDecimalSign,
+    roundDecimal
+} from '../utils/decimal';
 
 import './ProjectGroupPage.css';
 
@@ -125,9 +130,9 @@ const FINANCIAL_ENTRY_TYPES: Record<FinancialEntryKind, ReadonlyArray<{
     ]
 };
 
-/** 원화 금액을 소수점 없는 사용자 표시 문자열로 변환합니다. */
-function formatWon(value: number): string {
-    return `${new Intl.NumberFormat('ko-KR').format(value)}원`;
+/** BigDecimal 호환 금액 문자열을 정밀도 손실 없이 원화 표시로 변환합니다. */
+function formatWon(value: string): string {
+    return `${formatMoney(value)}원`;
 }
 
 /** 저장 날짜 문자열을 한국어 화면용 짧은 형식으로 표시합니다. */
@@ -171,7 +176,7 @@ function toFinancialFormValues(
 ): FinancialFormValues {
     return {
         entryType: entry.entryType,
-        amount: String(entry.amount),
+        amount: entry.amount,
         occurredOn: entry.occurredOn,
         memo: entry.memo ?? ''
     };
@@ -980,6 +985,7 @@ function ProjectGroupListView({
                 <ul className="project-group-list">
                     {groups.map(group => {
                         const status = STATUS_META[group.status];
+                        const profitSign = getDecimalSign(group.profit);
                         return (
                             <li key={group.projectGroupId} className="project-group-card">
                                 <div className="project-group-card__identity">
@@ -994,7 +1000,7 @@ function ProjectGroupListView({
                                     <div><dt>프로젝트</dt><dd>{group.projectCount}개</dd></div>
                                     <div><dt>실제 비용</dt><dd>{formatWon(group.actualCost)}</dd></div>
                                     <div><dt>실제 수익</dt><dd>{formatWon(group.actualRevenue)}</dd></div>
-                                    <div><dt>손익</dt><dd className={group.profit < 0 ? 'is-negative' : 'is-positive'}>{group.profit > 0 ? '+' : ''}{formatWon(group.profit)}</dd></div>
+                                    <div><dt>손익</dt><dd className={profitSign < 0 ? 'is-negative' : 'is-positive'}>{profitSign > 0 ? '+' : ''}{formatWon(group.profit)}</dd></div>
                                 </dl>
                                 <Link className="project-group-card__link" to={`/project-groups/${group.projectGroupId}`}>상세 보기</Link>
                             </li>
@@ -1055,6 +1061,7 @@ function ProjectGroupDetailView({
     }
 
     const status = STATUS_META[detail.status];
+    const profitSign = getDecimalSign(detail.profit);
 
     return (
         <>
@@ -1082,8 +1089,8 @@ function ProjectGroupDetailView({
             <section className="project-group-metrics" aria-label="프로젝트 그룹 재무 요약">
                 <article><span>실제 비용</span><strong>{formatWon(detail.actualCost)}</strong></article>
                 <article><span>실제 수익</span><strong>{formatWon(detail.actualRevenue)}</strong></article>
-                <article><span>손익</span><strong className={detail.profit < 0 ? 'is-negative' : 'is-positive'}>{detail.profit > 0 ? '+' : ''}{formatWon(detail.profit)}</strong></article>
-                <article><span>ROI</span><strong>{detail.roi === null ? '-' : `${detail.roi.toFixed(1)}%`}</strong></article>
+                <article><span>손익</span><strong className={profitSign < 0 ? 'is-negative' : 'is-positive'}>{profitSign > 0 ? '+' : ''}{formatWon(detail.profit)}</strong></article>
+                <article><span>ROI</span><strong>{detail.roi === null ? '-' : `${roundDecimal(detail.roi, 1)}%`}</strong></article>
             </section>
 
             <section className="project-group-section">

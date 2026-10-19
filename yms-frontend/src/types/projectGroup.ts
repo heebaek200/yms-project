@@ -19,15 +19,15 @@ export type ProjectGroupProject = {
     channelName: string;
     status: ProjectStatus;
     projectGroupId: number | null;
-    workerAmount: number;
-    directExpenseAmount: number;
-    directRevenueAmount: number;
+    workerAmount: string;
+    directExpenseAmount: string;
+    directRevenueAmount: string;
 };
 
 export type ProjectGroupFinancialEntry = {
     entryId: number;
     entryType: string;
-    amount: number;
+    amount: string;
     occurredOn: string;
     memo: string | null;
     status: FinancialEntryStatus;
@@ -42,14 +42,14 @@ export type ProjectGroupSummary = {
     status: ProjectGroupStatus;
     createdAt: string;
     projectCount: number;
-    actualCost: number;
-    actualRevenue: number;
-    profit: number;
+    actualCost: string;
+    actualRevenue: string;
+    profit: string;
 };
 
 export type ProjectGroupDetail = ProjectGroupSummary & {
     projects: ProjectGroupProject[];
     directExpenses: ProjectGroupFinancialEntry[];
     directRevenues: ProjectGroupFinancialEntry[];
-    roi: number | null;
+    roi: string | null;
 };

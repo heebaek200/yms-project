@@ -38,7 +38,7 @@ let projectGroups: StoredProjectGroup[] = [
         directExpenses: [{
             entryId: 101,
             entryType: '장비 렌탈',
-            amount: 500000,
+            amount: '500000.00',
             occurredOn: '2026-09-02',
             memo: '공통 촬영 장비',
             status: 'ACTIVE'
@@ -46,7 +46,7 @@ let projectGroups: StoredProjectGroup[] = [
         directRevenues: [{
             entryId: 201,
             entryType: 'SPONSORSHIP',
-            amount: 10000000,
+            amount: '10000000.00',
             occurredOn: '2026-09-01',
             memo: '브랜드 협찬 확정 금액',
             status: 'ACTIVE'
@@ -77,7 +77,7 @@ let projectGroups: StoredProjectGroup[] = [
         directRevenues: [{
             entryId: 202,
             entryType: 'OTHER',
-            amount: 2200000,
+            amount: '2200000.00',
             occurredOn: '2026-05-10',
             memo: '라이브 행사 정산금',
             status: 'ACTIVE'
@@ -94,9 +94,9 @@ let projects: StoredProject[] = [
         channelName: 'YMS 메인 채널',
         status: 'REVIEW',
         projectGroupId: 1,
-        workerAmount: 1200000,
-        directExpenseAmount: 300000,
-        directRevenueAmount: 450000
+        workerAmount: '1200000.00',
+        directExpenseAmount: '300000.00',
+        directRevenueAmount: '450000.00'
     },
     {
         workspaceId: 1,
@@ -105,9 +105,9 @@ let projects: StoredProject[] = [
         channelName: 'YMS Shorts',
         status: 'UPLOADED',
         projectGroupId: 1,
-        workerAmount: 350000,
-        directExpenseAmount: 100000,
-        directRevenueAmount: 150000
+        workerAmount: '350000.00',
+        directExpenseAmount: '100000.00',
+        directRevenueAmount: '150000.00'
     },
     {
         workspaceId: 1,
@@ -116,9 +116,9 @@ let projects: StoredProject[] = [
         channelName: 'YMS Shorts',
         status: 'PLANNING',
         projectGroupId: 2,
-        workerAmount: 0,
-        directExpenseAmount: 0,
-        directRevenueAmount: 0
+        workerAmount: '0.00',
+        directExpenseAmount: '0.00',
+        directRevenueAmount: '0.00'
     },
     {
         workspaceId: 1,
@@ -127,9 +127,9 @@ let projects: StoredProject[] = [
         channelName: 'YMS 메인 채널',
         status: 'EDITING',
         projectGroupId: null,
-        workerAmount: 600000,
-        directExpenseAmount: 180000,
-        directRevenueAmount: 0
+        workerAmount: '600000.00',
+        directExpenseAmount: '180000.00',
+        directRevenueAmount: '0.00'
     },
     {
         workspaceId: 1,
@@ -138,9 +138,9 @@ let projects: StoredProject[] = [
         channelName: '테크 리뷰',
         status: 'PLANNING',
         projectGroupId: null,
-        workerAmount: 200000,
-        directExpenseAmount: 0,
-        directRevenueAmount: 0
+        workerAmount: '200000.00',
+        directExpenseAmount: '0.00',
+        directRevenueAmount: '0.00'
     }
 ];
 

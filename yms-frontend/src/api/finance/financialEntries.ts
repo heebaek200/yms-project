@@ -5,6 +5,7 @@ import {
     readProjectGroup,
     replaceProjectGroup
 } from '../projectGroups/projectGroupStore';
+import { normalizeMoneyInput } from '../../utils/decimal';
 
 export type FinancialEntryKind = 'EXPENSE' | 'REVENUE';
 
@@ -28,10 +29,10 @@ async function waitForMockResponse() {
     await new Promise(resolve => setTimeout(resolve, 300));
 }
 
-/** 공통 Expense·Revenue 입력을 검증하고 숫자 금액과 정규화된 필드를 반환합니다. */
+/** 공통 Expense·Revenue 입력을 검증하고 BigDecimal 호환 문자열과 정규화된 필드를 반환합니다. */
 function validateFinancialEntry(request: SaveFinancialEntryRequest) {
     const errors = [];
-    const amount = Number(request.amount.replaceAll(',', '').trim());
+    const amountResult = normalizeMoneyInput(request.amount);
     const entryType = request.entryType.trim();
     const memo = request.memo?.trim() || null;
 
@@ -43,11 +44,11 @@ function validateFinancialEntry(request: SaveFinancialEntryRequest) {
         });
     }
 
-    if (!request.amount.trim() || !Number.isFinite(amount) || amount < 0) {
+    if (!amountResult.success) {
         errors.push({
             field: 'amount',
             value: request.amount,
-            reason: '금액은 0 이상의 숫자로 입력해 주세요.'
+            reason: amountResult.message
         });
     }
 
@@ -67,7 +68,14 @@ function validateFinancialEntry(request: SaveFinancialEntryRequest) {
         });
     }
 
-    return { errors, normalized: { amount, entryType, memo } };
+    return {
+        errors,
+        normalized: {
+            amount: amountResult.success ? amountResult.value : '0.00',
+            entryType,
+            memo
+        }
+    };
 }
 
 /** 현재 ProjectGroup과 항목 종류에 해당하는 저장 배열을 선택합니다. */
