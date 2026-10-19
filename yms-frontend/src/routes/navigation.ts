@@ -12,6 +12,7 @@ export type AppNavigationItem = {
     label: string;
     icon: string;
     path: string;
+    activePaths?: readonly string[];
     section: NavigationSection;
     allowedRoles?: readonly WorkspaceRole[];
 };
@@ -25,18 +26,11 @@ const COMMON_NAVIGATION_ITEMS: readonly AppNavigationItem[] = [
         section: 'work'
     },
     {
-        key: 'campaigns',
-        label: '캠페인',
-        icon: '🎯',
-        path: '/campaigns',
-        section: 'work',
-        allowedRoles: WORKSPACE_ADMIN_ROLES
-    },
-    {
         key: 'projects',
         label: '프로젝트',
         icon: '🎬',
         path: '/projects',
+        activePaths: ['/projects', '/project-groups'],
         section: 'work'
     },
     {
@@ -96,7 +90,7 @@ const WORKSPACE_LIST_ROUTES = [
     '/workspace/settlements',
     '/workspace/settings',
     '/my/settlements',
-    '/campaigns',
+    '/project-groups',
     '/projects',
     '/messenger',
     '/analytics',

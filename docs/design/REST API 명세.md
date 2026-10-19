@@ -28,7 +28,7 @@ YMS는 Workspace를 업무 데이터의 최상위 경계로 사용합니다.
 주요 원칙:
 
 - REST API는 화면의 모양보다 도메인 리소스를 기준으로 설계합니다.
-- PROJECT / CAMPAIGN / CHANNEL 등 Workspace 하위 리소스는 다른 Workspace와 섞이지 않도록 서버에서 다시 검증합니다.
+- PROJECT / PROJECT_GROUP / CHANNEL 등 Workspace 하위 리소스는 다른 Workspace와 섞이지 않도록 서버에서 다시 검증합니다.
 - CREATOR / PLANNER / WRITER / VIDEOGRAPHER / EDITOR / THUMBNAILER 전문 역할과 OWNER / ADMIN / MEMBER Workspace 권한을 분리합니다.
 - Project의 EDIT / VIEW 권한은 Workspace 전체 재무 정보 접근 권한을 의미하지 않습니다.
 - 금액과 조회수 1회당 수익 단가처럼 BigDecimal 성격의 값은 JSON에서 String으로 전달합니다.
@@ -796,11 +796,11 @@ CONNECT 단계에서 Access Token 인증이 필요합니다.
 
 ---
 
-# 7. Campaign API
+# 7. ProjectGroup(프로젝트 그룹) API
 
-## 7.1. Campaign 목록
+## 7.1. ProjectGroup 목록
 
-GET /api/workspaces/{workspaceId}/campaigns
+GET /api/workspaces/{workspaceId}/project-groups
 
 Query:
 
@@ -811,14 +811,18 @@ Query:
 - page
 - size
 
+기간 필터는 ProjectGroup 기간과 요청 기간이 하루라도 겹치면 포함합니다. 시작일 또는 종료일이 null이면 해당 방향의 제한이 없는 기간으로 취급합니다.
+
+기본 정렬은 ACTIVE, PLANNING, COMPLETED, CANCELLED 순서이며, 같은 상태에서는 startDate 내림차순, startDate가 없으면 createdAt 내림차순으로 정렬합니다.
+
 권한:
 
 - OWNER
 - ADMIN
 
-## 7.2. Campaign 생성
+## 7.2. ProjectGroup 생성
 
-POST /api/workspaces/{workspaceId}/campaigns
+POST /api/workspaces/{workspaceId}/project-groups
 
 요청:
 
@@ -828,26 +832,37 @@ POST /api/workspaces/{workspaceId}/campaigns
   "description": "롱폼 1편 + Shorts 2편",
   "startDate": "2026-09-01",
   "endDate": "2026-09-30",
-  "status": "PLANNING"
+  "projectIds": [12, 13, 14]
 }
 ~~~
 
 응답: 201 Created
 
-## 7.3. Campaign 상세
+검증:
 
-GET /api/workspaces/{workspaceId}/campaigns/{campaignId}
+- name: 필수, 앞뒤 공백 제거 후 1자 이상 150자 이하
+- 같은 Workspace에서 앞뒤 공백을 제거하고 영문 대소문자를 구분하지 않은 이름 중복 → 409
+- projectIds: 선택, 같은 Workspace에 속하고 아직 다른 ProjectGroup에 연결되지 않은 Project만 허용
+
+생성 상태는 PLANNING입니다.
+
+## 7.3. ProjectGroup 상세
+
+GET /api/workspaces/{workspaceId}/project-groups/{projectGroupId}
 
 반환 정보:
 
 - 기본 정보
 - 연결 Project 요약
-- 직접 ACTIVE Expense 합계
-- 직접 ACTIVE Revenue 합계
+- ProjectGroup 직접 Expense / Revenue 목록 요약
+- 연결 Project의 Channel과 상태
+- 실제 비용, 실제 수익, 손익과 ROI
 
-## 7.4. Campaign 수정
+실제 비용은 ProjectGroup 직접 ACTIVE Expense, 소속 Project의 지급 대상 Task 금액과 소속 Project 직접 ACTIVE Expense를 합산합니다. 실제 수익은 ProjectGroup 직접 ACTIVE Revenue와 소속 Project 직접 ACTIVE Revenue를 합산합니다. 실제 비용이 0이면 ROI는 null로 반환합니다.
 
-PATCH /api/workspaces/{workspaceId}/campaigns/{campaignId}
+## 7.4. ProjectGroup 수정
+
+PATCH /api/workspaces/{workspaceId}/project-groups/{projectGroupId}
 
 수정 가능:
 
@@ -864,7 +879,35 @@ PATCH /api/workspaces/{workspaceId}/campaigns/{campaignId}
 - COMPLETED
 - CANCELLED
 
-초기 릴리스에서는 Campaign 물리 삭제 API를 제공하지 않습니다.
+COMPLETED / CANCELLED로 변경해도 Expense와 Revenue 등록 및 정정은 허용합니다. 해당 상태에는 새 Project를 연결할 수 없으며 다시 연결하려면 먼저 ACTIVE로 변경합니다.
+
+## 7.5. ProjectGroup에 Project 연결
+
+POST /api/workspaces/{workspaceId}/project-groups/{projectGroupId}/projects
+
+요청:
+
+~~~json
+{
+  "projectIds": [12, 13]
+}
+~~~
+
+OWNER와 ADMIN만 호출할 수 있습니다. 같은 Workspace에 속하고 다른 ProjectGroup에 연결되지 않은 Project만 연결할 수 있습니다.
+
+다른 ProjectGroup에 속한 Project의 이동은 Project 수정 API에서 projectGroupId를 변경합니다. 변경 전 사용자 확인을 거치며 Project 직접 비용·수익의 집계 대상도 함께 바뀝니다.
+
+## 7.6. ProjectGroup에서 Project 연결 해제
+
+DELETE /api/workspaces/{workspaceId}/project-groups/{projectGroupId}/projects/{projectId}
+
+Project 자체와 Project 직접 Expense / Revenue는 유지하고 projectGroupId만 null로 변경합니다.
+
+## 7.7. ProjectGroup 삭제
+
+DELETE /api/workspaces/{workspaceId}/project-groups/{projectGroupId}
+
+연결 Project, 직접 Expense와 직접 Revenue가 모두 없을 때만 삭제합니다. 서버가 삭제 직전에 다시 확인하며 하나라도 존재하면 409와 함께 COMPLETED 또는 CANCELLED 상태 변경을 안내합니다.
 
 ---
 
@@ -880,7 +923,7 @@ Query:
 | --- | --- |
 | status | Project 상태 |
 | channelId | Channel 필터 |
-| campaignId | Campaign 필터 |
+| projectGroupId | ProjectGroup 필터 |
 | participatingOnly | 내가 참여한 Project만 |
 | archived | 보관 여부 |
 | keyword | 제목 검색 |
@@ -899,14 +942,16 @@ POST /api/workspaces/{workspaceId}/projects
   "title": "카메라 리뷰",
   "content": "제품 소개와 실제 촬영 테스트",
   "channelId": 3,
-  "campaignId": 7,
+  "projectGroupId": 7,
   "videoType": "LONG",
   "dueDate": "2026-09-22",
   "plannedUploadDate": "2026-09-23"
 }
 ~~~
 
-campaignId는 null 허용입니다.
+projectGroupId는 null 허용입니다.
+
+projectGroupId는 OWNER 또는 ADMIN만 지정할 수 있습니다. MEMBER가 생성하는 Project는 projectGroupId를 null로 처리하며, 기존 ProjectGroup 연결을 변경하거나 해제할 수도 없습니다.
 
 생성 시:
 
@@ -918,7 +963,8 @@ campaignId는 null 허용입니다.
 주요 오류:
 
 - CHANNEL_NOT_IN_WORKSPACE → 400
-- CAMPAIGN_NOT_IN_WORKSPACE → 400
+- PROJECT_GROUP_NOT_IN_WORKSPACE → 400
+- PROJECT_GROUP_CLOSED → 409
 - CREATOR_RATE_NOT_CONFIGURED → 필요 시 409
 
 ## 8.3. Project 상세
@@ -938,8 +984,8 @@ GET /api/projects/{projectId}
       "title": "카메라 리뷰",
       "channelId": 3,
       "channelName": "테크 리뷰",
-      "campaignId": 7,
-      "campaignName": "신제품 카메라 협찬",
+      "projectGroupId": 7,
+      "projectGroupName": "신제품 카메라 협찬",
       "videoType": "LONG",
       "projectStatus": "REVIEW",
       "dueDate": "2026-09-22",
@@ -965,7 +1011,7 @@ PATCH /api/projects/{projectId}
 - title
 - content
 - channelId
-- campaignId
+- projectGroupId
 - videoType
 - dueDate
 - plannedUploadDate
@@ -978,6 +1024,10 @@ PATCH /api/projects/{projectId}
 - 필요한 Workspace 관리자
 
 VIEW는 수정할 수 없습니다.
+
+projectGroupId의 지정, 변경과 null 해제는 Workspace OWNER와 ADMIN만 수행할 수 있습니다. Project Owner 또는 EDIT 권한만 가진 사용자는 다른 수정 가능 필드를 변경할 수 있더라도 projectGroupId는 변경할 수 없습니다.
+
+ProjectGroup을 변경하면 Project 직접 Expense / Revenue와 Task 지급 금액의 그룹 집계 대상도 변경됩니다. COMPLETED / CANCELLED ProjectGroup은 지정할 수 없습니다.
 
 ## 8.5. Project 보관 / 보관 해제
 
@@ -1326,7 +1376,7 @@ Query:
 - expenseType
 - scopeType
 - channelId
-- campaignId
+- projectGroupId
 - projectId
 - status: ACTIVE / VOIDED / ALL
 - page / size
@@ -1341,7 +1391,7 @@ POST /api/workspaces/{workspaceId}/expenses
 {
   "scopeType": "PROJECT",
   "channelId": null,
-  "campaignId": null,
+  "projectGroupId": null,
   "projectId": 12,
   "expenseType": "STUDIO",
   "amount": "300000.00",
@@ -1354,7 +1404,7 @@ scopeType:
 
 - WORKSPACE
 - CHANNEL
-- CAMPAIGN
+- PROJECT_GROUP
 - PROJECT
 
 선택한 scopeType에 해당하는 FK 하나만 값이 있어야 합니다.
@@ -1382,12 +1432,14 @@ PATCH /api/workspaces/{workspaceId}/revenues/{revenueId}
 POST  /api/workspaces/{workspaceId}/revenues/{revenueId}/void
 ~~~
 
+목록 Query는 Expense와 동일하게 startDate, endDate, revenueType, scopeType, channelId, projectGroupId, projectId, status와 page / size를 사용합니다.
+
 등록 예:
 
 ~~~json
 {
-  "scopeType": "CAMPAIGN",
-  "campaignId": 7,
+  "scopeType": "PROJECT_GROUP",
+  "projectGroupId": 7,
   "channelId": null,
   "projectId": null,
   "revenueType": "SPONSORSHIP",
@@ -1400,6 +1452,8 @@ POST  /api/workspaces/{workspaceId}/revenues/{revenueId}/void
 Revenue에는 실제 금액만 저장합니다.
 
 조회수 기반 예상 플랫폼 수익을 Revenue API로 등록하거나 자동 생성하지 않습니다.
+
+ProjectGroup 상세 화면에서 Expense / Revenue를 등록할 때는 각각 scopeType을 PROJECT_GROUP으로, projectGroupId를 현재 상세 대상 ID로 고정합니다. 계약 예정액, 청구, 입금 여부, 미수금과 세금계산서는 이 API에서 관리하지 않습니다.
 
 ---
 
@@ -1509,9 +1563,9 @@ Query:
 
 Backend는 Scatter Chart, Pie Chart처럼 특정 UI 라이브러리 형태에 종속된 DTO를 반환하지 않습니다.
 
-Project / Campaign의 도메인 성과 데이터를 반환하고 React가 화면에 맞게 시각화합니다.
+Project / ProjectGroup의 도메인 성과 데이터를 반환하고 React가 화면에 맞게 시각화합니다.
 
-## 14.1. Project / Campaign 분석 조회
+## 14.1. Project / ProjectGroup 분석 조회
 
 GET /api/workspaces/{workspaceId}/analytics
 
@@ -1519,7 +1573,7 @@ Query:
 
 | 필드 | 필수 | 설명 |
 | --- | --- | --- |
-| scopeType | Y | PROJECT / CAMPAIGN |
+| scopeType | Y | PROJECT / PROJECT_GROUP |
 | targetId | Y | 분석 대상 ID |
 
 접근 권한:
@@ -1552,13 +1606,13 @@ Project 분석 예:
 }
 ~~~
 
-Campaign 분석 예:
+ProjectGroup 분석 예:
 
 ~~~json
 {
   "success": true,
   "data": {
-    "scopeType": "CAMPAIGN",
+    "scopeType": "PROJECT_GROUP",
     "targetId": 7,
     "financial": {
       "actualCost": "2300000.00",
@@ -1588,7 +1642,7 @@ Campaign 분석 예:
 
 실제 비용이 0인 경우 roi와 revenueCostRatio는 null로 반환합니다.
 
-Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또는 Project에 임의 배분하지 않습니다.
+Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 ProjectGroup 또는 Project에 임의 배분하지 않습니다.
 
 ---
 
@@ -1621,7 +1675,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또�
 | WORKSPACE_NOT_FOUND | 404 | Workspace 없음 |
 | WORKSPACE_MEMBER_NOT_FOUND | 404 | Workspace 멤버 없음 |
 | WORKSPACE_INVITATION_NOT_FOUND | 404 | Workspace 초대 없음 |
-| CAMPAIGN_NOT_FOUND | 404 | Campaign 없음 |
+| PROJECT_GROUP_NOT_FOUND | 404 | ProjectGroup 없음 |
 | CHANNEL_NOT_FOUND | 404 | Channel 없음 |
 
 ## 충돌 / 상태 전이
@@ -1641,6 +1695,9 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 Campaign 또�
 | INVALID_TASK_STATUS_TRANSITION | 409 | 잘못된 Task 상태 전이 |
 | TASK_ALREADY_SETTLED | 409 | 이미 정산된 Task |
 | TASK_TYPE_IN_USE | 409 | 기존 작업에서 사용 중인 작업 종류 삭제 불가 |
+| DUPLICATE_PROJECT_GROUP_NAME | 409 | Workspace 내 정규화된 ProjectGroup 이름 중복 |
+| PROJECT_GROUP_CLOSED | 409 | 완료 또는 취소된 ProjectGroup에 새 Project 연결 불가 |
+| PROJECT_GROUP_IN_USE | 409 | Project, Expense 또는 Revenue가 연결된 ProjectGroup 삭제 불가 |
 | INVALID_RESOURCE_STATE | 409 | 현재 상태에서 수행할 수 없는 동작 |
 
 ---
@@ -1690,13 +1747,18 @@ PATCH /api/notifications/{notificationId}/read
 /user/queue/notifications
 ~~~
 
-## SCR-06 Campaign
+## SCR-06 ProjectGroup
 
 ~~~text
-GET   /api/workspaces/{workspaceId}/campaigns
-POST  /api/workspaces/{workspaceId}/campaigns
-GET   /api/workspaces/{workspaceId}/campaigns/{campaignId}
-PATCH /api/workspaces/{workspaceId}/campaigns/{campaignId}
+GET   /api/workspaces/{workspaceId}/project-groups
+POST  /api/workspaces/{workspaceId}/project-groups
+GET   /api/workspaces/{workspaceId}/project-groups/{projectGroupId}
+PATCH /api/workspaces/{workspaceId}/project-groups/{projectGroupId}
+DELETE /api/workspaces/{workspaceId}/project-groups/{projectGroupId}
+POST   /api/workspaces/{workspaceId}/project-groups/{projectGroupId}/projects
+DELETE /api/workspaces/{workspaceId}/project-groups/{projectGroupId}/projects/{projectId}
+GET/POST/PATCH/VOID Expense API, scopeType=PROJECT_GROUP
+GET/POST/PATCH/VOID Revenue API, scopeType=PROJECT_GROUP
 ~~~
 
 ## SCR-07 Project 목록 / 생성 / 보관함
@@ -1763,8 +1825,8 @@ GET /api/workspaces/{workspaceId}/analytics
 - Workspace Member / Invitation API 신규 추가
 - Channel API 신규 추가
 - 고정 Task Enum 대신 Workspace Task Type API 도입
-- Campaign API 신규 추가
-- Project 생성에 Channel, 선택적 Campaign, 일정 정보 추가
+- ProjectGroup API 신규 추가
+- Project 생성에 Channel, 선택적 ProjectGroup, 일정 정보 추가
 - Project Member 추가 대상을 이메일이 아닌 workspaceMemberId로 변경
 - Project Owner 이전 API와 Owner 정합성 검증 추가
 - assignment 용어를 task로 통일
@@ -1782,7 +1844,7 @@ GET /api/workspaces/{workspaceId}/analytics
 - 재무 데이터 삭제 대신 VOID 처리 Action Endpoint 사용
 - 단순 월별 isSettled 조회를 Settlement DRAFT → CONFIRMED → PAID 상태 전이 API로 재설계
 - Chat 과거 메시지 조회를 page 방식에서 cursor 방식으로 변경
-- Analytics 응답을 특정 차트 UI 구조가 아닌 Project / Campaign 도메인 데이터로 변경
+- Analytics 응답을 특정 차트 UI 구조가 아닌 Project / ProjectGroup 도메인 데이터로 변경
 - 400에 몰려 있던 중복 및 상태 충돌을 409 Conflict로 구분
 
 이 문서를 이후 Spring Boot Controller, Request / Response DTO, Service 권한 검증과 React API 모듈 구현의 기준으로 사용합니다.

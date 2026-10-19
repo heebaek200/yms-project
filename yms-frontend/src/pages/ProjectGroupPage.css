@@ -1,0 +1,768 @@
+/* SCR-06과 SCR-07은 같은 프로젝트 영역 탭 위치를 공유하고 본문 기능은 분리합니다. */
+.project-area-page {
+    display: grid;
+    gap: 22px;
+    width: 100%;
+}
+
+.project-area-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 6px;
+    padding: 5px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: rgb(255 255 255 / 0.5);
+}
+
+.project-area-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 42px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    font-weight: 750;
+}
+
+.project-area-tab:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+}
+
+.project-area-tab--active {
+    background: var(--color-surface-active);
+    color: var(--color-primary);
+}
+
+.project-group-header,
+.project-group-detail-header,
+.project-group-section__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.project-group-header h1,
+.project-group-header p,
+.project-group-detail-header h1,
+.project-group-detail-header p,
+.project-group-section h2,
+.project-group-section p,
+.project-group-card h2,
+.project-group-card p {
+    margin: 0;
+}
+
+.project-group-header h1,
+.project-group-detail-header h1 {
+    margin: 3px 0 7px;
+    font-size: clamp(27px, 4vw, 36px);
+}
+
+.project-group-header > div > p:last-child,
+.project-group-detail-header > div > p,
+.project-group-section__header p {
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+.project-group-eyebrow {
+    color: var(--color-primary);
+    font-size: 12px;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+}
+
+.project-group-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 13px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-background);
+    color: var(--color-text);
+    font-weight: 750;
+    text-align: center;
+}
+
+.project-group-button:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+}
+
+.project-group-button--primary {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.project-group-button--primary:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+}
+
+.project-group-button--danger {
+    border-color: #fecdd3;
+    color: #be123c;
+}
+
+.project-group-button--small {
+    min-height: 32px;
+    padding: 5px 9px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.project-group-button:disabled {
+    opacity: 0.55;
+}
+
+/* 필터는 넓은 화면에서 한 줄로 비교하고 모바일에서도 같은 순서로 접힙니다. */
+.project-group-filters {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.6fr) minmax(130px, 0.8fr) repeat(2, minmax(150px, 1fr));
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: var(--color-surface);
+}
+
+.project-group-filters label,
+.project-group-field {
+    display: grid;
+    gap: 6px;
+}
+
+.project-group-filters label > span,
+.project-group-field > span {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.project-group-filters input,
+.project-group-filters select,
+.project-group-field input,
+.project-group-field select,
+.project-group-field textarea {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 11px;
+}
+
+.project-group-field textarea {
+    resize: vertical;
+}
+
+.project-group-field input[aria-invalid="true"],
+.project-group-field select[aria-invalid="true"] {
+    border-color: var(--color-primary);
+}
+
+.project-group-field small {
+    color: var(--color-primary);
+    font-size: 12px;
+}
+
+.project-group-field small.project-group-field__hint,
+.project-group-field em {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 500;
+}
+
+.project-group-state {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    padding: 48px 20px;
+    border: 1px dashed var(--color-border);
+    border-radius: 16px;
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.project-group-state .feedback-message {
+    width: min(560px, 100%);
+    text-align: left;
+}
+
+.project-group-state--empty > span {
+    font-size: 40px;
+}
+
+.project-group-state--empty strong {
+    color: var(--color-text);
+    font-size: 18px;
+}
+
+.project-group-state--empty p {
+    max-width: 620px;
+    margin: 0;
+    line-height: 1.6;
+}
+
+.project-group-state__actions {
+    display: flex;
+    gap: 8px;
+}
+
+.project-group-list {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* 목록 카드는 버튼 유무와 내용 길이에 흔들리지 않도록 정보 열 너비를 고정합니다. */
+.project-group-card {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.25fr) minmax(540px, 2fr) auto;
+    align-items: center;
+    gap: 20px;
+    padding: 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: var(--color-background);
+    box-shadow: 0 7px 22px rgb(0 0 0 / 0.035);
+}
+
+.project-group-card__identity {
+    min-width: 0;
+}
+
+.project-group-card__identity > div {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.project-group-card h2 {
+    overflow-wrap: anywhere;
+    font-size: 17px;
+}
+
+.project-group-card h2 a:hover {
+    color: var(--color-primary);
+}
+
+.project-group-card__identity > p {
+    margin-top: 7px;
+    overflow: hidden;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-group-status {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 850;
+}
+
+.project-group-status--active {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.project-group-status--planning {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.project-group-status--completed {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+.project-group-status--cancelled {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.project-group-card__facts {
+    display: grid;
+    grid-template-columns: minmax(150px, 1.4fr) repeat(4, minmax(90px, 1fr));
+    gap: 14px;
+    margin: 0;
+}
+
+.project-group-card__facts div {
+    display: grid;
+    gap: 4px;
+}
+
+.project-group-card__facts dt {
+    color: var(--color-text-muted);
+    font-size: 11px;
+}
+
+.project-group-card__facts dd {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* 기간은 좁아질 때 날짜 경계에서 줄바꿈해 이웃 재무 열과 겹치지 않게 합니다. */
+.project-group-card__facts div:first-child dd {
+    white-space: normal;
+}
+
+.is-positive {
+    color: #15803d;
+}
+
+.is-negative {
+    color: #be123c;
+}
+
+.project-group-card__link {
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.project-group-detail-nav a,
+.project-group-detail-footer a {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.project-group-detail-nav a:hover,
+.project-group-detail-footer a:hover {
+    color: var(--color-primary);
+}
+
+.project-group-detail-header {
+    padding: 24px;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    background: var(--color-background);
+}
+
+.project-group-detail-header__status,
+.project-group-detail-header__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.project-group-detail-header__status > span:last-child {
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.project-group-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.project-group-metrics article {
+    display: grid;
+    gap: 8px;
+    padding: 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgb(255 255 255 / 0.82), rgb(248 249 250 / 0.65));
+}
+
+.project-group-metrics span {
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.project-group-metrics strong {
+    font-size: clamp(18px, 2.5vw, 24px);
+}
+
+.project-group-section {
+    padding: 22px;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    background: var(--color-background);
+}
+
+.project-group-section__header h2 {
+    margin-bottom: 5px;
+    font-size: 20px;
+}
+
+.project-group-section__header p {
+    font-size: 13px;
+}
+
+.project-group-notice {
+    margin-top: 14px !important;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.project-group-section__empty {
+    margin-top: 18px !important;
+    padding: 22px;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.project-group-project-list,
+.project-group-financial-list {
+    display: grid;
+    gap: 8px;
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.project-group-project-list li,
+.project-group-financial-list li {
+    display: grid;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 11px;
+}
+
+.project-group-project-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.project-group-project-list li > div,
+.project-group-financial-list li > div:first-child {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.project-group-project-list span,
+.project-group-financial-list li > div:first-child span {
+    overflow-wrap: anywhere;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.project-group-project-list a:hover {
+    color: var(--color-primary);
+}
+
+.project-group-finance-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.project-group-financial-list li {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.project-group-financial-list li.is-voided {
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    text-decoration: line-through;
+    opacity: 0.75;
+}
+
+.project-group-financial-list__actions {
+    display: flex;
+    gap: 6px;
+}
+
+.project-group-financial-list__actions button {
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 750;
+}
+
+.project-group-financial-list__actions button:hover {
+    color: var(--color-primary);
+}
+
+.project-group-voided-label {
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: #e4e4e7;
+    font-size: 11px;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.project-group-detail-footer {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 18px;
+}
+
+/* 생성·수정 폼은 프로젝트 그룹과 직접 재무 입력에서 같은 필드 순서를 유지합니다. */
+.project-group-modal-backdrop {
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgb(15 23 42 / 0.48);
+    backdrop-filter: blur(3px);
+}
+
+.project-group-modal {
+    width: min(650px, 100%);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding: 22px;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    background: var(--color-background);
+    box-shadow: 0 24px 70px rgb(0 0 0 / 0.22);
+}
+
+.project-group-modal__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.project-group-modal__header h2,
+.project-group-modal__header p {
+    margin: 0;
+}
+
+.project-group-modal__header h2 {
+    margin-bottom: 5px;
+    font-size: 22px;
+}
+
+.project-group-modal__header p {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.project-group-modal__close {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    background: var(--color-background);
+    color: var(--color-text-muted);
+    font-size: 23px;
+}
+
+.project-group-form {
+    display: grid;
+    gap: 16px;
+}
+
+.project-group-form__dates {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.project-group-project-picker {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.project-group-project-picker legend {
+    padding: 0 5px;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.project-group-project-picker legend span {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.project-group-project-picker label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px;
+    border-radius: 8px;
+}
+
+.project-group-project-picker label:hover {
+    background: var(--color-surface);
+}
+
+.project-group-project-picker label > span {
+    display: grid;
+    gap: 2px;
+}
+
+.project-group-project-picker small,
+.project-group-project-picker p {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.project-group-form__notice {
+    margin: 0;
+    padding: 11px 13px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.project-group-form__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.project-group-amount-input {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.project-group-amount-input > span {
+    color: var(--color-text-muted);
+}
+
+@media (max-width: 1050px) {
+    .project-group-card {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .project-group-card__facts {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+}
+
+@media (max-width: 780px) {
+    .project-group-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .project-group-metrics,
+    .project-group-finance-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .project-group-card__facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .project-area-page {
+        gap: 18px;
+    }
+
+    .project-area-tab {
+        padding-inline: 7px;
+        font-size: 13px;
+    }
+
+    .project-group-header,
+    .project-group-detail-header,
+    .project-group-section__header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .project-group-filters,
+    .project-group-metrics,
+    .project-group-finance-grid,
+    .project-group-form__dates {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .project-group-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .project-group-card__facts,
+    .project-group-card__link {
+        grid-column: auto;
+        grid-row: auto;
+    }
+
+    .project-group-card__facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .project-group-card__link {
+        justify-self: stretch;
+        text-align: center;
+    }
+
+    .project-group-financial-list li {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .project-group-financial-list__actions,
+    .project-group-voided-label {
+        grid-column: 1 / -1;
+        justify-self: start;
+    }
+
+    .project-group-modal-backdrop {
+        align-items: end;
+        padding: 0;
+    }
+
+    .project-group-modal {
+        width: 100%;
+        max-height: calc(100vh - 24px);
+        padding: 20px 16px;
+        border-radius: 18px 18px 0 0;
+    }
+
+    .project-group-form__actions .project-group-button {
+        flex: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .project-area-tab,
+    .project-group-button,
+    .project-group-modal__close {
+        transition: none;
+    }
+}
