@@ -501,7 +501,11 @@
     font-weight: 750;
 }
 
-.project-group-financial-list__actions button:hover {
+.project-group-financial-list__actions button:disabled {
+    opacity: 0.5;
+}
+
+.project-group-financial-list__actions button:not(:disabled):hover {
     color: var(--color-primary);
 }
 

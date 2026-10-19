@@ -216,6 +216,12 @@ function ProjectGroupPage() {
     const groupFormRef = useRef<HTMLFormElement>(null);
     const financialFormRef = useRef<HTMLFormElement>(null);
     const allowSavedNavigationRef = useRef(false);
+    const latestReadRequestIdRef = useRef(0);
+    const availableProjectsRequestIdRef = useRef(0);
+    const mutationLockRef = useRef(false);
+    const isMountedRef = useRef(true);
+    const activeViewContextRef = useRef('');
+    const viewContextKey = `${currentWorkspace?.workspaceId ?? 'none'}:${projectGroupId ?? 'list'}`;
 
     const initialGroupForm = useMemo(
         () => detail ? toGroupFormValues(detail) : EMPTY_GROUP_FORM,
@@ -244,12 +250,53 @@ function ProjectGroupPage() {
         )
     ));
 
+    // 커밋된 제작팀과 Route만 비동기 응답을 받을 수 있도록 최신 화면 경계를 기록합니다.
+    useLayoutEffect(() => {
+        activeViewContextRef.current = viewContextKey;
+    }, [viewContextKey]);
+
+    /** 비동기 응답이 요청을 시작한 제작팀과 Route에 여전히 속하는지 확인합니다. */
+    const isCurrentViewContext = useCallback((contextKey: string) => (
+        isMountedRef.current && activeViewContextRef.current === contextKey
+    ), []);
+
+    /** 변경 요청의 중복 실행을 동기적으로 차단하고 제출 상태를 시작합니다. */
+    const acquireMutationLock = () => {
+        if (mutationLockRef.current) {
+            return false;
+        }
+
+        mutationLockRef.current = true;
+        setIsSubmitting(true);
+        return true;
+    };
+
+    /** 변경 요청 잠금을 해제하고 마운트된 화면의 제출 상태를 복원합니다. */
+    const releaseMutationLock = () => {
+        mutationLockRef.current = false;
+        if (isMountedRef.current) {
+            setIsSubmitting(false);
+        }
+    };
+
+    // 컴포넌트가 사라진 뒤 도착한 조회·변경 응답은 화면 상태를 갱신하지 않습니다.
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+            latestReadRequestIdRef.current += 1;
+            availableProjectsRequestIdRef.current += 1;
+        };
+    }, []);
+
     /** 현재 필터와 Workspace를 기준으로 ProjectGroup 목록을 다시 조회합니다. */
     const loadGroups = useCallback(async () => {
         if (!currentWorkspace) {
             return;
         }
 
+        const requestId = ++latestReadRequestIdRef.current;
+        const requestContextKey = activeViewContextRef.current;
         try {
             setIsLoading(true);
             setLoadError(null);
@@ -263,6 +310,13 @@ function ProjectGroupPage() {
                 }
             );
 
+            if (
+                requestId !== latestReadRequestIdRef.current
+                || !isCurrentViewContext(requestContextKey)
+            ) {
+                return;
+            }
+
             if (!response.success) {
                 setGroups([]);
                 setLoadError(response.message);
@@ -271,15 +325,28 @@ function ProjectGroupPage() {
 
             setGroups(response.data);
         } catch (error) {
+            if (
+                requestId !== latestReadRequestIdRef.current
+                || !isCurrentViewContext(requestContextKey)
+            ) {
+                return;
+            }
+
             console.error(error);
             setGroups([]);
             setLoadError('프로젝트 그룹 목록을 불러오지 못했습니다.');
         } finally {
-            setIsLoading(false);
+            if (
+                requestId === latestReadRequestIdRef.current
+                && isCurrentViewContext(requestContextKey)
+            ) {
+                setIsLoading(false);
+            }
         }
     }, [
         currentWorkspace,
         endDateFilter,
+        isCurrentViewContext,
         keyword,
         startDateFilter,
         statusFilter
@@ -291,6 +358,8 @@ function ProjectGroupPage() {
             return;
         }
 
+        const requestId = ++latestReadRequestIdRef.current;
+        const requestContextKey = activeViewContextRef.current;
         try {
             setIsLoading(true);
             setLoadError(null);
@@ -298,6 +367,13 @@ function ProjectGroupPage() {
                 currentWorkspace.workspaceId,
                 projectGroupId
             );
+
+            if (
+                requestId !== latestReadRequestIdRef.current
+                || !isCurrentViewContext(requestContextKey)
+            ) {
+                return;
+            }
 
             if (!response.success) {
                 setDetail(null);
@@ -307,13 +383,25 @@ function ProjectGroupPage() {
 
             setDetail(response.data);
         } catch (error) {
+            if (
+                requestId !== latestReadRequestIdRef.current
+                || !isCurrentViewContext(requestContextKey)
+            ) {
+                return;
+            }
+
             console.error(error);
             setDetail(null);
             setLoadError('프로젝트 그룹 정보를 불러오지 못했습니다.');
         } finally {
-            setIsLoading(false);
+            if (
+                requestId === latestReadRequestIdRef.current
+                && isCurrentViewContext(requestContextKey)
+            ) {
+                setIsLoading(false);
+            }
         }
-    }, [currentWorkspace, projectGroupId]);
+    }, [currentWorkspace, isCurrentViewContext, projectGroupId]);
 
     // 목록과 상세 Route가 같은 페이지 컴포넌트를 사용하되 필요한 데이터만 조회합니다.
     useEffect(() => {
@@ -322,6 +410,7 @@ function ProjectGroupPage() {
         } else if (Number.isInteger(projectGroupId)) {
             void loadDetail();
         } else {
+            latestReadRequestIdRef.current += 1;
             setIsLoading(false);
             setLoadError('올바르지 않은 프로젝트 그룹 주소입니다.');
         }
@@ -341,6 +430,9 @@ function ProjectGroupPage() {
 
     // 제작팀 전환 시 이전 제작팀의 상세와 모달 입력을 화면에 남기지 않습니다.
     useEffect(() => {
+        availableProjectsRequestIdRef.current += 1;
+        setIsProjectsLoading(false);
+        setAvailableProjects([]);
         setDetail(null);
         setFeedback(null);
         setIsGroupModalOpen(false);
@@ -403,23 +495,54 @@ function ProjectGroupPage() {
             return;
         }
 
+        const requestId = ++availableProjectsRequestIdRef.current;
+        const requestContextKey = activeViewContextRef.current;
         try {
             setIsProjectsLoading(true);
             const response = await getUngroupedProjects(
                 currentWorkspace.workspaceId
             );
+
+            if (
+                requestId !== availableProjectsRequestIdRef.current
+                || !isCurrentViewContext(requestContextKey)
+            ) {
+                return;
+            }
+
             setAvailableProjects(response.success ? response.data : []);
             if (!response.success) {
                 setModalError(response.message);
             }
+        } catch (error) {
+            if (
+                requestId !== availableProjectsRequestIdRef.current
+                || !isCurrentViewContext(requestContextKey)
+            ) {
+                return;
+            }
+
+            console.error(error);
+            setAvailableProjects([]);
+            setModalError('연결 가능한 프로젝트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
         } finally {
-            setIsProjectsLoading(false);
+            if (
+                requestId === availableProjectsRequestIdRef.current
+                && isCurrentViewContext(requestContextKey)
+            ) {
+                setIsProjectsLoading(false);
+            }
         }
     };
 
     /** 빈 생성 폼과 선택 가능한 Project를 준비해 ProjectGroup 생성 모달을 엽니다. */
     const openCreateModal = () => {
+        if (mutationLockRef.current) {
+            return;
+        }
+
         setDetail(null);
+        setAvailableProjects([]);
         setGroupForm(EMPTY_GROUP_FORM);
         setGroupErrors({});
         setModalError(null);
@@ -430,7 +553,7 @@ function ProjectGroupPage() {
 
     /** 현재 상세 기본 정보를 복사해 ProjectGroup 수정 모달을 엽니다. */
     const openEditModal = () => {
-        if (!detail) {
+        if (!detail || mutationLockRef.current) {
             return;
         }
 
@@ -443,6 +566,11 @@ function ProjectGroupPage() {
 
     /** 현재 상세에 추가할 미연결 Project 선택 모달을 엽니다. */
     const openConnectModal = () => {
+        if (mutationLockRef.current) {
+            return;
+        }
+
+        setAvailableProjects([]);
         setGroupForm(current => ({ ...current, projectIds: [] }));
         setModalError(null);
         setIsConnectModalOpen(true);
@@ -454,6 +582,10 @@ function ProjectGroupPage() {
         kind: FinancialEntryKind,
         entry: ProjectGroupFinancialEntry | null = null
     ) => {
+        if (mutationLockRef.current) {
+            return;
+        }
+
         setEditingEntry(entry);
         setFinancialForm(entry
             ? toFinancialFormValues(entry)
@@ -467,6 +599,10 @@ function ProjectGroupPage() {
 
     /** 미저장 확인을 통과하면 열린 ProjectGroup 관련 모달 상태를 모두 초기화합니다. */
     const closeModal = useCallback(() => {
+        if (mutationLockRef.current) {
+            return;
+        }
+
         if (isFormDirty && !window.confirm(
             '저장하지 않은 변경사항이 있습니다. 변경사항을 버리고 닫을까요?'
         )) {
@@ -482,6 +618,8 @@ function ProjectGroupPage() {
         setGroupErrors({});
         setFinancialErrors({});
         setModalError(null);
+        availableProjectsRequestIdRef.current += 1;
+        setIsProjectsLoading(false);
     }, [isFormDirty]);
 
     /** ProjectGroup 생성·수정 결과를 저장하고 성공 시 상세 Route 또는 화면을 갱신합니다. */
@@ -491,8 +629,12 @@ function ProjectGroupPage() {
             return;
         }
 
+        if (!acquireMutationLock()) {
+            return;
+        }
+
+        const requestContextKey = activeViewContextRef.current;
         try {
-            setIsSubmitting(true);
             setGroupErrors({});
             setModalError(null);
             const response = detail
@@ -505,6 +647,10 @@ function ProjectGroupPage() {
                     currentWorkspace.workspaceId,
                     groupForm
                 );
+
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
 
             if (!response.success) {
                 const nextErrors: FieldErrors<GroupFormValues> = {};
@@ -541,10 +687,14 @@ function ProjectGroupPage() {
                 navigate(`/project-groups/${response.data.projectGroupId}`);
             }
         } catch (error) {
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+
             console.error(error);
             setModalError('프로젝트 그룹을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.');
         } finally {
-            setIsSubmitting(false);
+            releaseMutationLock();
         }
     };
 
@@ -560,14 +710,22 @@ function ProjectGroupPage() {
             return;
         }
 
+        if (!acquireMutationLock()) {
+            return;
+        }
+
+        const requestContextKey = activeViewContextRef.current;
         try {
-            setIsSubmitting(true);
             setModalError(null);
             const response = await addProjectsToProjectGroup(
                 currentWorkspace.workspaceId,
                 detail.projectGroupId,
                 groupForm.projectIds
             );
+
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
 
             if (!response.success) {
                 setModalError(response.message);
@@ -583,41 +741,69 @@ function ProjectGroupPage() {
             setIsConnectModalOpen(false);
             setGroupForm(current => ({ ...current, projectIds: [] }));
         } catch (error) {
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+
             console.error(error);
             setModalError('프로젝트를 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');
         } finally {
-            setIsSubmitting(false);
+            releaseMutationLock();
         }
     };
 
     /** Project 자체는 유지하면서 현재 그룹 연결을 확인 후 해제합니다. */
     const handleDisconnectProject = async (project: ProjectGroupProject) => {
-        if (!currentWorkspace || !detail || !window.confirm(
+        if (mutationLockRef.current || !currentWorkspace || !detail || !window.confirm(
             `${project.title} 프로젝트를 이 그룹에서 제외할까요? 프로젝트의 비용·수익도 이 그룹 집계에서 빠집니다.`
         )) {
             return;
         }
 
-        const response = await removeProjectFromProjectGroup(
-            currentWorkspace.workspaceId,
-            detail.projectGroupId,
-            project.projectId
-        );
-        if (!response.success) {
-            setFeedback({
-                type: 'error',
-                message: response.message,
-                projectGroupId: detail.projectGroupId
-            });
+        if (!acquireMutationLock()) {
             return;
         }
 
-        setDetail(response.data);
-        setFeedback({
-            type: 'success',
-            message: response.message ?? '연결을 해제했습니다.',
-            projectGroupId: response.data.projectGroupId
-        });
+        const requestContextKey = activeViewContextRef.current;
+        try {
+            const response = await removeProjectFromProjectGroup(
+                currentWorkspace.workspaceId,
+                detail.projectGroupId,
+                project.projectId
+            );
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+
+            if (!response.success) {
+                setFeedback({
+                    type: 'error',
+                    message: response.message,
+                    projectGroupId: detail.projectGroupId
+                });
+                return;
+            }
+
+            setDetail(response.data);
+            setFeedback({
+                type: 'success',
+                message: response.message ?? '연결을 해제했습니다.',
+                projectGroupId: response.data.projectGroupId
+            });
+        } catch (error) {
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+
+            console.error(error);
+            setFeedback({
+                type: 'error',
+                message: '프로젝트 연결을 해제하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+                projectGroupId: detail.projectGroupId
+            });
+        } finally {
+            releaseMutationLock();
+        }
     };
 
     /** 현재 그룹에 직접 귀속되는 Expense 또는 Revenue를 생성하거나 수정합니다. */
@@ -627,8 +813,12 @@ function ProjectGroupPage() {
             return;
         }
 
+        if (!acquireMutationLock()) {
+            return;
+        }
+
+        const requestContextKey = activeViewContextRef.current;
         try {
-            setIsSubmitting(true);
             setFinancialErrors({});
             setModalError(null);
             const request = {
@@ -648,6 +838,10 @@ function ProjectGroupPage() {
                     financialModalKind,
                     request
                 );
+
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
 
             if (!response.success) {
                 const nextErrors: FieldErrors<FinancialFormValues> = {};
@@ -679,10 +873,14 @@ function ProjectGroupPage() {
             setFinancialForm(EMPTY_FINANCIAL_FORM);
             await loadDetail();
         } catch (error) {
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+
             console.error(error);
             setModalError('비용·수익 항목을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.');
         } finally {
-            setIsSubmitting(false);
+            releaseMutationLock();
         }
     };
 
@@ -691,62 +889,110 @@ function ProjectGroupPage() {
         kind: FinancialEntryKind,
         entry: ProjectGroupFinancialEntry
     ) => {
-        if (!currentWorkspace || !detail || !window.confirm(
+        if (mutationLockRef.current || !currentWorkspace || !detail || !window.confirm(
             `${kind === 'REVENUE' ? '수익' : '비용'} 항목을 무효 처리할까요? 이력은 남고 재무 합계에서 제외됩니다.`
         )) {
             return;
         }
 
-        const response = await voidFinancialEntry(
-            currentWorkspace.workspaceId,
-            detail.projectGroupId,
-            kind,
-            entry.entryId
-        );
-        if (!response.success) {
-            setFeedback({
-                type: 'error',
-                message: response.message,
-                projectGroupId: detail.projectGroupId
-            });
+        if (!acquireMutationLock()) {
             return;
         }
 
-        setFeedback({
-            type: 'success',
-            message: response.message ?? '무효 처리했습니다.',
-            projectGroupId: detail.projectGroupId
-        });
-        await loadDetail();
+        const requestContextKey = activeViewContextRef.current;
+        try {
+            const response = await voidFinancialEntry(
+                currentWorkspace.workspaceId,
+                detail.projectGroupId,
+                kind,
+                entry.entryId
+            );
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+
+            if (!response.success) {
+                setFeedback({
+                    type: 'error',
+                    message: response.message,
+                    projectGroupId: detail.projectGroupId
+                });
+                return;
+            }
+
+            setFeedback({
+                type: 'success',
+                message: response.message ?? '무효 처리했습니다.',
+                projectGroupId: detail.projectGroupId
+            });
+            await loadDetail();
+        } catch (error) {
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+
+            console.error(error);
+            setFeedback({
+                type: 'error',
+                message: '비용·수익 항목을 무효 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+                projectGroupId: detail.projectGroupId
+            });
+        } finally {
+            releaseMutationLock();
+        }
     };
 
     /** 빈 ProjectGroup만 삭제하고 성공하면 목록 Route로 돌아갑니다. */
     const handleDeleteGroup = async () => {
-        if (!currentWorkspace || !detail || !window.confirm(
+        if (mutationLockRef.current || !currentWorkspace || !detail || !window.confirm(
             `${detail.name} 프로젝트 그룹을 삭제할까요? 삭제하면 되돌릴 수 없습니다.`
         )) {
             return;
         }
 
-        const response = await deleteWorkspaceProjectGroup(
-            currentWorkspace.workspaceId,
-            detail.projectGroupId
-        );
-        if (!response.success) {
-            setFeedback({
-                type: 'error',
-                message: response.message,
-                projectGroupId: detail.projectGroupId
-            });
+        if (!acquireMutationLock()) {
             return;
         }
 
-        setFeedback({
-            type: 'success',
-            message: response.message ?? '삭제했습니다.',
-            projectGroupId: null
-        });
-        navigate('/project-groups');
+        const requestContextKey = activeViewContextRef.current;
+        try {
+            const response = await deleteWorkspaceProjectGroup(
+                currentWorkspace.workspaceId,
+                detail.projectGroupId
+            );
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+
+            if (!response.success) {
+                setFeedback({
+                    type: 'error',
+                    message: response.message,
+                    projectGroupId: detail.projectGroupId
+                });
+                return;
+            }
+
+            setFeedback({
+                type: 'success',
+                message: response.message ?? '삭제했습니다.',
+                projectGroupId: null
+            });
+            navigate('/project-groups');
+        } catch (error) {
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+
+            console.error(error);
+            setFeedback({
+                type: 'error',
+                message: '프로젝트 그룹을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+                projectGroupId: detail.projectGroupId
+            });
+        } finally {
+            releaseMutationLock();
+        }
     };
 
     /** 그룹 폼의 단일 필드를 갱신하면서 해당 필드의 이전 오류를 제거합니다. */
@@ -786,6 +1032,7 @@ function ProjectGroupPage() {
                 <ProjectGroupDetailView
                     detail={detail}
                     isLoading={isLoading}
+                    isSubmitting={isSubmitting}
                     loadError={loadError}
                     feedback={visibleFeedback}
                     canConnectProjects={canConnectProjects}
@@ -1015,6 +1262,7 @@ function ProjectGroupListView({
 type ProjectGroupDetailViewProps = {
     detail: ProjectGroupDetail | null;
     isLoading: boolean;
+    isSubmitting: boolean;
     loadError: string | null;
     feedback: FeedbackState | null;
     canConnectProjects: boolean;
@@ -1032,6 +1280,7 @@ type ProjectGroupDetailViewProps = {
 function ProjectGroupDetailView({
     detail,
     isLoading,
+    isSubmitting,
     loadError,
     feedback,
     canConnectProjects,
@@ -1081,8 +1330,8 @@ function ProjectGroupDetailView({
                     <p>{detail.description ?? '설명이 없습니다.'}</p>
                 </div>
                 <div className="project-group-detail-header__actions">
-                    <button type="button" className="project-group-button" onClick={onEdit}>수정</button>
-                    <button type="button" className="project-group-button project-group-button--danger" onClick={onDelete}>삭제</button>
+                    <button type="button" className="project-group-button" disabled={isSubmitting} onClick={onEdit}>수정</button>
+                    <button type="button" className="project-group-button project-group-button--danger" disabled={isSubmitting} onClick={onDelete}>삭제</button>
                 </div>
             </header>
 
@@ -1096,7 +1345,7 @@ function ProjectGroupDetailView({
             <section className="project-group-section">
                 <div className="project-group-section__header">
                     <div><h2>연결 프로젝트</h2><p>프로젝트의 직접 비용·수익은 연결된 그룹의 분석에 반영됩니다.</p></div>
-                    <button type="button" className="project-group-button" disabled={!canConnectProjects} onClick={onConnect}>프로젝트 연결</button>
+                    <button type="button" className="project-group-button" disabled={!canConnectProjects || isSubmitting} onClick={onConnect}>프로젝트 연결</button>
                 </div>
                 {!canConnectProjects && <p className="project-group-notice">완료 또는 취소된 그룹은 진행 중으로 변경한 뒤 새 프로젝트를 연결할 수 있습니다.</p>}
                 {detail.projects.length === 0 ? (
@@ -1106,7 +1355,7 @@ function ProjectGroupDetailView({
                         {detail.projects.map(project => (
                             <li key={project.projectId}>
                                 <div><strong><Link to={`/projects/${project.projectId}`}>{project.title}</Link></strong><span>{project.channelName} · {PROJECT_STATUS_LABEL[project.status]}</span></div>
-                                <button type="button" className="project-group-button project-group-button--small" onClick={() => onDisconnect(project)}>연결 해제</button>
+                                <button type="button" className="project-group-button project-group-button--small" disabled={isSubmitting} onClick={() => onDisconnect(project)}>연결 해제</button>
                             </li>
                         ))}
                     </ul>
@@ -1119,6 +1368,7 @@ function ProjectGroupDetailView({
                     description="협찬·제휴·상품 판매 등 확정된 외부 수익을 기록합니다."
                     kind="REVENUE"
                     entries={detail.directRevenues}
+                    isSubmitting={isSubmitting}
                     onCreate={() => onFinancialCreate('REVENUE')}
                     onEdit={entry => onFinancialEdit('REVENUE', entry)}
                     onVoid={entry => onFinancialVoid('REVENUE', entry)}
@@ -1128,6 +1378,7 @@ function ProjectGroupDetailView({
                     description="여러 프로젝트에 공통으로 발생한 제작 비용을 기록합니다."
                     kind="EXPENSE"
                     entries={detail.directExpenses}
+                    isSubmitting={isSubmitting}
                     onCreate={() => onFinancialCreate('EXPENSE')}
                     onEdit={entry => onFinancialEdit('EXPENSE', entry)}
                     onVoid={entry => onFinancialVoid('EXPENSE', entry)}
@@ -1147,6 +1398,7 @@ type FinancialSectionProps = {
     description: string;
     kind: FinancialEntryKind;
     entries: ProjectGroupFinancialEntry[];
+    isSubmitting: boolean;
     onCreate: () => void;
     onEdit: (entry: ProjectGroupFinancialEntry) => void;
     onVoid: (entry: ProjectGroupFinancialEntry) => void;
@@ -1158,6 +1410,7 @@ function FinancialSection({
     description,
     kind,
     entries,
+    isSubmitting,
     onCreate,
     onEdit,
     onVoid
@@ -1166,7 +1419,7 @@ function FinancialSection({
         <section className="project-group-section project-group-financial-section">
             <div className="project-group-section__header">
                 <div><h2>{title}</h2><p>{description}</p></div>
-                <button type="button" className="project-group-button" onClick={onCreate}>{kind === 'REVENUE' ? '수익 등록' : '비용 등록'}</button>
+                <button type="button" className="project-group-button" disabled={isSubmitting} onClick={onCreate}>{kind === 'REVENUE' ? '수익 등록' : '비용 등록'}</button>
             </div>
             {kind === 'REVENUE' && <p className="project-group-notice">다른 프로젝트나 그룹에 이미 등록한 수익을 중복 입력하지 않도록 확인해 주세요.</p>}
             {entries.length === 0 ? (
@@ -1182,8 +1435,8 @@ function FinancialSection({
                             <strong>{formatWon(entry.amount)}</strong>
                             {entry.status === 'ACTIVE' ? (
                                 <div className="project-group-financial-list__actions">
-                                    <button type="button" onClick={() => onEdit(entry)}>수정</button>
-                                    <button type="button" onClick={() => onVoid(entry)}>무효 처리</button>
+                                    <button type="button" disabled={isSubmitting} onClick={() => onEdit(entry)}>수정</button>
+                                    <button type="button" disabled={isSubmitting} onClick={() => onVoid(entry)}>무효 처리</button>
                                 </div>
                             ) : <span className="project-group-voided-label">무효</span>}
                         </li>
