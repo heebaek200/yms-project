@@ -332,6 +332,7 @@ Query:
 - status
 - joinedAt
 - leftAt
+- ownedProjectCount: 논리 삭제되지 않은 소유 Project 수, 보관 Project 포함
 
 ## 4.6. Workspace 멤버 권한 변경
 
@@ -370,6 +371,10 @@ DELETE /api/workspaces/{workspaceId}/members/{workspaceMemberId}
 - MEMBER: 제외 API 사용 불가
 
 LEFT 또는 REMOVED 멤버에는 제외 요청을 보내지 않습니다. 자기 자신을 제외하는 제작팀 나가기는 별도 기능으로 두고 이 API의 현재 범위에 포함하지 않습니다.
+
+대상 멤버가 논리 삭제되지 않은 Project를 하나라도 소유하면 `409 PROJECT_OWNERSHIP_TRANSFER_REQUIRED`를 반환합니다. 보관 Project도 포함하고 논리 삭제 Project는 제외합니다. 화면의 `ownedProjectCount`는 위험 확인 전 사전 안내에 사용하지만 최종 판단은 이 요청의 서버 검증을 기준으로 합니다.
+
+제외가 가능하면 Workspace Member를 REMOVED로 변경하면서 대상 멤버의 ACTIVE Project Member를 같은 트랜잭션에서 비활성화하고 참여 종료 시각을 기록합니다. 대상 Workspace Member와 소유 Project를 잠근 상태에서 재검증하여 소유권 이전 요청과의 경합을 차단합니다.
 
 ## 4.8. 내 Workspace 초대 목록
 
@@ -466,7 +471,7 @@ POST /api/workspace-invitations/{invitationId}/reject
 
 현재 인증 사용자가 수신한 PENDING 상태의 유효한 초대만 처리할 수 있습니다.
 
-초대 수락 시 ACTIVE 멤버가 새로 중복 생성되지 않도록 다시 검증합니다. 기존 Workspace Member가 LEFT 또는 REMOVED 상태라면 새 행을 만들지 않고 ACTIVE로 복구하며 Workspace Role은 MEMBER로 설정합니다.
+초대 수락 시 ACTIVE 멤버가 새로 중복 생성되지 않도록 다시 검증합니다. 기존 Workspace Member가 LEFT 또는 REMOVED 상태라면 새 행을 만들지 않고 ACTIVE로 복구하며 Workspace Role은 MEMBER로 설정합니다. 이전에 이전된 Project 소유권과 비활성 Project Member는 자동 복구하지 않습니다.
 
 수락 응답 예:
 
@@ -1097,13 +1102,17 @@ POST /api/projects/{projectId}/transfer-owner
 
 ~~~json
 {
-  "newOwnerProjectMemberId": 48
+  "newOwnerWorkspaceMemberId": 25
 }
 ~~~
 
-새 Owner는 ACTIVE Project Member이며 EDIT 권한이어야 합니다.
+현재 Project 소유자와 Workspace OWNER / ADMIN만 논리 삭제되지 않은 Project의 소유권을 이전할 수 있습니다. 새 Owner는 같은 Workspace의 ACTIVE Member여야 합니다.
+
+새 Owner가 Project Member가 아니면 ACTIVE·EDIT로 생성하고, 비활성 참여자이면 재활성화하며, VIEW이면 EDIT로 변경한 뒤 소유권을 이전합니다. 이 과정은 하나의 트랜잭션에서 처리합니다.
 
 응답 성공 후 기존 Owner는 일반 EDIT Member로 남습니다.
+
+소유권 이전과 Workspace 멤버 제외는 대상 Workspace Member를 먼저 잠근 뒤 Project를 확인하는 동일한 잠금 순서를 사용합니다. 제외 요청은 커밋 직전에 남은 비삭제 소유 Project를 다시 검증합니다. 초기 범위에는 일괄 이전 API를 추가하지 않습니다.
 
 ---
 
@@ -1721,6 +1730,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 ProjectGroup �
 | ALREADY_PROJECT_MEMBER | 409 | 이미 Project 참여자 |
 | LAST_OWNER_REQUIRED | 409 | 마지막 Workspace OWNER 변경 불가 |
 | PROJECT_OWNER_CANNOT_BE_REMOVED | 409 | 현재 Project Owner 제거 불가 |
+| PROJECT_OWNERSHIP_TRANSFER_REQUIRED | 409 | 멤버 제외·탈퇴 전 비삭제 Project 소유권 이전 필요 |
 | DUPLICATE_YOUTUBE_VIDEO | 409 | Workspace 내 YouTube 영상 중복 |
 | CHANNEL_IN_USE | 409 | 기존 Project나 업무 데이터에서 사용 중인 Channel 삭제 불가 |
 | INVALID_TASK_STATUS_TRANSITION | 409 | 잘못된 Task 상태 전이 |

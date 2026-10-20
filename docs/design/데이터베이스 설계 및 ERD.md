@@ -232,7 +232,9 @@ Workspace 삭제 시 하위 업무 이력까지 즉시 물리 삭제하지 않�
 - 복수 OWNER를 허용하며 OWNER만 다른 ACTIVE 멤버에게 OWNER 권한을 부여할 수 있습니다.
 - OWNER는 다른 ACTIVE OWNER가 있을 때만 자신의 권한을 ADMIN 또는 MEMBER로 변경할 수 있습니다.
 - ADMIN은 일반 MEMBER만 제외할 수 있으며 OWNER·ADMIN 권한 변경과 제외는 허용하지 않습니다.
-- 재참여 시 중복 행을 만들지 않고 기존 멤버 상태를 ACTIVE, Workspace 권한을 MEMBER로 변경합니다.
+- `deleted_at IS NULL`인 Project를 소유한 멤버는 LEFT 또는 REMOVED로 변경할 수 없습니다. 보관 여부와 Project 상태는 이 검사에서 제외 조건이 아닙니다.
+- 멤버를 LEFT 또는 REMOVED로 변경할 때 해당 멤버의 ACTIVE `project_members`를 같은 트랜잭션에서 비활성화하고 `left_at`을 기록합니다.
+- 재참여 시 중복 행을 만들지 않고 기존 멤버 상태를 ACTIVE, Workspace 권한을 MEMBER로 변경하지만 이전 Project 소유권과 `project_members` 상태를 자동 복구하지 않습니다.
 - 자기 자신을 제외하는 제작팀 나가기 기능은 현재 범위에 포함하지 않습니다.
 
 ## 5.3. workspace_invitations
@@ -353,10 +355,11 @@ Workspace에서 관리하는 YouTube 채널입니다.
 - ProjectGroup 연결 생성, 변경과 해제는 Workspace OWNER와 ADMIN만 수행합니다.
 - ProjectGroup을 변경하면 Project 직접 Expense, Revenue와 Task 지급 금액은 Project를 따라 새 그룹의 집계에 반영합니다.
 - `workspace_id`는 Channel을 통해 유추할 수 있지만 tenant 범위 조회와 권한 검증을 위해 명시적으로 유지합니다.
-- `owner_member_id`는 동일 Workspace의 ACTIVE 멤버여야 합니다.
+- 논리 삭제되지 않은 Project의 `owner_member_id`는 동일 Workspace의 ACTIVE 멤버여야 합니다. 논리 삭제 Project는 당시 소유자를 이력으로 유지하므로 LEFT 또는 REMOVED 멤버를 참조할 수 있습니다.
 - Owner는 `project_members`에도 EDIT 권한 참여자로 등록하는 것을 애플리케이션 규칙으로 둡니다.
 - 현재 Owner에 해당하는 Project Member는 비활성화하거나 VIEW로 낮출 수 없습니다.
-- Owner 변경 시 새 Owner를 먼저 ACTIVE Project Member로 등록하고 EDIT 권한을 보장한 뒤 `owner_member_id`를 변경합니다.
+- Owner 변경 시 같은 Workspace의 ACTIVE 멤버를 대상으로 ACTIVE Project Member를 생성·재활성화하고 EDIT 권한을 보장한 뒤 `owner_member_id`를 변경합니다.
+- 이전 Owner가 ACTIVE Workspace Member이면 일반 EDIT Project Member로 남습니다. 이후 제작팀에서 제외·탈퇴하면 다른 Project 참여와 함께 비활성화합니다.
 - `created_by_member_id`와 `created_at`은 Owner 변경과 무관하게 최초 생성 정보를 유지합니다.
 - YouTube Video ID 중복은 Workspace 내부에서만 차단하며 `UNIQUE(workspace_id, youtube_video_id)`를 사용합니다.
 - 삭제는 하위 Task, Chat, Expense, Revenue 이력을 보존하기 위해 논리 삭제를 사용합니다.
@@ -386,6 +389,7 @@ Project에 참여하는 Workspace Member와 프로젝트 권한을 관리합니�
 - Project와 Workspace Member가 동일 Workspace에 속하는지는 서비스 계층에서 재검증합니다.
 - VIEW는 조회 및 채팅 가능, Project / Task 수정 불가입니다.
 - 현재 Project Owner에 해당하는 Project Member는 제거하거나 비활성화할 수 없으며 VIEW로 권한을 낮출 수도 없습니다. 소유권 이전을 먼저 완료해야 합니다.
+- LEFT 또는 REMOVED 멤버가 Workspace에 재참여해도 기존 Project Member 행을 자동 재활성화하지 않습니다.
 
 ## 6.4. project_status_histories
 
