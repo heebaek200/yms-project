@@ -15,7 +15,7 @@ YMS의 데이터 구조는 `User → Project` 중심의 초기 구조에서 **Wo
 User
  └─ Workspace Member
       ├─ Channel
-      ├─ Campaign
+      ├─ ProjectGroup
       │    └─ Project (선택적 연결)
       └─ Project
            ├─ Project Member
@@ -32,12 +32,12 @@ Workspace
 주요 원칙:
 
 - 사용자 전문 역할과 Workspace 권한을 분리합니다.
-- Campaign은 Workspace 소속이며 Channel을 직접 소유하지 않습니다.
-- Project는 반드시 하나의 Channel에 속하고 Campaign에는 선택적으로 속합니다.
-- Campaign과 Project의 관계는 **1:N**이며 하나의 Project가 여러 Campaign에 동시에 속하지 않습니다.
+- ProjectGroup은 Workspace 소속이며 Channel을 직접 소유하지 않습니다.
+- Project는 반드시 하나의 Channel에 속하고 ProjectGroup에는 선택적으로 속합니다.
+- ProjectGroup과 Project의 관계는 **1:N**이며 하나의 Project가 여러 ProjectGroup에 동시에 속하지 않습니다.
 - Project Task의 담당자는 `users`가 아니라 `project_members`를 참조합니다.
 - Project 소유자는 `video_projects.owner_member_id`로 명시합니다.
-- Expense와 Revenue는 Workspace / Channel / Campaign / Project 중 **한 곳에만 직접 귀속**합니다.
+- Expense와 Revenue는 Workspace / Channel / ProjectGroup / Project 중 **한 곳에만 직접 귀속**합니다.
 - 실제 Revenue와 조회수 기반 예상 수익을 분리합니다.
 - 예상 YouTube 플랫폼 수익은 저장하지 않고 `view_count × applied_revenue_per_view`로 계산합니다.
 - 금액과 조회수 1회당 수익 단가는 부동소수점이 아닌 `DECIMAL`을 사용합니다.
@@ -52,7 +52,7 @@ Workspace
 YMS에서는 데이터 성격을 다음과 같이 구분합니다.
 
 - **Master**: 비교적 장기간 유지되며 다른 업무 데이터의 기준이 되는 사용자, 조직, 채널, 작업 종류 등의 데이터
-- **Transaction**: 초대, 캠페인, 프로젝트, 작업, 메시지, 비용, 수익, 정산 등 실제 업무 과정에서 계속 발생하는 데이터
+- **Transaction**: 초대, 프로젝트 그룹, 프로젝트, 작업, 메시지, 비용, 수익, 정산 등 실제 업무 과정에서 계속 발생하는 데이터
 
 ### 2.2. 감사 컬럼 원칙
 
@@ -98,7 +98,7 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | channels | Master | 적용 | 채널 ID 및 연동 상태 변경이 Project와 YouTube 연동에 영향 |
 | task_types | Master | 적용 | 작업 종류 추가 / 비활성화 이력 확인 필요 |
 | workspace_invitations | Transaction | 미적용 | 초대자, 발송 / 응답 시각이 자체 업무 데이터이므로 별도 감사 컬럼 불필요 |
-| campaigns | Transaction | 미적용 | 범용 Audit은 두지 않되 캠페인 생성자 / 생성 시각은 업무 발생 정보로 보존 |
+| project_groups | Transaction | 미적용 | 범용 Audit은 두지 않되 프로젝트 그룹 생성자 / 생성 시각은 업무 발생 정보로 보존 |
 | video_projects | Transaction | 미적용 | 범용 Audit은 두지 않되 최초 생성자 / 생성 시각과 보관 / 삭제 라이프사이클 정보는 보존 |
 | project_members | Transaction | 미적용 | 참여 / 제외 시각과 활성 상태로 충분 |
 | project_tasks | Transaction | 미적용 | 일정, 상태, 완료 시각이 핵심. 정산 확정 후 금액은 Settlement Item에서 스냅샷 보존 |
@@ -124,7 +124,7 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | Workspace | workspace_members | Workspace 참여자 및 권한 |
 | Workspace | workspace_invitations | 이메일 기반 Workspace 초대 |
 | Channel | channels | Workspace가 관리하는 YouTube 채널 |
-| Campaign | campaigns | 여러 Project를 묶는 선택적 상위 업무 단위 |
+| ProjectGroup | project_groups | 여러 Project를 묶는 선택적 상위 업무 단위 |
 | Project | video_projects | 영상 제작 프로젝트 |
 | Project | project_members | Project 참여자 및 EDIT / VIEW 권한 |
 | Task | task_types | Workspace별 확장 가능한 작업 종류 |
@@ -304,29 +304,34 @@ Workspace에서 관리하는 YouTube 채널입니다.
 
 ---
 
-# 6. Campaign 및 Project 도메인
+# 6. ProjectGroup 및 Project 도메인
 
-## 6.1. campaigns
+## 6.1. project_groups
 
-하나의 계약, 프로모션 또는 비즈니스 목적에 속하는 여러 Project를 묶습니다.
+여러 Project의 실제 비용과 외부 수익을 함께 분석하기 위한 선택적 상위 단위입니다.
 
 | 컬럼 | 타입 | 제약 | 설명 |
 | --- | --- | --- | --- |
-| campaign_id | BIGINT | PK | Campaign ID |
+| project_group_id | BIGINT | PK | ProjectGroup ID |
 | workspace_id | BIGINT | FK → workspaces | 소속 Workspace |
-| name | VARCHAR(150) | NOT NULL | 캠페인명 |
+| name | VARCHAR(150) | NOT NULL | 프로젝트 그룹명 |
 | description | TEXT | NULL | 설명 |
 | start_date | DATE | NULL | 시작일 |
 | end_date | DATE | NULL | 종료일 |
 | status | VARCHAR(20) | NOT NULL | PLANNING / ACTIVE / COMPLETED / CANCELLED |
-| created_by_member_id | BIGINT | FK → workspace_members | 캠페인 생성자 |
-| created_at | DATETIME | NOT NULL | 캠페인 생성 시각 |
+| created_by_member_id | BIGINT | FK → workspace_members | 프로젝트 그룹 생성자 |
+| created_at | DATETIME | NOT NULL | 프로젝트 그룹 생성 시각 |
 
-Campaign은 Channel FK를 가지지 않습니다.
+`created_by_member_id`와 `created_at`은 범용 감사 컬럼이 아니라 프로젝트 그룹이 누가 언제 생성했는지를 보존하는 업무 발생 정보입니다.
 
-`created_by_member_id`와 `created_at`은 범용 감사 컬럼이 아니라 캠페인이 누가 언제 생성했는지를 보존하는 업무 발생 정보입니다.
+정책:
 
-Project가 연결된 Campaign은 즉시 삭제하지 않고 상태 변경을 우선합니다.
+- 생성 상태는 PLANNING입니다.
+- 같은 Workspace에서는 이름의 앞뒤 공백을 제거하고 영문 대소문자를 구분하지 않은 값으로 중복을 검증합니다.
+- ProjectGroup은 Channel FK를 가지지 않으며 서로 다른 Channel의 Project를 포함할 수 있습니다.
+- COMPLETED / CANCELLED 상태에는 새 Project를 연결하지 않지만 Expense와 Revenue는 추가하거나 정정할 수 있습니다.
+- 연결된 Project, 직접 Expense 또는 직접 Revenue가 하나라도 존재하면 삭제하지 않고 COMPLETED / CANCELLED 상태로 이력을 보존합니다.
+- 연결 데이터가 전혀 없는 ProjectGroup만 삭제할 수 있으며 서비스 계층에서 삭제 직전에 다시 검증합니다.
 
 ## 6.2. video_projects
 
@@ -337,7 +342,7 @@ Project가 연결된 Campaign은 즉시 삭제하지 않고 상태 변경을 우
 | project_id | BIGINT | PK | Project ID |
 | workspace_id | BIGINT | FK → workspaces | 소속 Workspace |
 | channel_id | BIGINT | FK → channels | 담당 Channel |
-| campaign_id | BIGINT | FK → campaigns, NULL | 선택적 Campaign |
+| project_group_id | BIGINT | FK → project_groups, NULL | 선택적 ProjectGroup |
 | owner_member_id | BIGINT | FK → workspace_members | Project 소유자 |
 | title | VARCHAR(200) | NOT NULL | 프로젝트 제목 |
 | content | TEXT | NULL | 기획 내용 |
@@ -358,7 +363,9 @@ Project가 연결된 Campaign은 즉시 삭제하지 않고 상태 변경을 우
 정책:
 
 - Project는 반드시 하나의 Channel에 속합니다.
-- Campaign은 선택값이며 한 Project는 최대 하나의 Campaign에만 속합니다.
+- ProjectGroup은 선택값이며 한 Project는 최대 하나의 ProjectGroup에만 속합니다.
+- ProjectGroup 연결 생성, 변경과 해제는 Workspace OWNER와 ADMIN만 수행합니다.
+- ProjectGroup을 변경하면 Project 직접 Expense, Revenue와 Task 지급 금액은 Project를 따라 새 그룹의 집계에 반영합니다.
 - `workspace_id`는 Channel을 통해 유추할 수 있지만 tenant 범위 조회와 권한 검증을 위해 명시적으로 유지합니다.
 - `owner_member_id`는 동일 Workspace의 ACTIVE 멤버여야 합니다.
 - Owner는 `project_members`에도 EDIT 권한 참여자로 등록하는 것을 애플리케이션 규칙으로 둡니다.
@@ -506,20 +513,20 @@ Expense와 Revenue는 항상 `workspace_id`를 보유하고, 실제 직접 귀�
 
 - WORKSPACE
 - CHANNEL
-- CAMPAIGN
+- PROJECT_GROUP
 - PROJECT
 
 공통 구조:
 
 ```text
 scope_type = WORKSPACE
-→ channel_id / campaign_id / project_id 모두 NULL
+→ channel_id / project_group_id / project_id 모두 NULL
 
 scope_type = CHANNEL
 → channel_id만 값 존재
 
-scope_type = CAMPAIGN
-→ campaign_id만 값 존재
+scope_type = PROJECT_GROUP
+→ project_group_id만 값 존재
 
 scope_type = PROJECT
 → project_id만 값 존재
@@ -527,7 +534,7 @@ scope_type = PROJECT
 
 DB의 CHECK 제약과 서비스 계층 검증을 함께 사용합니다.
 
-Channel / Campaign / Project가 `workspace_id`와 동일 Workspace에 속하는지도 서비스 계층에서 재검증합니다.
+Channel / ProjectGroup / Project가 `workspace_id`와 동일 Workspace에 속하는지도 서비스 계층에서 재검증합니다.
 
 ## 9.2. expenses
 
@@ -537,9 +544,9 @@ Channel / Campaign / Project가 `workspace_id`와 동일 Workspace에 속하는�
 | --- | --- | --- | --- |
 | expense_id | BIGINT | PK | Expense ID |
 | workspace_id | BIGINT | FK → workspaces | 소속 Workspace |
-| scope_type | VARCHAR(20) | NOT NULL | WORKSPACE / CHANNEL / CAMPAIGN / PROJECT |
+| scope_type | VARCHAR(20) | NOT NULL | WORKSPACE / CHANNEL / PROJECT_GROUP / PROJECT |
 | channel_id | BIGINT | FK → channels, NULL | Channel 직접 귀속 시 사용 |
-| campaign_id | BIGINT | FK → campaigns, NULL | Campaign 직접 귀속 시 사용 |
+| project_group_id | BIGINT | FK → project_groups, NULL | ProjectGroup 직접 귀속 시 사용 |
 | project_id | BIGINT | FK → video_projects, NULL | Project 직접 귀속 시 사용 |
 | expense_type | VARCHAR(50) | NOT NULL | 장소, 장비, 출연료, 라이선스, 외주, 광고비, 기타 등 |
 | amount | DECIMAL(15,2) | NOT NULL | 실제 비용 |
@@ -555,7 +562,7 @@ Channel / Campaign / Project가 `workspace_id`와 동일 Workspace에 속하는�
 
 `expense_type`은 DB ENUM으로 고정하지 않고 확장 가능한 문자열 코드로 관리합니다.
 
-잘못 등록된 비용은 물리 삭제하지 않고 `VOIDED`로 무효 처리합니다. Project / Campaign 비용 집계에는 `ACTIVE` Expense만 포함합니다.
+잘못 등록된 비용은 물리 삭제하지 않고 `VOIDED`로 무효 처리합니다. Project / ProjectGroup 비용 집계에는 `ACTIVE` Expense만 포함합니다.
 
 Task의 `worker_amount`는 이미 Project 비용에 포함되므로 동일 금액을 Expense로 다시 입력하지 않습니다.
 
@@ -567,9 +574,9 @@ Task의 `worker_amount`는 이미 Project 비용에 포함되므로 동일 금�
 | --- | --- | --- | --- |
 | revenue_id | BIGINT | PK | Revenue ID |
 | workspace_id | BIGINT | FK → workspaces | 소속 Workspace |
-| scope_type | VARCHAR(20) | NOT NULL | WORKSPACE / CHANNEL / CAMPAIGN / PROJECT |
+| scope_type | VARCHAR(20) | NOT NULL | WORKSPACE / CHANNEL / PROJECT_GROUP / PROJECT |
 | channel_id | BIGINT | FK → channels, NULL | Channel 직접 귀속 시 사용 |
-| campaign_id | BIGINT | FK → campaigns, NULL | Campaign 직접 귀속 시 사용 |
+| project_group_id | BIGINT | FK → project_groups, NULL | ProjectGroup 직접 귀속 시 사용 |
 | project_id | BIGINT | FK → video_projects, NULL | Project 직접 귀속 시 사용 |
 | revenue_type | VARCHAR(50) | NOT NULL | YOUTUBE_PLATFORM / SPONSORSHIP / AFFILIATE / MERCHANDISE / MEMBERSHIP / OTHER |
 | amount | DECIMAL(15,2) | NOT NULL | 실제 수익 |
@@ -583,7 +590,7 @@ Task의 `worker_amount`는 이미 Project 비용에 포함되므로 동일 금�
 | voided_by_member_id | BIGINT | FK → workspace_members, NULL | 무효 처리 사용자 |
 | voided_at | DATETIME | NULL | 무효 처리 시각 |
 
-잘못 등록되었거나 취소된 실제 수익은 물리 삭제하지 않고 `VOIDED`로 무효 처리합니다. Project / Campaign 실제 수익 집계에는 `ACTIVE` Revenue만 포함합니다.
+잘못 등록되었거나 취소된 실제 수익은 물리 삭제하지 않고 `VOIDED`로 무효 처리합니다. Project / ProjectGroup 실제 수익 집계에는 `ACTIVE` Revenue만 포함합니다.
 
 조회수 1회당 단가로 계산한 예상 플랫폼 수익은 이 테이블에 저장하지 않습니다.
 
@@ -681,11 +688,11 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 다음 관계는 FK만으로는 "같은 Workspace인가"를 완전히 표현하기 어렵기 때문에 서비스 계층에서 반드시 재검증합니다.
 
 - Project의 `channel_id`
-- Project의 `campaign_id`
+- Project의 `project_group_id`
 - Project의 `owner_member_id`
 - Project Member의 `workspace_member_id`
 - Task의 `task_type_id`
-- Expense / Revenue의 Channel / Campaign / Project 대상
+- Expense / Revenue의 Channel / ProjectGroup / Project 대상
 - Settlement의 `worker_member_id`
 
 모든 쓰기 API는 현재 인증 사용자의 Workspace 권한과 대상 데이터의 Workspace ID를 함께 검증합니다.
@@ -711,7 +718,7 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 - `workspace_members(workspace_id, status)`
 - `video_projects(workspace_id, status, archived_at)`
 - `video_projects(channel_id, status)`
-- `video_projects(campaign_id, status)`
+- `video_projects(project_group_id, status)`
 - `project_tasks(project_id, status)`
 - `project_tasks(assignee_project_member_id, end_date, status)`
 - `chat_messages(project_id, chat_message_id)`
@@ -727,7 +734,7 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 대표 원칙:
 
 - Project나 채널 귀속 업무 데이터가 연결된 Channel은 물리 삭제하지 않고 비활성화합니다. 연결 이력이 없는 Channel은 관리 화면에서 삭제할 수 있습니다.
-- Project가 연결된 Campaign은 상태를 COMPLETED / CANCELLED로 변경하고 즉시 물리 삭제하지 않습니다.
+- Project가 연결된 ProjectGroup은 상태를 COMPLETED / CANCELLED로 변경하고 즉시 물리 삭제하지 않습니다.
 - Settlement Item이 연결된 Task는 물리 삭제하지 않습니다.
 - Project는 Task, Chat, Expense, Revenue 이력을 보존하기 위해 논리 삭제합니다.
 - Expense / Revenue의 잘못된 입력은 삭제 대신 VOIDED 처리합니다.
@@ -753,11 +760,11 @@ erDiagram
 
     WORKSPACES ||--o{ CHANNELS : owns
     WORKSPACES ||--o{ TASK_TYPES : defines
-    WORKSPACES ||--o{ CAMPAIGNS : owns
+    WORKSPACES ||--o{ PROJECT_GROUPS : owns
     WORKSPACES ||--o{ VIDEO_PROJECTS : owns
 
     CHANNELS ||--o{ VIDEO_PROJECTS : contains
-    CAMPAIGNS o|--o{ VIDEO_PROJECTS : groups
+    PROJECT_GROUPS o|--o{ VIDEO_PROJECTS : groups
     WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : owns
 
     VIDEO_PROJECTS ||--o{ PROJECT_MEMBERS : has
@@ -776,10 +783,10 @@ erDiagram
     WORKSPACES ||--o{ EXPENSES : records
     WORKSPACES ||--o{ REVENUES : records
     CHANNELS o|--o{ EXPENSES : target
-    CAMPAIGNS o|--o{ EXPENSES : target
+    PROJECT_GROUPS o|--o{ EXPENSES : target
     VIDEO_PROJECTS o|--o{ EXPENSES : target
     CHANNELS o|--o{ REVENUES : target
-    CAMPAIGNS o|--o{ REVENUES : target
+    PROJECT_GROUPS o|--o{ REVENUES : target
     VIDEO_PROJECTS o|--o{ REVENUES : target
 
     WORKSPACES ||--o{ SETTLEMENTS : owns
@@ -855,7 +862,7 @@ erDiagram
     WORKSPACE_MEMBERS ||--o{ WORKSPACE_INVITATIONS : invites
 ```
 
-## 14.2. Channel / Campaign / Project / Task
+## 14.2. Channel / ProjectGroup / Project / Task
 
 ```mermaid
 erDiagram
@@ -879,8 +886,8 @@ erDiagram
         varchar integration_status
     }
 
-    CAMPAIGNS {
-        bigint campaign_id PK
+    PROJECT_GROUPS {
+        bigint project_group_id PK
         bigint workspace_id FK
         varchar name
         varchar status
@@ -894,7 +901,7 @@ erDiagram
         bigint project_id PK
         bigint workspace_id FK
         bigint channel_id FK
-        bigint campaign_id FK
+        bigint project_group_id FK
         bigint owner_member_id FK
         bigint created_by_member_id FK
         varchar title
@@ -938,12 +945,12 @@ erDiagram
 
     WORKSPACES ||--o{ WORKSPACE_MEMBERS : contains
     WORKSPACES ||--o{ CHANNELS : owns
-    WORKSPACES ||--o{ CAMPAIGNS : owns
+    WORKSPACES ||--o{ PROJECT_GROUPS : owns
     WORKSPACES ||--o{ VIDEO_PROJECTS : owns
     WORKSPACES ||--o{ TASK_TYPES : defines
     CHANNELS ||--o{ VIDEO_PROJECTS : contains
-    CAMPAIGNS o|--o{ VIDEO_PROJECTS : groups
-    WORKSPACE_MEMBERS ||--o{ CAMPAIGNS : creates
+    PROJECT_GROUPS o|--o{ VIDEO_PROJECTS : groups
+    WORKSPACE_MEMBERS ||--o{ PROJECT_GROUPS : creates
     WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : owns
     WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : creates
     VIDEO_PROJECTS ||--o{ PROJECT_MEMBERS : has
@@ -1021,8 +1028,8 @@ erDiagram
         bigint channel_id PK
     }
 
-    CAMPAIGNS {
-        bigint campaign_id PK
+    PROJECT_GROUPS {
+        bigint project_group_id PK
     }
 
     VIDEO_PROJECTS {
@@ -1039,7 +1046,7 @@ erDiagram
         bigint workspace_id FK
         varchar scope_type
         bigint channel_id FK
-        bigint campaign_id FK
+        bigint project_group_id FK
         bigint project_id FK
         varchar expense_type
         decimal amount
@@ -1054,7 +1061,7 @@ erDiagram
         bigint workspace_id FK
         varchar scope_type
         bigint channel_id FK
-        bigint campaign_id FK
+        bigint project_group_id FK
         bigint project_id FK
         varchar revenue_type
         decimal amount
@@ -1084,10 +1091,10 @@ erDiagram
     WORKSPACES ||--o{ EXPENSES : records
     WORKSPACES ||--o{ REVENUES : records
     CHANNELS o|--o{ EXPENSES : target
-    CAMPAIGNS o|--o{ EXPENSES : target
+    PROJECT_GROUPS o|--o{ EXPENSES : target
     VIDEO_PROJECTS o|--o{ EXPENSES : target
     CHANNELS o|--o{ REVENUES : target
-    CAMPAIGNS o|--o{ REVENUES : target
+    PROJECT_GROUPS o|--o{ REVENUES : target
     VIDEO_PROJECTS o|--o{ REVENUES : target
     WORKSPACE_MEMBERS ||--o{ EXPENSES : records
     WORKSPACE_MEMBERS ||--o{ EXPENSES : voids
@@ -1144,24 +1151,24 @@ Project 실제 수익
 = Project에 직접 귀속된 ACTIVE Revenue 합계
 ```
 
-## Campaign 실제 비용
+## ProjectGroup 실제 비용
 
 ```text
-Campaign 실제 비용
-= Campaign 직접 ACTIVE Expense
+ProjectGroup 실제 비용
+= ProjectGroup 직접 ACTIVE Expense
 + 연결 Project Task의 worker_amount
 + 연결 Project 직접 ACTIVE Expense
 ```
 
-## Campaign 실제 수익
+## ProjectGroup 실제 수익
 
 ```text
-Campaign 실제 수익
-= Campaign 직접 ACTIVE Revenue
+ProjectGroup 실제 수익
+= ProjectGroup 직접 ACTIVE Revenue
 + 연결 Project 직접 ACTIVE Revenue
 ```
 
-Channel 또는 Workspace에 직접 귀속된 Expense / Revenue는 Campaign 또는 Project에 임의 배분하지 않습니다.
+Channel 또는 Workspace에 직접 귀속된 Expense / Revenue는 ProjectGroup 또는 Project에 임의 배분하지 않습니다.
 
 ## 재무 성과
 
@@ -1196,8 +1203,8 @@ ROI = (실제 수익 - 실제 비용) ÷ 실제 비용 × 100
 - 실제 Channel 엔티티인 `channels` 추가
 - Workspace 권한을 위한 `workspace_members` 추가
 - 미가입 사용자 초대를 포함한 `workspace_invitations` 추가
-- Campaign 1:N Project 구조의 `campaigns` 추가
-- Project에 `workspace_id`, `channel_id`, `campaign_id`, `owner_member_id` 추가
+- ProjectGroup 1:N Project 구조의 `project_groups` 추가
+- Project에 `workspace_id`, `channel_id`, `project_group_id`, `owner_member_id` 추가
 - Project 보관과 삭제를 진행 상태와 분리
 - `project_assignments`를 실제 의미에 맞게 `project_tasks`로 변경
 - Task 담당 FK를 `user_id`에서 `project_member_id`로 변경
@@ -1213,7 +1220,7 @@ ROI = (실제 수익 - 실제 비용) ÷ 실제 비용 × 100
 - 조회수 1회당 단가를 `applied_revenue_per_view`로 명확화
 - 예상 수익은 파생값, 실제 Revenue와 분리
 - 모든 테이블에 일괄 적용하던 감사 / Soft Delete 컬럼 정책을 데이터 성격에 따라 분리
-- Campaign / Project의 최초 생성자와 생성 시각을 업무 발생 정보로 보존
+- ProjectGroup / Project의 최초 생성자와 생성 시각을 업무 발생 정보로 보존
 - Project Owner와 Project Member의 정합성 및 소유권 이전 순서 명시
 - YouTube Video ID 중복 범위를 전역이 아닌 Workspace 단위로 제한
 - Expense / Revenue는 물리 삭제 대신 ACTIVE / VOIDED 상태로 관리

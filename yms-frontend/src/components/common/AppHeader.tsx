@@ -1,5 +1,5 @@
 import './AppHeader.css';
-import { NavLink, useLocation, useNavigate } from 'react-router';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext'
 import { useCallback, useEffect, useRef, useState } from 'react';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
@@ -110,12 +110,18 @@ function AppHeader() {
                             role="group"
                             aria-label={group.label}
                         >
-                            {group.items.map(item => (
-                                <NavLink
+                            {group.items.map(item => {
+                                const isActive = (item.activePaths ?? [item.path]).some(path => (
+                                    location.pathname === path
+                                    || location.pathname.startsWith(`${path}/`)
+                                ));
+
+                                return (
+                                <Link
                                     key={item.key}
                                     to={item.path}
-                                    end={item.path === '/dashboard'}
-                                    className={({ isActive }) => [
+                                    aria-current={isActive ? 'page' : undefined}
+                                    className={[
                                         'app-nav__link',
                                         isActive ? 'app-nav__link--active' : ''
                                     ].filter(Boolean).join(' ')}
@@ -129,8 +135,9 @@ function AppHeader() {
                                     <span className="app-nav__label">
                                         {item.label}
                                     </span>
-                                </NavLink>
-                            ))}
+                                </Link>
+                                );
+                            })}
                         </div>
                     ))}
                 </nav>

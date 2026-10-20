@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR-06 프로젝트 그룹 관리</title>
+    <link rel="stylesheet" href="./wireframe.css">
+</head>
+<body>
+<main class="wireframe-page">
+    <header class="wireframe-header">
+        <h1>SCR-06. 프로젝트 그룹 관리</h1>
+        <p>접근 권한: OWNER / ADMIN</p>
+    </header>
+
+    <nav class="tab-row">
+        <a class="tab" href="./scr-07-projects.html">프로젝트</a>
+        <a class="tab is-active" href="./scr-06-project-group.html">프로젝트 그룹</a>
+    </nav>
+
+    <div class="toolbar">
+        <select><option>상태: 전체</option></select>
+        <input type="text" placeholder="기간">
+        <input type="search" placeholder="프로젝트 그룹 검색">
+        <button class="small-button" type="button">+ 새 프로젝트 그룹</button>
+    </div>
+
+    <section class="screen-frame">
+        <h2 class="section-title">프로젝트 그룹 목록</h2>
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr><th>프로젝트 그룹</th><th>상태</th><th>기간</th><th>프로젝트</th><th>실제 비용</th><th>실제 수익</th><th>손익</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>신제품 카메라 협찬</td><td>진행 중</td><td>09-01 ~ 09-30</td><td>4개</td><td>3,500,000원</td><td>10,000,000원</td><td>+6,500,000원</td></tr>
+                    <tr><td>여름 굿즈 프로모션</td><td>준비 중</td><td>기간 미정</td><td>2개</td><td>500,000원</td><td>0원</td><td>-500,000원</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="screen-frame" style="margin-top: 24px;">
+        <div class="row between">
+            <div>
+                <h2 class="section-title">신제품 카메라 협찬 <span class="badge">진행 중</span></h2>
+                <p>기간: 2026-09-01 ~ 2026-09-30</p>
+            </div>
+            <button class="small-button" type="button">수정</button>
+        </div>
+
+        <div class="grid-2" style="margin-top: 16px;">
+            <div class="card">실제 비용<br><strong>3,500,000원</strong></div>
+            <div class="card">실제 수익<br><strong>10,000,000원</strong></div>
+            <div class="card">손익<br><strong>+6,500,000원</strong></div>
+            <div class="card">ROI<br><strong>185.7%</strong></div>
+        </div>
+
+        <h3>연결 프로젝트 <button class="small-button" type="button">프로젝트 연결</button></h3>
+        <div class="table-wrap">
+            <table class="table">
+                <tr><th>프로젝트</th><th>채널</th><th>상태</th></tr>
+                <tr><td>롱폼 리뷰</td><td>테크 리뷰</td><td>편집 중</td></tr>
+                <tr><td>Shorts #1</td><td>쇼츠 채널</td><td>업로드 완료</td></tr>
+            </table>
+        </div>
+
+        <div class="grid-2" style="margin-top: 16px;">
+            <div class="card">
+                <div class="row between"><strong>그룹 직접 수익</strong><button class="small-button" type="button">수익 등록</button></div>
+                <p>브랜드 협찬 · 10,000,000원 · 2026-09-01</p>
+            </div>
+            <div class="card">
+                <div class="row between"><strong>그룹 직접 비용</strong><button class="small-button" type="button">비용 등록</button></div>
+                <p>장비 렌탈 · 500,000원 · 2026-09-02</p>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>

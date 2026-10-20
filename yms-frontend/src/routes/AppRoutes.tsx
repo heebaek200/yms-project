@@ -16,6 +16,8 @@ import DashboardPage from '../pages/DashboardPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import ComingSoonPage from '../pages/ComingSoonPage';
 import WorkspaceSettingsPage from '../pages/WorkspaceSettingsPage';
+import ProjectsPage from '../pages/ProjectsPage';
+import ProjectGroupPage from '../pages/ProjectGroupPage';
 import AppLayout from '../layouts/AppLayout';
 import WorkspaceRouteStatus from '../components/routing/WorkspaceRouteStatus';
 import WorkspaceRoleRoute from '../components/routing/WorkspaceRoleRoute';
@@ -207,12 +209,21 @@ const router = createBrowserRouter(
                     element={<DashboardPage />}
                 />
 
-                {/* SCR-06 캠페인 관리 예정 Route */}
+                {/* SCR-06 프로젝트 그룹 목록·상세 Route */}
                 <Route
-                    path="/campaigns"
+                    path="/project-groups"
                     element={
                         <WorkspaceRoleRoute allowedRoles={WORKSPACE_ADMIN_ROLES}>
-                            <ComingSoonPage featureName="캠페인" />
+                            <ProjectGroupPage />
+                        </WorkspaceRoleRoute>
+                    }
+                />
+
+                <Route
+                    path="/project-groups/:projectGroupId"
+                    element={
+                        <WorkspaceRoleRoute allowedRoles={WORKSPACE_ADMIN_ROLES}>
+                            <ProjectGroupPage />
                         </WorkspaceRoleRoute>
                     }
                 />
@@ -220,7 +231,12 @@ const router = createBrowserRouter(
                 {/* SCR-07 프로젝트 목록 예정 Route */}
                 <Route
                     path="/projects"
-                    element={<ComingSoonPage featureName="프로젝트" />}
+                    element={<ProjectsPage />}
+                />
+
+                <Route
+                    path="/projects/:projectId"
+                    element={<ProjectsPage />}
                 />
 
                 {/* SCR-09 메신저 예정 Route */}
