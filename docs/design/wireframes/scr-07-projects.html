@@ -20,8 +20,8 @@
 
     <div class="row between">
         <nav class="tab-row" style="margin: 0;">
-            <button class="tab is-active" type="button">진행 프로젝트</button>
-            <button class="tab" type="button">보관함</button>
+            <a class="tab is-active" href="?view=active" aria-current="page">진행 프로젝트</a>
+            <a class="tab" href="?view=archived">보관함</a>
         </nav>
         <button class="small-button" type="button">+ 새 프로젝트</button>
     </div>
@@ -50,15 +50,21 @@
     <section class="modal-box modal-preview" style="margin-top: 24px;">
         <h2 class="section-title">Project 생성 모달 예시</h2>
         <div class="form-group"><label>제목</label><input type="text" value="새 영상 프로젝트"></div>
+        <div class="form-group"><label>기획 내용 (선택)</label><textarea rows="3"></textarea></div>
         <div class="grid-2">
             <div class="form-group"><label>Channel</label><select><option>테크 리뷰</option></select></div>
             <div class="form-group"><label>프로젝트 그룹 (선택, OWNER / ADMIN)</label><select><option>선택 안 함</option><option>신제품 협찬</option></select></div>
         </div>
         <div class="grid-2">
+            <div class="form-group"><label>영상 유형</label><select><option>선택해 주세요</option><option>롱폼</option><option>쇼츠</option></select></div>
+            <div class="form-group"><label>초기 상태</label><select><option>기획 중</option><option>편집 중</option></select></div>
+        </div>
+        <div class="grid-2">
             <div class="form-group"><label>제작 마감일</label><input type="date"></div>
             <div class="form-group"><label>업로드 예정일</label><input type="date"></div>
         </div>
-        <button class="action-button" type="button">생성</button>
+        <p class="help-text">영상 유형은 직접 선택해야 하며, 두 날짜는 필요한 항목만 입력할 수 있습니다.</p>
+        <div class="row"><button class="small-button" type="button">취소</button><button class="action-button" type="button">생성</button></div>
     </section>
 </main>
 </body>
