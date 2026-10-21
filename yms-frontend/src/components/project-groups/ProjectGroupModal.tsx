@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
+import CloseIcon from '../common/CloseIcon';
+
 type ProjectGroupModalProps = {
     titleId: string;
     title: string;
@@ -113,7 +115,7 @@ function ProjectGroupModal({
                         aria-label={`${title} 닫기`}
                         onClick={onRequestClose}
                     >
-                        ×
+                        <CloseIcon />
                     </button>
                 </header>
                 {children}

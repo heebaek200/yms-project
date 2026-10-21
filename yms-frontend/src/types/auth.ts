@@ -23,8 +23,3 @@ export type AuthSession = {
     accessToken: string;
     tokenType: string;
 };
-
-// 단가 변경 적용 범위
-export type RateScope =
-    | 'FUTURE_ONLY'
-    | 'INCLUDE_UNFINALIZED';

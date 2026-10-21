@@ -22,6 +22,7 @@ import {
     subtractMoney,
     sumMoney
 } from '../../utils/decimal';
+import { readDeletedProjectFinanceByGroup, readProjects } from '../projects/projectStore';
 
 export type ProjectGroupListRequest = {
     status?: ProjectGroupStatus | 'ALL';
@@ -82,9 +83,33 @@ function normalizeName(value: string): string {
     return value.trim().toLocaleLowerCase();
 }
 
+/** 대표 결과물만 사용해 ProjectGroup의 현재·누적 콘텐츠 성과를 계산합니다. */
+function aggregateGroupPerformance(projectGroupId: number, mode: 'current' | 'cumulative') {
+    const aggregates = readProjects()
+        .filter(project => project.projectGroupId === projectGroupId)
+        .flatMap(project => project.videoContents
+            .filter(content => content.primaryProjectId === project.projectId)
+            .map(content => mode === 'current' ? content.currentPerformance : content.cumulativePerformance));
+    const includedPublicationCount = aggregates.reduce((sum, item) => sum + item.includedPublicationCount, 0);
+    const missingPublicationCount = aggregates.reduce((sum, item) => sum + item.missingPublicationCount, 0);
+
+    return {
+        viewCount: aggregates.reduce((sum, item) => sum + item.viewCount, 0),
+        likeCount: aggregates.reduce((sum, item) => sum + item.likeCount, 0),
+        commentCount: aggregates.reduce((sum, item) => sum + item.commentCount, 0),
+        estimatedRevenue: aggregates.reduce((sum, item) => sum + Number(item.estimatedRevenue), 0).toFixed(2),
+        completeness: includedPublicationCount === 0 ? 'UNAVAILABLE' as const : missingPublicationCount > 0 ? 'PARTIAL' as const : 'COMPLETE' as const,
+        includedPublicationCount,
+        missingPublicationCount
+    };
+}
+
 /** 직접 항목과 연결 Project의 금액을 합산해 목록·상세에서 같은 재무 결과를 사용합니다. */
 function toProjectGroupDetail(group: StoredProjectGroup): ProjectGroupDetail {
     const projects = readProjectsByGroup(group.projectGroupId);
+    const deletedProjectFinance = readDeletedProjectFinanceByGroup(
+        group.projectGroupId
+    );
     const directExpenses = group.directExpenses.filter(entry => entry.status === 'ACTIVE');
     const directRevenues = group.directRevenues.filter(entry => entry.status === 'ACTIVE');
 
@@ -94,11 +119,16 @@ function toProjectGroupDetail(group: StoredProjectGroup): ProjectGroupDetail {
         ...projects.flatMap(project => [
             project.workerAmount,
             project.directExpenseAmount
+        ]),
+        ...deletedProjectFinance.flatMap(project => [
+            project.workerAmount,
+            project.directExpenseAmount
         ])
     ]);
     const actualRevenue = sumMoney([
         ...directRevenues.map(entry => entry.amount),
-        ...projects.map(project => project.directRevenueAmount)
+        ...projects.map(project => project.directRevenueAmount),
+        ...deletedProjectFinance.map(project => project.directRevenueAmount)
     ]);
     const profit = subtractMoney(actualRevenue, actualCost);
 
@@ -111,6 +141,8 @@ function toProjectGroupDetail(group: StoredProjectGroup): ProjectGroupDetail {
         actualCost,
         actualRevenue,
         profit,
+        currentContentPerformance: aggregateGroupPerformance(group.projectGroupId, 'current'),
+        cumulativeContentPerformance: aggregateGroupPerformance(group.projectGroupId, 'cumulative'),
         roi: calculateRoi(profit, actualCost)
     };
 }

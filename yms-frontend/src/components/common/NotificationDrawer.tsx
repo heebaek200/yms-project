@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { NotificationItem } from '../../api/notifications/notifications';
 import { useNotifications } from '../../hooks/useNotifications';
+import CloseIcon from './CloseIcon';
 import NotificationList from './NotificationList';
 
 import './NotificationDrawer.css';
@@ -101,7 +102,7 @@ function NotificationDrawer({ onClose }: NotificationDrawerProps) {
                         onClick={onClose}
                         aria-label="알림 창 닫기"
                     >
-                        ×
+                        <CloseIcon />
                     </button>
                 </header>
 

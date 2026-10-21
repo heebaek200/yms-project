@@ -1,4 +1,4 @@
-import type { RateScope, UserRole } from '../../types/auth';
+import type { UserRole } from '../../types/auth';
 import type {
     ApiFailureResponse,
     ApiResponse,
@@ -12,8 +12,6 @@ export type ProfileData = {
     email: string;
     name: string;
     roles: UserRole[];
-    longFormRate: string | null;
-    shortFormRate: string | null;
 };
 
 export type ProfileResponse = ApiSuccessResponse<ProfileData>;
@@ -21,18 +19,12 @@ export type ProfileResponse = ApiSuccessResponse<ProfileData>;
 export type UpdateProfileRequest = {
     name: string;
     roles: UserRole[];
-    longFormRate?: string;
-    shortFormRate?: string;
-    rateScope?: RateScope;
 };
 
 export type UpdateProfileSuccessData = {
     userId: number;
     name: string;
     roles: UserRole[];
-    longFormRate: string | null;
-    shortFormRate: string | null;
-    processedUnfinalizedProjectCount: number;
 };
 
 export type UpdateProfileSuccessResponse =
@@ -40,22 +32,17 @@ export type UpdateProfileSuccessResponse =
 export type UpdateProfileFailureResponse = ApiFailureResponse;
 export type UpdateProfileResponse = ApiResponse<UpdateProfileSuccessData>;
 
-const RATE_PATTERN = /^\d+(\.\d{1,6})?$/;
-
 // 실제 백엔드 연동 전까지 GET과 PATCH가 동일한 프로필 상태를 공유합니다.
 let mockProfile: ProfileData = {
     userId: 24601,
     email: 'test@test.com',
     name: '테스트 사용자',
-    roles: [],
-    longFormRate: null,
-    shortFormRate: null
+    roles: []
 };
 
 /**
- * 현재 사용자의 프로필, 전문 역할과 CREATOR 기본 단가를 조회합니다.
+ * 현재 사용자의 프로필과 검색 필터에 사용할 전문 역할을 조회합니다.
  * 실제 연동 시 GET /api/users/me/profile 요청으로 교체할 Mock 함수입니다.
- * 단가를 아직 저장하지 않은 프로필은 null 값을 반환할 수 있습니다.
  */
 export async function getProfile(): Promise<ProfileResponse> {
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -64,17 +51,6 @@ export async function getProfile(): Promise<ProfileResponse> {
         success: true,
         data: { ...mockProfile }
     };
-}
-
-/**
- * CREATOR 단가를 API 제약에 맞는 문자열로 정규화합니다.
- * 누락되거나 빈 단가는 확정된 업무 규칙에 따라 문자열 "0"으로 처리합니다.
- * 화면 검증을 우회한 호출도 안전하게 처리할 수 있도록 공백을 제거합니다.
- */
-function normalizeCreatorRate(rate: string | undefined) {
-    const trimmedRate = rate?.trim() ?? '';
-
-    return trimmedRate || '0';
 }
 
 /**
@@ -120,75 +96,20 @@ export async function updateProfile(
         };
     }
 
-    const isCreator = request.roles.includes('CREATOR');
-    const longFormRate = normalizeCreatorRate(request.longFormRate);
-    const shortFormRate = normalizeCreatorRate(request.shortFormRate);
-
-    // CREATOR 요청은 0 이상의 정수 또는 소수점 이하 최대 6자리만 허용합니다.
-    if (isCreator && (!RATE_PATTERN.test(longFormRate) || !RATE_PATTERN.test(shortFormRate))) {
-        return {
-            success: false,
-            errorCode: 'INVALID_INPUT_VALUE',
-            message: '입력값 검증에 실패했습니다.',
-            errors: [
-                ...(!RATE_PATTERN.test(longFormRate) ? [{
-                    field: 'longFormRate',
-                    value: request.longFormRate ?? null,
-                    reason: '단가는 0 이상의 숫자로 소수점 여섯째 자리까지 입력해 주세요.'
-                }] : []),
-                ...(!RATE_PATTERN.test(shortFormRate) ? [{
-                    field: 'shortFormRate',
-                    value: request.shortFormRate ?? null,
-                    reason: '단가는 0 이상의 숫자로 소수점 여섯째 자리까지 입력해 주세요.'
-                }] : [])
-            ]
-        };
-    }
-
-    if (
-        isCreator
-        && request.rateScope !== undefined
-        && request.rateScope !== 'FUTURE_ONLY'
-        && request.rateScope !== 'INCLUDE_UNFINALIZED'
-    ) {
-        return {
-            success: false,
-            errorCode: 'INVALID_INPUT_VALUE',
-            message: '입력값 검증에 실패했습니다.',
-            errors: [{
-                field: 'rateScope',
-                value: request.rateScope,
-                reason: '올바른 단가 변경 적용 범위를 선택해 주세요.'
-            }]
-        };
-    }
-
-    // CREATOR가 아닌 프로필에는 개인 기본 단가를 남기지 않습니다.
+    // 전문 역할은 기능 권한이 아닌 검색·소개용 전역 분류로만 저장합니다.
     mockProfile = {
         ...mockProfile,
         name: trimmedName,
-        roles: request.roles,
-        longFormRate: isCreator ? longFormRate : null,
-        shortFormRate: isCreator ? shortFormRate : null
+        roles: request.roles
     };
-
-    const processedUnfinalizedProjectCount =
-        isCreator && request.rateScope === 'INCLUDE_UNFINALIZED'
-            ? 3
-            : 0;
 
     return {
         success: true,
-        message: processedUnfinalizedProjectCount > 0
-            ? `프로필 정보가 수정되었습니다. 미확정 프로젝트 ${processedUnfinalizedProjectCount}건에 새 단가를 적용했습니다.`
-            : '프로필 정보가 수정되었습니다.',
+        message: '프로필 정보가 수정되었습니다.',
         data: {
             userId: mockProfile.userId,
             name: mockProfile.name,
-            roles: mockProfile.roles,
-            longFormRate: mockProfile.longFormRate,
-            shortFormRate: mockProfile.shortFormRate,
-            processedUnfinalizedProjectCount
+            roles: mockProfile.roles
         }
     };
 }

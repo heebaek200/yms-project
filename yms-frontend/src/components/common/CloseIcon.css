@@ -1,0 +1,10 @@
+/* 폰트 글리프의 비대칭 여백 대신 SVG 좌표를 버튼의 실제 중심에 고정합니다. */
+.close-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}

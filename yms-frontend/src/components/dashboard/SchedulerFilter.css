@@ -42,8 +42,7 @@
 }
 
 .scheduler-filter__select:focus-visible,
-.scheduler-filter__input:focus-visible,
-.scheduler-filter__reset:focus-visible {
+.scheduler-filter__input:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
@@ -51,32 +50,6 @@
 
 .scheduler-filter__input {
     width: 100%;
-}
-
-
-.scheduler-filter__reset {
-    height: 38px;
-    padding: 0 14px;
-
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-
-    color: var(--color-text);
-
-    font-size: 13px;
-    font-weight: 600;
-
-    cursor: pointer;
-}
-
-
-.scheduler-filter__reset:hover {
-    background: var(--color-surface-hover);
-}
-
-.scheduler-filter__reset:active {
-    background: var(--color-surface-active);
 }
 
 
@@ -94,8 +67,4 @@
         flex-basis: 100%;
     }
 
-    /* 좁은 화면에서 초기화 버튼이 다른 입력 요소와 겹치지 않도록 분리합니다. */
-    .scheduler-filter__reset {
-        width: 100%;
-    }
 }

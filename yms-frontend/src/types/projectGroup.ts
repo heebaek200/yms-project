@@ -1,3 +1,5 @@
+import type { PerformanceAggregate } from './project';
+
 export type ProjectGroupStatus =
     | 'PLANNING'
     | 'ACTIVE'
@@ -45,6 +47,8 @@ export type ProjectGroupSummary = {
     actualCost: string;
     actualRevenue: string;
     profit: string;
+    currentContentPerformance: PerformanceAggregate;
+    cumulativeContentPerformance: PerformanceAggregate;
 };
 
 export type ProjectGroupDetail = ProjectGroupSummary & {

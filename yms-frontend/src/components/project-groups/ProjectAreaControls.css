@@ -1,0 +1,302 @@
+/* 프로젝트와 프로젝트 그룹에서 같은 의미의 조작은 동일한 크기와 상태 표현을 공유합니다. */
+.project-button,
+.project-group-button,
+.project-pagination button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 13px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: rgb(255 255 255 / 0.65);
+    color: var(--color-text);
+    font: inherit;
+    font-weight: 750;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition:
+        background-color 0.18s ease,
+        border-color 0.18s ease,
+        color 0.18s ease;
+}
+
+.project-button:hover:not(:disabled),
+.project-group-button:hover:not(:disabled),
+.project-pagination button:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+}
+
+.project-button:focus-visible,
+.project-group-button:focus-visible,
+.project-pagination button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.project-button--primary,
+.project-group-button--primary {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.project-button--primary:hover:not(:disabled),
+.project-group-button--primary:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+}
+
+.project-button--danger,
+.project-group-button--danger {
+    border-color: #fecdd3;
+    color: #be123c;
+}
+
+.project-button--danger:hover:not(:disabled),
+.project-group-button--danger:hover:not(:disabled) {
+    background: #fff1f2;
+}
+
+.project-button--small,
+.project-group-button--small {
+    min-height: 32px;
+    padding: 5px 9px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.project-button:disabled,
+.project-group-button:disabled,
+.project-pagination button:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+/* 상세 헤더와 폼 하단 액션은 화면이 달라도 같은 간격과 정렬 원칙을 사용합니다. */
+.project-actions,
+.project-group-detail-header__actions,
+.project-group-state__actions,
+.project-form__actions,
+.project-group-form__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.project-actions,
+.project-group-detail-header__actions {
+    flex-wrap: wrap;
+}
+
+.project-form__actions,
+.project-group-form__actions {
+    justify-content: flex-end;
+}
+
+/* 두 목록의 검색 카드는 같은 글래스 표면과 여백을 사용합니다. */
+.project-filters,
+.project-group-filters {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: rgb(255 255 255 / 0.5);
+    backdrop-filter: blur(10px);
+}
+
+/* 필터와 모달 필드는 라벨만 강조하고 입력값과 placeholder는 보통 굵기로 유지합니다. */
+.project-filters label,
+.project-group-filters label,
+.project-form label,
+.project-group-field {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+    font-weight: 400;
+}
+
+.project-filters label > span,
+.project-group-filters label > span,
+.project-form label > span,
+.project-group-field > span {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.project-filters input,
+.project-filters select,
+.project-group-filters input,
+.project-group-filters select,
+.project-form input,
+.project-form select,
+.project-form textarea,
+.project-group-field input,
+.project-group-field select,
+.project-group-field textarea,
+.project-youtube-link input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 11px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: rgb(255 255 255 / 0.72);
+    color: var(--color-text);
+    font: inherit;
+    font-weight: 400;
+}
+
+/* Windows Chromium의 빈 날짜 편집 영역이 값이 있을 때보다 커지는 네이티브 차이를 고정합니다. */
+.project-area-page input[type="date"],
+.project-area-page input[type="datetime-local"] {
+    height: 42px;
+}
+
+.project-filters input::placeholder,
+.project-group-filters input::placeholder,
+.project-form input::placeholder,
+.project-form textarea::placeholder,
+.project-group-field input::placeholder,
+.project-group-field textarea::placeholder,
+.project-youtube-link input::placeholder {
+    color: var(--color-text-muted);
+    font-weight: 400;
+    opacity: 1;
+}
+
+.project-form [aria-invalid="true"],
+.project-group-field [aria-invalid="true"] {
+    border-color: var(--color-primary);
+}
+
+.project-form small,
+.project-group-field small {
+    color: var(--color-primary);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.project-form em,
+.project-group-field em,
+.project-group-field small.project-group-field__hint {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 500;
+}
+
+.project-filter-actions {
+    display: flex;
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+}
+
+/* 고정된 업무 선택지는 펼쳐진 라디오 카드로 노출해 현재 값과 가능한 값을 함께 보여줍니다. */
+.project-choice-group {
+    min-width: 0;
+    margin: 0;
+}
+
+.project-choice-group > legend,
+.project-revenue-settings > legend {
+    padding: 0 5px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.project-choice-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.project-form .project-choice-option {
+    display: flex;
+    align-items: center;
+    min-height: 42px;
+    padding: 9px 11px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: rgb(255 255 255 / 0.55);
+    cursor: pointer;
+    transition:
+        background-color 0.18s ease,
+        border-color 0.18s ease,
+        color 0.18s ease;
+}
+
+.project-form .project-choice-option:hover {
+    background: var(--color-surface-hover);
+}
+
+.project-form .project-choice-option:has(input:checked) {
+    border-color: var(--color-primary);
+    background: var(--color-surface-active);
+    color: var(--color-primary);
+}
+
+.project-form .project-choice-option--danger:has(input:checked) {
+    border-color: #fb7185;
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.project-form .project-choice-option:focus-within {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.project-form .project-choice-option > input[type="radio"] {
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    min-height: 17px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--color-primary);
+}
+
+.project-form .project-choice-option > span {
+    color: inherit;
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.project-revenue-settings .project-choice-group {
+    padding: 0;
+    border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .project-form .project-choice-option {
+        transition: none;
+    }
+}
+
+/* 도메인별 색상은 유지하되 상태 배지의 형태와 타이포그래피는 통일합니다. */
+.project-status,
+.project-group-status {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .project-button,
+    .project-group-button,
+    .project-pagination button {
+        transition: none;
+    }
+}

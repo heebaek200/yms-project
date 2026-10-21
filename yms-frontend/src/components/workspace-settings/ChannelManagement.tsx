@@ -12,6 +12,7 @@ import type {
 } from '../../types/workspaceSettings';
 import FeedbackMessage, { type FeedbackMessageType } from '../common/FeedbackMessage';
 import SettingsModal from './SettingsModal';
+import { normalizeRateInput } from '../../utils/format';
 
 type ChannelManagementProps = {
     workspaceId: number;
@@ -23,6 +24,8 @@ type ChannelFormValues = {
     youtubeChannelId: string;
     youtubeChannelUrl: string;
     description: string;
+    longFormRate: string;
+    shortFormRate: string;
 };
 
 type ChannelFieldErrors = Partial<Record<keyof ChannelFormValues, string>>;
@@ -36,7 +39,9 @@ const EMPTY_FORM: ChannelFormValues = {
     name: '',
     youtubeChannelId: '',
     youtubeChannelUrl: '',
-    description: ''
+    description: '',
+    longFormRate: '',
+    shortFormRate: ''
 };
 
 const INTEGRATION_STATUS: Record<
@@ -55,7 +60,9 @@ function toChannelFormValues(channel: WorkspaceChannel): ChannelFormValues {
         name: channel.name,
         youtubeChannelId: channel.youtubeChannelId ?? '',
         youtubeChannelUrl: channel.youtubeChannelUrl ?? '',
-        description: channel.description ?? ''
+        description: channel.description ?? '',
+        longFormRate: channel.longFormRate,
+        shortFormRate: channel.shortFormRate
     };
 }
 
@@ -98,6 +105,8 @@ function ChannelManagement({
         || formValues.youtubeChannelId !== initialFormValues.youtubeChannelId
         || formValues.youtubeChannelUrl !== initialFormValues.youtubeChannelUrl
         || formValues.description !== initialFormValues.description
+        || formValues.longFormRate !== initialFormValues.longFormRate
+        || formValues.shortFormRate !== initialFormValues.shortFormRate
     );
 
     // 현재 모달의 변경 여부를 공통 Header와 탭 전환 Guard에 전달합니다.
@@ -182,6 +191,16 @@ function ChannelManagement({
     const updateFormValue = (field: keyof ChannelFormValues, value: string) => {
         setFormValues(current => ({ ...current, [field]: value }));
         setFieldErrors(current => ({ ...current, [field]: undefined }));
+    };
+
+    /** 원·쉼표를 포함한 편의 입력을 포커스 이탈 시 API 단가 문자열로 정규화합니다. */
+    const normalizeRateField = (field: 'longFormRate' | 'shortFormRate') => {
+        const result = normalizeRateInput(formValues[field]);
+        if (result.success) {
+            updateFormValue(field, result.value);
+            return;
+        }
+        setFieldErrors(current => ({ ...current, [field]: result.message }));
     };
 
     /** Channel 생성 또는 수정 결과를 목록에 반영하고 성공한 모달을 닫습니다. */
@@ -406,6 +425,7 @@ function ChannelManagement({
                                     <div><dt>Channel ID</dt><dd>{channel.youtubeChannelId ?? '입력 안 함'}</dd></div>
                                     <div><dt>URL</dt><dd>{channel.youtubeChannelUrl ?? '입력 안 함'}</dd></div>
                                     <div><dt>설명</dt><dd>{channel.description ?? '설명 없음'}</dd></div>
+                                    <div><dt>기본 단가</dt><dd>롱폼 {channel.longFormRate}원 · 쇼츠 {channel.shortFormRate}원</dd></div>
                                 </dl>
 
                                 <div className="settings-card__actions">
@@ -448,6 +468,33 @@ function ChannelManagement({
                             <input data-autofocus id="channel-name" value={formValues.name} maxLength={150} disabled={isSubmitting} aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? 'channel-name-error' : undefined} onChange={event => updateFormValue('name', event.target.value)} />
                             {fieldErrors.name && <p id="channel-name-error" className="settings-field__error">{fieldErrors.name}</p>}
                         </div>
+
+                        <aside className="settings-rate-guide" aria-label="기본 단가 참고 안내">
+                            <p>처음 설정할 때 참고할 수 있는 예시입니다.</p>
+                            <strong>롱폼 약 3.00원/조회 · 쇼츠 약 0.20원/조회</strong>
+                            <p>채널과 콘텐츠에 따라 실제 수익은 달라질 수 있습니다.</p>
+                        </aside>
+
+                        <div className="settings-form__columns">
+                            <div className="settings-field">
+                                <label htmlFor="channel-long-rate">롱폼 기본 단가 <span>선택</span></label>
+                                <div className="settings-amount-input">
+                                    <input id="channel-long-rate" inputMode="decimal" value={formValues.longFormRate} disabled={isSubmitting} aria-invalid={Boolean(fieldErrors.longFormRate)} onChange={event => updateFormValue('longFormRate', event.target.value)} onBlur={() => normalizeRateField('longFormRate')} />
+                                    <span>원</span>
+                                </div>
+                                {fieldErrors.longFormRate && <p className="settings-field__error">{fieldErrors.longFormRate}</p>}
+                            </div>
+                            <div className="settings-field">
+                                <label htmlFor="channel-short-rate">쇼츠 기본 단가 <span>선택</span></label>
+                                <div className="settings-amount-input">
+                                    <input id="channel-short-rate" inputMode="decimal" value={formValues.shortFormRate} disabled={isSubmitting} aria-invalid={Boolean(fieldErrors.shortFormRate)} onChange={event => updateFormValue('shortFormRate', event.target.value)} onBlur={() => normalizeRateField('shortFormRate')} />
+                                    <span>원</span>
+                                </div>
+                                {fieldErrors.shortFormRate && <p className="settings-field__error">{fieldErrors.shortFormRate}</p>}
+                            </div>
+                        </div>
+
+                        <p className="settings-form__notice">단가를 입력하지 않으면 0원으로 저장됩니다. 기존 프로젝트에 저장된 단가는 바뀌지 않습니다.</p>
 
                         <div className="settings-field">
                             <label htmlFor="channel-youtube-id">YouTube Channel ID <span>선택</span></label>

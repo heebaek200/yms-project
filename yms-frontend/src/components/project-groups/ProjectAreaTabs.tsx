@@ -2,6 +2,8 @@ import { NavLink } from 'react-router';
 
 import { useWorkspace } from '../../hooks/useWorkspace';
 
+import './ProjectAreaControls.css';
+
 /** 프로젝트와 ProjectGroup을 같은 상위 메뉴 안의 독립 Route 탭으로 연결합니다. */
 function ProjectAreaTabs() {
     const { currentWorkspace } = useWorkspace();

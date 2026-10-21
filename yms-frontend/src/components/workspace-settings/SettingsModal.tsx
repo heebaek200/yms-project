@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
+import CloseIcon from '../common/CloseIcon';
+
 type SettingsModalProps = {
     titleId: string;
     title: string;
@@ -128,7 +130,7 @@ function SettingsModal({
                         aria-label={`${title} 닫기`}
                         onClick={onRequestClose}
                     >
-                        ×
+                        <CloseIcon />
                     </button>
                 </header>
 

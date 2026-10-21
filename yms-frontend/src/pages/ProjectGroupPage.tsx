@@ -32,6 +32,9 @@ import {
 import FeedbackMessage, {
     type FeedbackMessageType
 } from '../components/common/FeedbackMessage';
+import CompositionSafeSearchInput from '../components/common/CompositionSafeSearchInput';
+import FilterResetButton from '../components/common/FilterResetButton';
+import ResourceNavigationLink from '../components/common/ResourceNavigationLink';
 import ProjectAreaTabs from '../components/project-groups/ProjectAreaTabs';
 import ProjectGroupModal from '../components/project-groups/ProjectGroupModal';
 import { useWorkspace } from '../hooks/useWorkspace';
@@ -1023,6 +1026,18 @@ function ProjectGroupPage() {
         : null;
     const canConnectProjects = detail?.status === 'PLANNING'
         || detail?.status === 'ACTIVE';
+    const hasGroupFilters = keyword !== ''
+        || statusFilter !== 'ALL'
+        || startDateFilter !== ''
+        || endDateFilter !== '';
+
+    /** 프로젝트 그룹 목록의 모든 검색 조건을 기본값으로 되돌립니다. */
+    const resetGroupFilters = () => {
+        setKeyword('');
+        setStatusFilter('ALL');
+        setStartDateFilter('');
+        setEndDateFilter('');
+    };
 
     return (
         <section className="project-area-page">
@@ -1059,6 +1074,8 @@ function ProjectGroupPage() {
                     onStatusChange={setStatusFilter}
                     onStartDateChange={setStartDateFilter}
                     onEndDateChange={setEndDateFilter}
+                    canResetFilters={hasGroupFilters}
+                    onResetFilters={resetGroupFilters}
                     onCreate={openCreateModal}
                     onRetry={() => void loadGroups()}
                 />
@@ -1144,6 +1161,8 @@ type ProjectGroupListViewProps = {
     onStatusChange: (value: ProjectGroupStatus | 'ALL') => void;
     onStartDateChange: (value: string) => void;
     onEndDateChange: (value: string) => void;
+    canResetFilters: boolean;
+    onResetFilters: () => void;
     onCreate: () => void;
     onRetry: () => void;
 };
@@ -1162,6 +1181,8 @@ function ProjectGroupListView({
     onStatusChange,
     onStartDateChange,
     onEndDateChange,
+    canResetFilters,
+    onResetFilters,
     onCreate,
     onRetry
 }: ProjectGroupListViewProps) {
@@ -1183,11 +1204,10 @@ function ProjectGroupListView({
             <div className="project-group-filters" aria-label="프로젝트 그룹 필터">
                 <label>
                     <span>이름 또는 설명</span>
-                    <input
-                        type="search"
+                    <CompositionSafeSearchInput
                         value={keyword}
                         placeholder="프로젝트 그룹 검색"
-                        onChange={event => onKeywordChange(event.target.value)}
+                        onValueChange={onKeywordChange}
                     />
                 </label>
                 <label>
@@ -1212,6 +1232,12 @@ function ProjectGroupListView({
                     <span>검색 종료일</span>
                     <input type="date" value={endDateFilter} onChange={event => onEndDateChange(event.target.value)} />
                 </label>
+                <div className="project-filter-actions">
+                    <FilterResetButton
+                        disabled={!canResetFilters}
+                        onClick={onResetFilters}
+                    />
+                </div>
             </div>
 
             {isLoading ? (
@@ -1247,9 +1273,10 @@ function ProjectGroupListView({
                                     <div><dt>프로젝트</dt><dd>{group.projectCount}개</dd></div>
                                     <div><dt>실제 비용</dt><dd>{formatWon(group.actualCost)}</dd></div>
                                     <div><dt>실제 수익</dt><dd>{formatWon(group.actualRevenue)}</dd></div>
+                                    <div><dt>누적 조회수</dt><dd>{group.cumulativeContentPerformance.completeness === 'UNAVAILABLE' ? '미집계' : group.cumulativeContentPerformance.viewCount.toLocaleString()}</dd></div>
                                     <div><dt>손익</dt><dd className={profitSign < 0 ? 'is-negative' : 'is-positive'}>{profitSign > 0 ? '+' : ''}{formatWon(group.profit)}</dd></div>
                                 </dl>
-                                <Link className="project-group-card__link" to={`/project-groups/${group.projectGroupId}`}>상세 보기</Link>
+                                <ResourceNavigationLink label="상세 보기" variant="detail" to={`/project-groups/${group.projectGroupId}`} />
                             </li>
                         );
                     })}
@@ -1315,7 +1342,7 @@ function ProjectGroupDetailView({
     return (
         <>
             <div className="project-group-detail-nav">
-                <Link to="/project-groups">← 프로젝트 그룹 목록</Link>
+                <ResourceNavigationLink label="프로젝트 그룹 목록" variant="back" to="/project-groups" />
             </div>
 
             {feedback && <FeedbackMessage type={feedback.type} message={feedback.message} />}
@@ -1340,6 +1367,12 @@ function ProjectGroupDetailView({
                 <article><span>실제 수익</span><strong>{formatWon(detail.actualRevenue)}</strong></article>
                 <article><span>손익</span><strong className={profitSign < 0 ? 'is-negative' : 'is-positive'}>{profitSign > 0 ? '+' : ''}{formatWon(detail.profit)}</strong></article>
                 <article><span>ROI</span><strong>{detail.roi === null ? '-' : `${roundDecimal(detail.roi, 1)}%`}</strong></article>
+            </section>
+            <section className="project-group-metrics" aria-label="프로젝트 그룹 콘텐츠 성과 요약">
+                <article><span>누적 게시 조회수</span><strong>{detail.cumulativeContentPerformance.completeness === 'UNAVAILABLE' ? '미집계' : detail.cumulativeContentPerformance.viewCount.toLocaleString()}</strong></article>
+                <article><span>현재 게시 조회수</span><strong>{detail.currentContentPerformance.completeness === 'UNAVAILABLE' ? '미집계' : detail.currentContentPerformance.viewCount.toLocaleString()}</strong></article>
+                <article><span>누적 좋아요</span><strong>{detail.cumulativeContentPerformance.completeness === 'UNAVAILABLE' ? '-' : detail.cumulativeContentPerformance.likeCount.toLocaleString()}</strong></article>
+                <article><span>누적 댓글</span><strong>{detail.cumulativeContentPerformance.completeness === 'UNAVAILABLE' ? '-' : detail.cumulativeContentPerformance.commentCount.toLocaleString()}</strong></article>
             </section>
 
             <section className="project-group-section">

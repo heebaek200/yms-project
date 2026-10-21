@@ -1,6 +1,7 @@
 import type { ScheduleRoleFilter, ScheduleStatusFilter } from '../../api/dashboard/schedule';
 import type { ChannelSummary } from '../../types/workspace';
 import { PROFESSIONAL_ROLE_OPTIONS } from '../../professionalRoles';
+import FilterResetButton from '../common/FilterResetButton';
 
 import './SchedulerFilter.css';
 
@@ -197,13 +198,10 @@ function SchedulerFilter({
 
 
             {/* 모든 조건을 최초의 전체 조회 상태로 되돌립니다. */}
-            <button
-                className="scheduler-filter__reset"
-                type="button"
+            <FilterResetButton
+                disabled={status === 'ALL' && role === 'ALL' && channelId === null && keyword === ''}
                 onClick={onReset}
-            >
-                초기화
-            </button>
+            />
         </div>
     );
 }

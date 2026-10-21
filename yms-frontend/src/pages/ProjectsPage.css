@@ -1,0 +1,186 @@
+/* Project 화면은 기존 글래스 카드와 같은 테두리·여백 체계를 공유합니다. */
+.project-header,
+.project-detail-header,
+.project-detail-nav,
+.project-youtube-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.project-header,
+.project-detail-header { margin: 28px 0 20px; }
+.project-header h1,
+.project-detail-header h1 { margin: 2px 0 6px; font-size: clamp(1.8rem, 4vw, 2.5rem); }
+.project-header p,
+.project-detail-header p,
+.project-section p { margin: 0; color: #747681; }
+.project-view-tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; border: 1px solid #e2e3e9; border-radius: 12px; }
+.project-view-tabs button { padding: 8px 14px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.project-view-tabs button.is-active { background: #ececf1; color: #f04b55; font-weight: 700; }
+.project-filters { grid-template-columns: minmax(180px, 2fr) repeat(4, minmax(120px, 1fr)); }
+
+.project-list { display: grid; gap: 12px; padding: 0; margin: 18px 0; list-style: none; }
+.project-list > li { position: relative; display: grid; grid-template-columns: minmax(220px, 1.3fr) minmax(320px, 2fr) auto; align-items: center; gap: 20px; padding: 20px; border: 1px solid #e1e2e7; border-radius: 16px; background: rgba(255, 255, 255, .42); }
+.project-list > li.project-card--popover-open { z-index: 10; }
+.project-list h2 { margin: 7px 0 4px; font-size: 1.05rem; }
+.project-list h2 a { color: inherit; text-decoration: none; }
+.project-list p { margin: 0; color: #767883; }
+.project-list dl,
+.project-detail-grid dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.project-list dt,
+.project-detail-grid dt { color: #8a8c96; font-size: .75rem; }
+.project-list dd,
+.project-detail-grid dd { margin: 4px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.project-state { margin: 18px 0; padding: 28px; border: 1px dashed #d9dae0; border-radius: 14px; text-align: center; }
+
+/* 상태와 접근 역할을 같은 정보 단계에 두되 역할 안내는 독립적인 버튼으로 제공합니다. */
+.project-card__badges { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.project-access { --access-color: #6f7280; --access-bg: #f2f3f6; position: relative; display: inline-flex; }
+.project-access--project-owner { --access-color: #6d46c7; --access-bg: #eee8ff; }
+.project-access--project-editor { --access-color: #2467a8; --access-bg: #e6f1ff; }
+.project-access--project-viewer { --access-color: #666975; --access-bg: #f0f1f4; }
+.project-access--workspace-admin { --access-color: #9c6412; --access-bg: #fff0d8; }
+.project-access--workspace-owner { --access-color: #b73a50; --access-bg: #ffe7ec; }
+.project-access__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 26px;
+    padding: 4px 9px;
+    border: 1px solid color-mix(in srgb, var(--access-color) 25%, transparent);
+    border-radius: 999px;
+    background: var(--access-bg);
+    color: var(--access-color);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.2;
+    cursor: pointer;
+}
+.project-access__trigger span { font-weight: 500; opacity: .82; }
+.project-access__trigger strong { font-weight: 800; }
+.project-access__trigger:hover { filter: brightness(.98); }
+.project-access__trigger:focus-visible { outline: 3px solid color-mix(in srgb, var(--access-color) 30%, transparent); outline-offset: 2px; }
+.project-access__popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    width: min(330px, calc(100vw - 72px));
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--access-color) 22%, #dddfe6);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .96);
+    box-shadow: 0 14px 36px rgba(34, 36, 45, .16);
+    color: #292b33;
+    backdrop-filter: blur(14px);
+}
+.project-list .project-access__popover p { margin: 4px 0 14px; color: #686b77; line-height: 1.55; }
+.project-list .project-access__popover .project-access__eyebrow { margin: 0 0 4px; color: var(--access-color); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+.project-access__popover h3 { margin: 0; font-size: 1rem; }
+.project-access__popover > strong { display: block; margin-top: 12px; font-size: 12px; }
+.project-access__popover ul { display: grid; gap: 5px; margin: 6px 0 0; padding-left: 18px; color: #555864; font-size: 12px; line-height: 1.45; }
+
+.project-status { background: #eef0f4; }
+.project-status--editing { background: #e6f1ff; color: #2467a8; }
+.project-status--review { background: #fff0d8; color: #9c6412; }
+.project-status--uploaded { background: #ddf6e7; color: #1f8148; }
+.project-status--cancelled { color: #777985; text-decoration: line-through; }
+.project-detail-nav { margin-top: 22px; justify-content: flex-start; }
+.project-detail-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; }
+.project-detail-grid article,
+.project-section { padding: 20px; border: 1px solid #e1e2e7; border-radius: 16px; background: rgba(255, 255, 255, .42); }
+.project-detail-grid h2,
+.project-section h2 { margin: 0 0 12px; font-size: 1.05rem; }
+.project-detail-grid dl { grid-template-columns: 1fr; margin-top: 18px; }
+.project-detail-grid ul { padding-left: 18px; }
+.project-detail-grid li { margin: 8px 0; }
+.project-big-number { display: block; margin: 20px 0 8px; font-size: 2rem; }
+.project-section { margin-top: 14px; }
+.project-youtube-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+.project-youtube-metrics article { min-width: 0; padding: 14px; border-radius: 12px; background: rgba(244, 245, 248, .7); }
+.project-youtube-metrics span { display: block; color: #7b7d87; font-size: .78rem; }
+.project-youtube-metrics strong { display: block; margin-top: 7px; overflow-wrap: anywhere; }
+.project-youtube-link { justify-content: flex-start; margin-top: 16px; }
+.project-youtube-link input { max-width: 520px; }
+.project-history { display: grid; gap: 10px; padding-left: 20px; }
+.project-history span { margin-left: 10px; color: #777985; }
+.project-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.project-form { display: grid; gap: 16px; }
+
+/* 제작 과정과 분리된 결과물·게시 이력은 중첩 깊이가 보이도록 카드 단계별 톤을 달리합니다. */
+.project-section__header,
+.project-video-content > header,
+.project-performance-summary > header,
+.project-publication__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+.project-video-contents { display: grid; gap: 16px; }
+.project-video-contents > .project-section__header h2 { margin-bottom: 6px; }
+.project-video-content { padding: 18px; border: 1px solid #dddfe6; border-radius: 14px; background: rgba(255, 255, 255, .5); }
+.project-video-content > header span { color: #7b7d87; font-size: .75rem; font-weight: 800; }
+.project-video-content > header h3 { margin: 4px 0; }
+.project-video-content > header p { font-size: .82rem; }
+.project-primary-badge { padding: 5px 10px; border-radius: 999px; background: #eee8ff; color: #6d46c7; font-size: .75rem; white-space: nowrap; }
+.project-video-content__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+
+/* 현재와 누적을 같은 구조로 보여 주어 값의 기준만 비교할 수 있게 합니다. */
+.project-performance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+.project-performance-summary { min-width: 0; padding: 14px; border-radius: 12px; background: rgba(244, 245, 248, .78); }
+.project-performance-summary h4 { margin: 0; }
+.project-performance-summary dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 8px; }
+.project-performance-summary dt { color: #7b7d87; font-size: .72rem; }
+.project-performance-summary dd { margin: 4px 0 0; font-weight: 800; overflow-wrap: anywhere; }
+.project-performance-summary p { font-size: .75rem; }
+.project-completeness { padding: 4px 8px; border-radius: 999px; background: #ddf6e7; color: #1f8148; font-size: .7rem; font-weight: 800; }
+.project-completeness--partial { background: #fff0d8; color: #9c6412; }
+.project-completeness--unavailable { background: #eceef2; color: #6f7280; }
+
+/* Channel 단위 타임라인은 재업로드 순서와 현재 게시물을 동시에 읽을 수 있게 합니다. */
+.project-publication-timelines { display: grid; gap: 12px; }
+.project-publication-channel { padding-top: 14px; border-top: 1px solid #e4e5ea; }
+.project-publication-channel h4 { margin: 0 0 10px; }
+.project-publication-channel ol { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; }
+.project-publication { padding: 14px; border: 1px solid #e0e2e8; border-left: 4px solid #aeb2bf; border-radius: 10px; background: rgba(255, 255, 255, .62); }
+.project-publication--current { border-left-color: #2f9d5b; }
+.project-publication--removed { opacity: .72; }
+.project-publication__header > div { display: flex; align-items: center; gap: 7px; }
+.project-publication__header a { color: #40434d; font-weight: 700; text-decoration: none; }
+.project-publication__status { padding: 4px 8px; border-radius: 999px; background: #eef0f4; font-size: .72rem; font-weight: 800; }
+.project-publication--current .project-publication__status { background: #ddf6e7; color: #1f8148; }
+.project-publication__metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.project-publication__metrics span { color: #7b7d87; font-size: .75rem; }
+.project-publication__metrics strong { display: block; margin-top: 3px; color: #2b2d35; font-size: .9rem; }
+.project-publication__actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.project-empty-publication { padding: 14px 0; }
+.project-publication-form { display: grid; grid-template-columns: minmax(140px, .7fr) minmax(220px, 2fr) auto; align-items: start; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e4e5ea; }
+.project-publication-field { display: grid; gap: 5px; min-width: 0; }
+.project-publication-field input[aria-invalid="true"] { border-color: var(--color-primary); outline-color: var(--color-primary); }
+.project-publication-field small { color: var(--color-primary-hover); font-size: .75rem; line-height: 1.45; }
+/* 한쪽에 검증 메시지가 생겨도 같은 행의 필드는 상단 기준선을 유지합니다. */
+.project-form__columns { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 12px; }
+.project-form fieldset { display: grid; gap: 12px; padding: 14px; border: 1px solid #e1e2e7; border-radius: 12px; }
+@media (max-width: 850px) {
+    .project-filters { grid-template-columns: 1fr 1fr; }
+    .project-list > li { grid-template-columns: 1fr; }
+    .project-detail-grid { grid-template-columns: 1fr; }
+    .project-youtube-metrics { grid-template-columns: 1fr 1fr; }
+    .project-performance-grid { grid-template-columns: 1fr; }
+    .project-performance-summary dl { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 560px) {
+    .project-header,
+    .project-detail-header { align-items: stretch; flex-direction: column; }
+    .project-actions { flex-wrap: wrap; justify-content: flex-start; }
+    .project-filters,
+    .project-form__columns { grid-template-columns: 1fr; }
+    .project-youtube-link { align-items: stretch; flex-direction: column; }
+    .project-section__header { align-items: stretch; flex-direction: column; }
+    .project-publication-form { grid-template-columns: 1fr; }
+    .project-publication__metrics { grid-template-columns: 1fr 1fr; }
+}

@@ -1,0 +1,48 @@
+/* 모든 목록 필터는 대시보드에서 시작한 동일한 중립 초기화 조작을 사용합니다. */
+.filter-reset-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.18s ease;
+}
+
+.filter-reset-button:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+}
+
+.filter-reset-button:active:not(:disabled) {
+    background: var(--color-surface-active);
+}
+
+.filter-reset-button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.filter-reset-button:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+@media (max-width: 768px) {
+    /* 좁은 화면에서는 모든 필터 초기화 조작이 한 행 전체를 사용합니다. */
+    .filter-reset-button {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .filter-reset-button {
+        transition: none;
+    }
+}

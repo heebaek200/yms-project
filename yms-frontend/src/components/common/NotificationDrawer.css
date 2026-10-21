@@ -53,16 +53,13 @@
 }
 
 .notification-drawer__close {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    position: relative;
 
     width: 32px;
     height: 32px;
     padding: 0;
 
     color: var(--color-text-muted);
-    font-size: 24px;
 
     background: transparent;
     border: 0;
