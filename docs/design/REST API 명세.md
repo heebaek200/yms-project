@@ -1028,7 +1028,7 @@ VIEW는 수정할 수 없습니다. 프로젝트 소유자와 EDIT 참여자는 
 
 projectGroupId의 지정, 변경과 null 해제는 Workspace OWNER와 ADMIN만 수행할 수 있습니다. Project Owner 또는 EDIT 권한만 가진 사용자는 다른 수정 가능 필드를 변경할 수 있더라도 projectGroupId는 변경할 수 없습니다.
 
-ProjectGroup을 변경하면 Project 직접 Expense / Revenue와 Task 지급 금액의 그룹 집계 대상도 변경됩니다. 이 데이터가 하나라도 있을 때 클라이언트가 영향 확인을 표시하고, 데이터가 없으면 바로 저장합니다. COMPLETED / CANCELLED ProjectGroup은 지정할 수 없습니다.
+ProjectGroup을 변경하면 Project 직접 Expense / Revenue와 Task 지급 금액의 그룹 집계 대상도 변경됩니다. 해당 Project가 대표인 VideoContent에 동기화된 성과 또는 계산 가능한 예상 플랫폼 수익이 있으면 콘텐츠 성과의 그룹 귀속도 이동합니다. 이 조건 중 하나라도 충족하면 클라이언트가 실제 재무와 참고용 콘텐츠 성과의 영향을 구분해 확인하고, 영향 데이터가 없으면 바로 저장합니다. COMPLETED / CANCELLED ProjectGroup은 지정할 수 없습니다.
 
 channelId와 defaultVideoType 변경은 앞으로 생성하는 VideoContent와 YouTubePublication의 기본값에만 영향을 줍니다. 기존 결과물의 영상 유형, 게시 Channel과 적용 단가를 자동 변경하지 않습니다.
 
@@ -1048,7 +1048,23 @@ UPLOADED / CANCELLED Project만 보관할 수 있습니다. 프로젝트 소유�
 
 DELETE /api/projects/{projectId}
 
-프로젝트 소유자와 Workspace OWNER / ADMIN만 호출할 수 있습니다. 하위 업무 이력은 유지하고 deleted_at / deleted_by_member_id를 기록합니다. 삭제 Project는 업무 목록, 보관함, 일정, 검색과 콘텐츠 성과에서 제외하지만 실제 Expense, Revenue와 확정 Settlement는 재무 합계에서 유지합니다.
+요청 본문은 삭제할 Project가 대표인 VideoContent마다 새 대표 Project를 지정할 때 사용합니다.
+
+~~~json
+{
+  "primaryProjectReassignments": [
+    {
+      "videoContentId": 31,
+      "newPrimaryProjectId": 12
+    }
+  ],
+  "confirmContentPerformanceMove": true
+}
+~~~
+
+프로젝트 소유자와 Workspace OWNER / ADMIN만 호출할 수 있습니다. 다른 활성 연결 Project가 있는 VideoContent는 새 대표를 반드시 명시해야 하며, 후보가 하나뿐이어도 서버가 임의 이전하지 않습니다. 대표 변경과 논리 삭제는 하나의 트랜잭션으로 처리합니다. 후보가 없으면 삭제된 Project를 역사적 대표로 계속 참조하고 연결을 유지하되 활성 Project·ProjectGroup 콘텐츠 성과 집계에서 제외합니다.
+
+새 대표가 같은 ProjectGroup에 있거나 양쪽 모두 그룹이 없으면 삭제 요청자에게 두 Project의 관리 권한이 있어야 합니다. 그룹 경계를 넘으면 Workspace OWNER 또는 ADMIN만 수행할 수 있습니다. 콘텐츠 성과 또는 계산 가능한 예상 플랫폼 수익이 다른 그룹으로 이동할 때 `confirmContentPerformanceMove`가 없으면 영향 정보를 포함한 409를 반환합니다. 하위 업무 이력과 대표 변경 이력을 유지하고 deleted_at / deleted_by_member_id를 기록합니다. 삭제 Project는 업무 목록, 보관함, 일정, 검색과 콘텐츠 성과에서 제외하지만 실제 Expense, Revenue와 확정 Settlement는 재무 합계에서 유지합니다.
 
 ## 8.7. Project Member 추가
 
@@ -1339,11 +1355,15 @@ PATCH /api/video-contents/{videoContentId}/primary-project
 
 ~~~json
 {
-  "primaryProjectId": 12
+  "primaryProjectId": 12,
+  "changeReason": "합본 영상의 주 제작 프로젝트 변경",
+  "confirmContentPerformanceMove": true
 }
 ~~~
 
-대표 Project는 연결된 Project 중에서만 선택할 수 있습니다.
+대표 Project는 같은 Workspace의 논리 삭제되지 않은 연결 Project 중에서만 선택할 수 있습니다. 같은 ProjectGroup 안의 변경 또는 양쪽 모두 그룹이 없는 변경은 두 Project를 모두 관리할 수 있는 프로젝트 소유자, EDIT 참여자와 Workspace OWNER·ADMIN이 수행할 수 있습니다. ProjectGroup 경계를 넘는 변경은 Workspace OWNER·ADMIN만 수행할 수 있습니다.
+
+동기화된 성과 또는 계산 가능한 예상 플랫폼 수익의 ProjectGroup 귀속이 바뀌는데 확인값이 없으면 `409 CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED`와 영향 정보를 반환합니다. 대표 변경 시 이전·새 Project, 양쪽 ProjectGroup 스냅샷, 사유, 변경자와 시각을 이력으로 기록합니다. 실제 Expense, Revenue, 손익과 ROI는 대표 변경으로 이동하지 않습니다.
 
 ## 11.3. YouTube 게시물 등록
 
@@ -1362,13 +1382,28 @@ POST /api/video-contents/{videoContentId}/youtube-publications
 
 `watch`, `youtu.be`, `shorts` URL 또는 11자리 Video ID를 받아 정규화한 ID를 저장합니다. 동일 Workspace 안에서 이미 등록된 YouTube Video ID는 다시 등록할 수 없습니다. channelId를 생략하면 대표 Project의 담당 Channel을 기본값으로 사용합니다.
 
-재업로드는 기존 게시물의 Video ID를 교체하지 않고 새 YouTubePublication으로 생성합니다. `supersedesPublicationId`가 있으면 기존 게시물의 `lifecycleStatus`를 SUPERSEDED로 바꾸고 `supersededByPublicationId`를 새 게시물로 지정합니다. 게시물 등록과 Project 상태 변경 및 성과 동기화는 서로 자동 실행하지 않습니다.
+재업로드는 기존 게시물의 Video ID를 교체하지 않고 새 YouTubePublication으로 생성합니다. 서로 다른 Channel에는 CURRENT 게시물을 각각 둘 수 있지만 같은 VideoContent와 Channel에는 CURRENT를 최대 하나만 허용합니다. 같은 Channel의 기존 CURRENT가 있을 때는 `supersedesPublicationId`를 명시하여 대체 의사를 확인해야 합니다. 대체 대상은 같은 Workspace, VideoContent와 Channel에 있어야 하며, 등록·기존 게시물의 SUPERSEDED 전환·대체 관계 및 상태 이력 기록을 하나의 트랜잭션에서 처리합니다. 게시물 등록과 Project 상태 변경 및 성과 동기화는 서로 자동 실행하지 않습니다.
 
-## 11.4. YouTube 게시물 상태 변경
+## 11.4. YouTube 게시물 생명주기 변경
 
 PATCH /api/youtube-publications/{publicationId}
 
-수정 가능 필드는 channelId, lifecycleStatus, publishedAt과 supersededByPublicationId입니다. REMOVED는 외부 게시물을 삭제한다는 의미가 아니라 YMS 내부에서 더 이상 유효한 게시물로 취급하지 않는 상태입니다. 기존 성과 동기화 이력은 보존합니다.
+게시 일시 등 일반 정보와 생명주기 변경 의도를 구분해 요청합니다. 상태 표시명은 CURRENT `게시 중`, SUPERSEDED `대체됨`, REMOVED `게시 종료`입니다. REMOVED로 바꿀 때는 `removalReason`에 `UNAVAILABLE` 또는 `INCORRECT`를 필수로 지정합니다. UNAVAILABLE은 누적 성과에 포함하고 INCORRECT는 현재·누적 집계에서 제외합니다.
+
+~~~json
+{
+  "lifecycleStatus": "REMOVED",
+  "removalReason": "UNAVAILABLE",
+  "changeReason": "외부 게시 종료",
+  "replaceCurrentPublicationId": null
+}
+~~~
+
+SUPERSEDED 또는 REMOVED를 CURRENT로 복원할 수 있습니다. 같은 Channel에 다른 CURRENT가 있으면 `replaceCurrentPublicationId`로 대체 대상을 명시해야 합니다. 상태·종료 사유·대체 관계 변경과 생명주기 이력 기록은 하나의 트랜잭션에서 처리하며 자기 참조, 순환과 다른 Workspace·VideoContent·Channel 간 대체를 차단합니다. 외부 API의 조회 실패나 일시 오류만으로 REMOVED로 자동 변경하지 않습니다.
+
+GET /api/youtube-publications/{publicationId}/status-histories
+
+변경 전후 상태와 종료 사유, 관련 대체 게시물, 변경자, 시각과 사유를 시간순으로 반환합니다.
 
 ## 11.5. YouTube 게시물 예상 수익 설정
 
@@ -1418,7 +1453,15 @@ estimatedPlatformRevenue는 응답 시 계산하는 파생값이며 실제 Reven
 
 연결 Project의 소유자, EDIT 참여자와 Workspace OWNER / ADMIN이 동기화를 요청할 수 있습니다. 일반 MEMBER 응답에는 조회수, 좋아요, 댓글과 마지막 성공 시각만 포함하고 적용 단가와 예상 플랫폼 수익은 OWNER / ADMIN에게만 포함합니다.
 
-## 11.7. YouTube 관련 오류
+## 11.7. 콘텐츠 성과 집계 조회
+
+GET /api/video-contents/{videoContentId}/performance-summary
+
+현재 성과와 누적 게시 성과를 함께 반환합니다. 현재 성과는 CURRENT, 누적 게시 성과는 CURRENT·SUPERSEDED·REMOVED/UNAVAILABLE의 마지막 성공값을 게시물별로 합산하며 REMOVED/INCORRECT는 모두 제외합니다. 예상 플랫폼 수익도 같은 게시물 범위에서 `viewCount × appliedRevenuePerView`를 게시물별 계산한 뒤 합산합니다.
+
+응답에는 각 집계의 `completeness`(COMPLETE / PARTIAL / UNAVAILABLE), 포함 게시물 수, 한 번도 성공하지 못한 미집계 게시물 수와 게시물별 마지막 성공·시도 시각을 포함합니다. 마지막 성공값에는 임의의 만료 기간을 적용하지 않습니다. 프로젝트 목록은 현재 성과, 프로젝트 상세는 현재·누적, ProjectGroup과 분석 화면은 누적을 주 지표로 사용합니다.
+
+## 11.8. YouTube 관련 오류
 
 | errorCode | HTTP | 의미 |
 | --- | --- | --- |
@@ -1428,12 +1471,16 @@ estimatedPlatformRevenue는 응답 시 계산하는 파생값이며 실제 Reven
 | PROJECT_NOT_LINKED_TO_VIDEO_CONTENT | 409 | 대표 Project 또는 해제 대상 Project가 VideoContent에 연결되지 않음 |
 | LAST_VIDEO_CONTENT_PROJECT | 409 | VideoContent의 마지막 Project 연결 해제 시도 |
 | INVALID_PUBLICATION_REPLACEMENT | 409 | 자기 참조, 순환 또는 다른 VideoContent 게시물로 대체 관계 지정 |
+| CURRENT_PUBLICATION_EXISTS | 409 | 같은 VideoContent와 Channel에 CURRENT 게시물이 있으나 명시적 대체 대상 누락 |
+| INVALID_REMOVAL_REASON | 400 | REMOVED 상태의 종료 사유 누락 또는 허용되지 않은 값 |
+| PRIMARY_PROJECT_REASSIGNMENT_REQUIRED | 409 | Project 삭제 전 다른 활성 연결 Project로 대표 변경 필요 |
+| CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED | 409 | 대표 또는 ProjectGroup 변경으로 콘텐츠 성과 귀속 이동 확인 필요 |
 | CUSTOM_REVENUE_RATE_REQUIRED | 400 | CUSTOM인데 단가 누락 |
 | YOUTUBE_API_UNAVAILABLE | 503 | 외부 API 일시 장애 |
 | YOUTUBE_QUOTA_EXCEEDED | 503 | API 할당량 제한 |
 | YOUTUBE_UPSTREAM_ERROR | 502 | 외부 API 비정상 응답 |
 
-동기화 실패 시 마지막 성공 데이터를 삭제하지 않습니다.
+동기화 실패 시 마지막 성공 데이터를 삭제하거나 게시물 생명주기를 변경하지 않습니다. 성공 이력이 없는 게시물은 0이 아닌 미집계로 응답하고, 성공 이력이 있으면 마지막 성공값과 마지막 시도 시각·오류를 함께 반환합니다.
 
 ---
 
@@ -1770,6 +1817,10 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 ProjectGroup �
 | PROJECT_OWNER_CANNOT_BE_REMOVED | 409 | 현재 Project Owner 제거 불가 |
 | PROJECT_OWNERSHIP_TRANSFER_REQUIRED | 409 | 멤버 제외·탈퇴 전 비삭제 Project 소유권 이전 필요 |
 | DUPLICATE_YOUTUBE_VIDEO | 409 | Workspace 내 YouTubePublication Video ID 중복 |
+| CURRENT_PUBLICATION_EXISTS | 409 | 같은 VideoContent와 Channel의 CURRENT 게시물 대체 확인 필요 |
+| INVALID_PUBLICATION_REPLACEMENT | 409 | 허용되지 않는 게시물 대체 관계 |
+| PRIMARY_PROJECT_REASSIGNMENT_REQUIRED | 409 | Project 삭제 전 대표 Project 재지정 필요 |
+| CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED | 409 | 콘텐츠 성과의 ProjectGroup 귀속 이동 확인 필요 |
 | CHANNEL_IN_USE | 409 | 기존 Project나 업무 데이터에서 사용 중인 Channel 삭제 불가 |
 | INVALID_TASK_STATUS_TRANSITION | 409 | 잘못된 Task 상태 전이 |
 | TASK_ALREADY_SETTLED | 409 | 이미 정산된 Task |
