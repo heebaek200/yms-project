@@ -8,14 +8,16 @@ import {
 } from '../../api/workspaces/channels';
 import type {
     ChannelIntegrationStatus,
-    WorkspaceChannel
+    WorkspaceChannelListItem
 } from '../../types/workspaceSettings';
+import type { WorkspaceRole } from '../../types/workspace';
 import FeedbackMessage, { type FeedbackMessageType } from '../common/FeedbackMessage';
 import SettingsModal from './SettingsModal';
 import { normalizeRateInput } from '../../utils/format';
 
 type ChannelManagementProps = {
     workspaceId: number;
+    workspaceRole: WorkspaceRole;
     onDirtyChange: (isDirty: boolean) => void;
 };
 
@@ -55,14 +57,14 @@ const INTEGRATION_STATUS: Record<
 };
 
 /** Channel API 응답을 입력 폼에서 편집할 문자열 값으로 변환합니다. */
-function toChannelFormValues(channel: WorkspaceChannel): ChannelFormValues {
+function toChannelFormValues(channel: WorkspaceChannelListItem): ChannelFormValues {
     return {
         name: channel.name,
         youtubeChannelId: channel.youtubeChannelId ?? '',
         youtubeChannelUrl: channel.youtubeChannelUrl ?? '',
         description: channel.description ?? '',
-        longFormRate: channel.longFormRate,
-        shortFormRate: channel.shortFormRate
+        longFormRate: channel.longFormRate ?? '0',
+        shortFormRate: channel.shortFormRate ?? '0'
     };
 }
 
@@ -72,17 +74,18 @@ function toChannelFormValues(channel: WorkspaceChannel): ChannelFormValues {
  */
 function ChannelManagement({
     workspaceId,
+    workspaceRole,
     onDirtyChange
 }: ChannelManagementProps) {
-    const [channels, setChannels] = useState<WorkspaceChannel[]>([]);
+    const [channels, setChannels] = useState<WorkspaceChannelListItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<FeedbackState | null>(null);
     const [modalError, setModalError] = useState<string | null>(null);
     const [editingChannel, setEditingChannel] =
-        useState<WorkspaceChannel | null>(null);
+        useState<WorkspaceChannelListItem | null>(null);
     const [removingChannel, setRemovingChannel] =
-        useState<WorkspaceChannel | null>(null);
+        useState<WorkspaceChannelListItem | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [formValues, setFormValues] = useState<ChannelFormValues>(EMPTY_FORM);
     const [fieldErrors, setFieldErrors] = useState<ChannelFieldErrors>({});
@@ -125,6 +128,7 @@ function ChannelManagement({
 
             const response = await getWorkspaceChannels(
                 workspaceId,
+                { workspaceRole },
                 { activeOnly: false }
             );
 
@@ -142,7 +146,7 @@ function ChannelManagement({
         } finally {
             setIsLoading(false);
         }
-    }, [workspaceId]);
+    }, [workspaceId, workspaceRole]);
 
     useEffect(() => {
         void loadChannels();
@@ -159,7 +163,7 @@ function ChannelManagement({
     };
 
     /** 선택한 Channel의 현재 값을 수정 모달에 복사합니다. */
-    const openEditModal = (channel: WorkspaceChannel) => {
+    const openEditModal = (channel: WorkspaceChannelListItem) => {
         setIsCreateModalOpen(false);
         setEditingChannel(channel);
         setFormValues(toChannelFormValues(channel));
@@ -268,7 +272,7 @@ function ChannelManagement({
     };
 
     /** 삭제 대신 활성 상태만 전환하고 기존 프로젝트의 Channel 참조는 보존합니다. */
-    const handleActiveChange = async (channel: WorkspaceChannel) => {
+    const handleActiveChange = async (channel: WorkspaceChannelListItem) => {
         const nextActive = !channel.active;
         const actionLabel = nextActive ? '다시 활성화' : '비활성화';
 
@@ -321,7 +325,7 @@ function ChannelManagement({
     };
 
     /** Project 연결 이력이 없는 Channel을 YMS 관리 목록에서 제거합니다. */
-    const handleDelete = async (channel: WorkspaceChannel) => {
+    const handleDelete = async (channel: WorkspaceChannelListItem) => {
         try {
             setDeletingChannelIds(current => new Set(current).add(channel.channelId));
             setChannelErrors(current => {
@@ -425,7 +429,7 @@ function ChannelManagement({
                                     <div><dt>Channel ID</dt><dd>{channel.youtubeChannelId ?? '입력 안 함'}</dd></div>
                                     <div><dt>URL</dt><dd>{channel.youtubeChannelUrl ?? '입력 안 함'}</dd></div>
                                     <div><dt>설명</dt><dd>{channel.description ?? '설명 없음'}</dd></div>
-                                    <div><dt>기본 단가</dt><dd>롱폼 {channel.longFormRate}원 · 쇼츠 {channel.shortFormRate}원</dd></div>
+                                    <div><dt>기본 단가</dt><dd>롱폼 {channel.longFormRate ?? '0'}원 · 쇼츠 {channel.shortFormRate ?? '0'}원</dd></div>
                                 </dl>
 
                                 <div className="settings-card__actions">

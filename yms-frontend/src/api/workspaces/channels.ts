@@ -1,7 +1,9 @@
 import type {
     ChannelIntegrationStatus,
-    WorkspaceChannel
+    WorkspaceChannel,
+    WorkspaceChannelListItem
 } from '../../types/workspaceSettings';
+import type { WorkspaceRole } from '../../types/workspace';
 import type { ApiResponse } from '../types';
 import { readProjects } from '../projects/projectStore';
 
@@ -23,7 +25,7 @@ export type UpdateChannelRequest = SaveChannelRequest & {
     active: boolean;
 };
 
-export type ChannelListResponse = ApiResponse<WorkspaceChannel[]>;
+export type ChannelListResponse = ApiResponse<WorkspaceChannelListItem[]>;
 export type ChannelMutationResponse = ApiResponse<WorkspaceChannel>;
 export type ChannelDeleteResponse = ApiResponse<{ channelId: number }>;
 
@@ -213,6 +215,7 @@ export function findWorkspaceChannel(
 /** 현재 제작팀의 Channel을 활성 상태와 검색어 기준으로 조회합니다. */
 export async function getWorkspaceChannels(
     workspaceId: number,
+    context: { workspaceRole: WorkspaceRole },
     request: ChannelListRequest = {}
 ): Promise<ChannelListResponse> {
     // TODO: GET /api/workspaces/{workspaceId}/channels 호출로 교체합니다.
@@ -236,7 +239,12 @@ export async function getWorkspaceChannels(
     const channels = (mockChannelsByWorkspace[workspaceId] ?? [])
         .filter(channel => !activeOnly || channel.active)
         .filter(channel => !keyword || channel.name.toLocaleLowerCase().includes(keyword))
-        .map(channel => ({ ...channel }));
+        .map(channel => {
+            const { longFormRate, shortFormRate, ...publicChannel } = channel;
+            return context.workspaceRole === 'MEMBER'
+                ? publicChannel
+                : { ...publicChannel, longFormRate, shortFormRate };
+        });
 
     return { success: true, data: channels };
 }

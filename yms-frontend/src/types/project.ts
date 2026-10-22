@@ -141,3 +141,34 @@ export type ProjectListItem = ProjectSummary & {
     myAccessRole: ProjectAccessRole;
     currentPerformance: PerformanceAggregate;
 };
+
+// 역할별 API 응답은 내부 저장 모델과 달리 관리자 전용 재무 필드를 생략할 수 있습니다.
+export type PerformanceAggregateResponse = Omit<PerformanceAggregate, 'estimatedRevenue'> & {
+    estimatedRevenue?: string;
+};
+
+export type YouTubePublicationResponse = Omit<YouTubePublication, 'revenueOption' | 'appliedRate'> & {
+    revenueOption?: ProjectRevenueOption;
+    appliedRate?: string;
+};
+
+export type VideoContentResponse = Omit<VideoContent, 'publications' | 'currentPerformance' | 'cumulativePerformance'> & {
+    publications: YouTubePublicationResponse[];
+    currentPerformance: PerformanceAggregateResponse;
+    cumulativePerformance: PerformanceAggregateResponse;
+};
+
+export type ProjectDetailResponse = Omit<ProjectDetail, 'workerAmount' | 'directExpenseAmount' | 'directRevenueAmount' | 'videoContents'> & {
+    workerAmount?: string;
+    directExpenseAmount?: string;
+    directRevenueAmount?: string;
+    videoContents: VideoContentResponse[];
+};
+
+export type ProjectListItemResponse = Omit<ProjectListItem, 'currentPerformance'> & {
+    currentPerformance: PerformanceAggregateResponse;
+};
+
+export type ProjectListPageResponse = Omit<ProjectListPage, 'items'> & {
+    items: ProjectListItemResponse[];
+};

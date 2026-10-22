@@ -2,8 +2,9 @@ import type { WorkspaceRole } from '../../types/workspace';
 import type { ProjectStatus } from '../../types/projectGroup';
 import type {
     ProjectDetail,
+    ProjectDetailResponse,
     ProjectAccessRole,
-    ProjectListPage,
+    ProjectListPageResponse,
     ProjectVideoType
 } from '../../types/project';
 import type { ApiResponse } from '../types';
@@ -21,6 +22,10 @@ import {
     replaceVideoContent,
     replaceProject
 } from './projectStore';
+import {
+    toPerformanceAggregateResponse,
+    toProjectDetailResponse
+} from './projectResponses';
 
 export type ProjectListRequest = {
     view?: 'active' | 'archived';
@@ -132,7 +137,7 @@ function validateProjectRequest(workspaceId: number, request: SaveProjectRequest
     if (request.videoType !== 'LONG' && request.videoType !== 'SHORTS') errors.push({ field: 'videoType', value: request.videoType, reason: '영상 유형을 선택해 주세요.' });
     if (!EDITABLE_STATUSES.includes(request.status)) errors.push({ field: 'status', value: request.status, reason: '올바른 프로젝트 상태를 선택해 주세요.' });
     if (dueDate && plannedUploadDate && dueDate > plannedUploadDate) errors.push({ field: 'plannedUploadDate', value: plannedUploadDate, reason: '업로드 예정일은 마감일보다 빠를 수 없습니다.' });
-    if (request.projectGroupId && !readProjectGroup(workspaceId, request.projectGroupId)) errors.push({ field: 'projectGroupId', value: String(request.projectGroupId), reason: '현재 제작팀의 프로젝트 그룹을 선택해 주세요.' });
+    if (request.projectGroupId != null && !readProjectGroup(workspaceId, request.projectGroupId)) errors.push({ field: 'projectGroupId', value: String(request.projectGroupId), reason: '현재 제작팀의 프로젝트 그룹을 선택해 주세요.' });
 
     return { errors, normalized: { title, content, dueDate, plannedUploadDate, channel } };
 }
@@ -142,7 +147,7 @@ export async function getWorkspaceProjects(
     workspaceId: number,
     request: ProjectListRequest,
     context: ProjectMutationContext
-): Promise<ApiResponse<ProjectListPage>> {
+): Promise<ApiResponse<ProjectListPageResponse>> {
     await waitForMockResponse();
     const view = request.view ?? 'active';
     const page = Math.max(1, request.page ?? 1);
@@ -161,7 +166,10 @@ export async function getWorkspaceProjects(
     const items = filtered.slice((page - 1) * pageSize, page * pageSize).map(project => ({
         ...project,
         isParticipant: project.members.some(member => member.userId === context.userId && member.active),
-        currentPerformance: getProjectCurrentPerformance(project),
+        currentPerformance: toPerformanceAggregateResponse(
+            getProjectCurrentPerformance(project),
+            context.workspaceRole
+        ),
         // canViewProject를 통과한 항목은 프로젝트 관계 또는 제작팀 관리 역할 중 하나가 반드시 존재합니다.
         myAccessRole: getProjectAccessRole(project, context) as ProjectAccessRole
     }));
@@ -170,30 +178,33 @@ export async function getWorkspaceProjects(
 }
 
 /** 프로젝트 상세를 Workspace와 조회 권한 경계 안에서 반환합니다. */
-export async function getWorkspaceProject(workspaceId: number, projectId: number, context: ProjectMutationContext): Promise<ApiResponse<ProjectDetail>> {
+export async function getWorkspaceProject(workspaceId: number, projectId: number, context: ProjectMutationContext): Promise<ApiResponse<ProjectDetailResponse>> {
     await waitForMockResponse();
     const project = readProject(workspaceId, projectId);
     if (!project || !canViewProject(project, context)) return { success: false, errorCode: 'PROJECT_NOT_FOUND', message: '현재 제작팀에서 확인할 수 있는 프로젝트가 없습니다.', errors: null };
-    return { success: true, data: project };
+    return { success: true, data: toProjectDetailResponse(project, context.workspaceRole) };
 }
 
 /** ACTIVE 멤버를 소유자 겸 EDIT 참여자로 등록하며 결과물·게시물은 별도 흐름에서 생성합니다. */
-export async function createWorkspaceProject(workspaceId: number, request: SaveProjectRequest, context: ProjectMutationContext): Promise<ApiResponse<ProjectDetail>> {
+export async function createWorkspaceProject(workspaceId: number, request: SaveProjectRequest, context: ProjectMutationContext): Promise<ApiResponse<ProjectDetailResponse>> {
     await waitForMockResponse();
     const member = findActiveWorkspaceMemberByUserId(workspaceId, context.userId);
-    const validation = validateProjectRequest(workspaceId, request);
     if (!member) return { success: false, errorCode: 'WORKSPACE_MEMBER_NOT_ACTIVE', message: '현재 제작팀의 활동 중인 멤버만 프로젝트를 만들 수 있습니다.', errors: null };
+    if (context.workspaceRole === 'MEMBER' && request.projectGroupId != null) {
+        return { success: false, errorCode: 'PROJECT_GROUP_EDIT_FORBIDDEN', message: '프로젝트 그룹은 제작팀 소유자 또는 관리자만 지정할 수 있습니다.', errors: null };
+    }
+    const validation = validateProjectRequest(workspaceId, request);
     if (request.status !== 'PLANNING' && request.status !== 'EDITING') validation.errors.push({ field: 'status', value: request.status, reason: '생성 상태는 준비 중 또는 편집 중에서 선택해 주세요.' });
     if (validation.errors.length > 0 || !validation.normalized.channel) return { success: false, errorCode: 'INVALID_INPUT_VALUE', message: '입력값을 다시 확인해 주세요.', errors: validation.errors };
 
     const group = request.projectGroupId ? readProjectGroup(workspaceId, request.projectGroupId) : null;
     const now = new Date().toISOString();
     const created = insertProject({ workspaceId, title: validation.normalized.title, content: validation.normalized.content, channelId: validation.normalized.channel.channelId, channelName: validation.normalized.channel.name, projectGroupId: group?.projectGroupId ?? null, projectGroupName: group?.name ?? null, videoType: request.videoType, status: request.status, ownerWorkspaceMemberId: member.workspaceMemberId, ownerName: member.name, dueDate: validation.normalized.dueDate, plannedUploadDate: validation.normalized.plannedUploadDate, archivedAt: null, updatedAt: now, taskCount: 0, completedTaskCount: 0, isParticipant: true, workerAmount: '0.00', directExpenseAmount: '0.00', directRevenueAmount: '0.00', members: [{ workspaceMemberId: member.workspaceMemberId, userId: member.userId, name: member.name, permission: 'EDIT', active: true, isOwner: true }], statusHistory: [{ status: request.status, changedAt: now, changedByName: context.userName }], videoContents: [] });
-    return { success: true, message: '프로젝트를 만들었습니다.', data: created };
+    return { success: true, message: '프로젝트를 만들었습니다.', data: toProjectDetailResponse(created, context.workspaceRole) };
 }
 
 /** 수정 권한과 ProjectGroup 권한을 분리하고 Project 기본값만 변경합니다. */
-export async function updateWorkspaceProject(workspaceId: number, projectId: number, request: UpdateProjectRequest, context: ProjectMutationContext): Promise<ApiResponse<ProjectDetail>> {
+export async function updateWorkspaceProject(workspaceId: number, projectId: number, request: UpdateProjectRequest, context: ProjectMutationContext): Promise<ApiResponse<ProjectDetailResponse>> {
     await waitForMockResponse();
     const project = readProject(workspaceId, projectId);
     if (!project || !canEditProject(project, context)) return { success: false, errorCode: 'PROJECT_EDIT_FORBIDDEN', message: '프로젝트를 수정할 권한이 없습니다.', errors: null };
@@ -217,11 +228,11 @@ export async function updateWorkspaceProject(workspaceId: number, projectId: num
     const group = request.projectGroupId ? readProjectGroup(workspaceId, request.projectGroupId) : null;
     const updated: ProjectDetail = { ...project, title: validation.normalized.title, content: validation.normalized.content, channelId: validation.normalized.channel.channelId, channelName: validation.normalized.channel.name, projectGroupId: isAdmin ? group?.projectGroupId ?? null : project.projectGroupId, projectGroupName: isAdmin ? group?.name ?? null : project.projectGroupName, videoType: request.videoType, status: request.status, dueDate: validation.normalized.dueDate, plannedUploadDate: validation.normalized.plannedUploadDate, archivedAt: project.archivedAt && ACTIVE_STATUSES.includes(request.status) ? null : project.archivedAt, updatedAt: now, statusHistory: request.status === project.status ? project.statusHistory : [...project.statusHistory, { status: request.status, changedAt: now, changedByName: context.userName }] };
     replaceProject(updated);
-    return { success: true, message: '프로젝트를 저장했습니다.', data: updated };
+    return { success: true, message: '프로젝트를 저장했습니다.', data: toProjectDetailResponse(updated, context.workspaceRole) };
 }
 
 /** 완료·취소 프로젝트를 보관하거나 다시 활성 목록으로 복원합니다. */
-export async function setWorkspaceProjectArchived(workspaceId: number, projectId: number, archived: boolean, context: ProjectMutationContext): Promise<ApiResponse<ProjectDetail>> {
+export async function setWorkspaceProjectArchived(workspaceId: number, projectId: number, archived: boolean, context: ProjectMutationContext): Promise<ApiResponse<ProjectDetailResponse>> {
     await waitForMockResponse();
     const project = readProject(workspaceId, projectId);
     const member = findActiveWorkspaceMemberByUserId(workspaceId, context.userId);
@@ -230,7 +241,7 @@ export async function setWorkspaceProjectArchived(workspaceId: number, projectId
     if (archived && project.status !== 'UPLOADED' && project.status !== 'CANCELLED') return { success: false, errorCode: 'PROJECT_STATUS_NOT_ARCHIVABLE', message: '업로드 완료 또는 취소 상태의 프로젝트만 보관할 수 있습니다.', errors: null };
     const updated = { ...project, archivedAt: archived ? new Date().toISOString() : null, updatedAt: new Date().toISOString() };
     replaceProject(updated);
-    return { success: true, message: archived ? '프로젝트를 보관했습니다.' : '프로젝트를 활성 목록으로 복원했습니다.', data: updated };
+    return { success: true, message: archived ? '프로젝트를 보관했습니다.' : '프로젝트를 활성 목록으로 복원했습니다.', data: toProjectDetailResponse(updated, context.workspaceRole) };
 }
 
 /** 소유자 또는 제작팀 관리자가 프로젝트를 논리 삭제해 모든 일반 조회에서 제외합니다. */
@@ -283,9 +294,18 @@ export async function deleteWorkspaceProject(workspaceId: number, projectId: num
     return { success: true, message: '프로젝트를 삭제했습니다. 비용·수익과 정산 이력은 유지됩니다.', data: { projectId } };
 }
 
-/** 프로젝트 그룹 필터 선택지를 현재 Workspace 범위로 제공합니다. */
-export function getProjectGroupOptions(workspaceId: number) {
-    return readProjectGroups().filter(group => group.workspaceId === workspaceId).map(group => ({ projectGroupId: group.projectGroupId, name: group.name }));
+/** 프로젝트 그룹 선택지를 관리자 전체 또는 MEMBER가 참여 중인 프로젝트 범위로 제한합니다. */
+export function getProjectGroupOptions(workspaceId: number, context: ProjectMutationContext) {
+    const visibleGroupIds = context.workspaceRole === 'MEMBER'
+        ? new Set(readProjects()
+            .filter(project => project.workspaceId === workspaceId && canViewProject(project, context))
+            .map(project => project.projectGroupId)
+            .filter((projectGroupId): projectGroupId is number => projectGroupId !== null))
+        : null;
+    return readProjectGroups()
+        .filter(group => group.workspaceId === workspaceId)
+        .filter(group => visibleGroupIds === null || visibleGroupIds.has(group.projectGroupId))
+        .map(group => ({ projectGroupId: group.projectGroupId, name: group.name }));
 }
 
 /** 같은 Workspace ACTIVE 멤버에게 소유권을 넘기고 EDIT 참여를 보장합니다. */
@@ -294,7 +314,7 @@ export async function transferProjectOwner(
     projectId: number,
     newOwnerWorkspaceMemberId: number,
     context: ProjectMutationContext
-): Promise<ApiResponse<ProjectDetail>> {
+): Promise<ApiResponse<ProjectDetailResponse>> {
     await waitForMockResponse();
     const project = readProject(workspaceId, projectId);
     const actor = findActiveWorkspaceMemberByUserId(workspaceId, context.userId);
@@ -316,5 +336,5 @@ export async function transferProjectOwner(
     if (!members.some(member => member.workspaceMemberId === newOwnerWorkspaceMemberId)) members.push({ workspaceMemberId: newOwner.workspaceMemberId, userId: newOwner.userId, name: newOwner.name, permission: 'EDIT', active: true, isOwner: true });
     const updated = { ...project, ownerWorkspaceMemberId: newOwner.workspaceMemberId, ownerName: newOwner.name, members: members.map(member => member.workspaceMemberId === newOwnerWorkspaceMemberId ? { ...member, active: true, permission: 'EDIT' as const } : member), updatedAt: new Date().toISOString() };
     replaceProject(updated);
-    return { success: true, message: `${newOwner.name} 님에게 프로젝트 소유권을 이전했습니다.`, data: updated };
+    return { success: true, message: `${newOwner.name} 님에게 프로젝트 소유권을 이전했습니다.`, data: toProjectDetailResponse(updated, context.workspaceRole) };
 }

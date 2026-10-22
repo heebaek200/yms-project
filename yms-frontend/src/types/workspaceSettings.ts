@@ -23,6 +23,12 @@ export type WorkspaceChannel = ChannelSummary & {
     shortFormRate: string;
 };
 
+// 일반 업무 화면의 Channel 응답은 관리자 전용 기본 단가를 생략합니다.
+export type WorkspaceChannelListItem = Omit<WorkspaceChannel, 'longFormRate' | 'shortFormRate'> & {
+    longFormRate?: string;
+    shortFormRate?: string;
+};
+
 // 제작팀에서 자유롭게 확장하는 작업 종류 정보입니다.
 export type WorkspaceTaskType = {
     taskTypeId: number;

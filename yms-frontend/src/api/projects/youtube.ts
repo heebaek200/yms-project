@@ -2,6 +2,7 @@ import type { WorkspaceRole } from '../../types/workspace';
 import type {
     PerformanceAggregate,
     ProjectDetail,
+    ProjectDetailResponse,
     ProjectVideoType,
     VideoContent,
     YouTubePublication,
@@ -16,6 +17,7 @@ import {
     replaceProject,
     replaceVideoContent
 } from './projectStore';
+import { toProjectDetailResponse } from './projectResponses';
 
 type YouTubeContext = { userId: number; userName: string; workspaceRole: WorkspaceRole };
 type CreateVideoContentRequest = { title?: string; videoType?: ProjectVideoType };
@@ -123,7 +125,7 @@ export async function createProjectVideoContent(
     projectId: number,
     request: CreateVideoContentRequest,
     context: YouTubeContext
-): Promise<ApiResponse<ProjectDetail>> {
+): Promise<ApiResponse<ProjectDetailResponse>> {
     await new Promise(resolve => setTimeout(resolve, 250));
     const project = readProject(workspaceId, projectId);
     if (!project || !canManage(project, context)) {
@@ -153,7 +155,7 @@ export async function createProjectVideoContent(
         updatedAt: new Date().toISOString()
     };
     replaceProject(updated);
-    return { success: true, message: '영상 결과물을 추가했습니다.', data: updated };
+    return { success: true, message: '영상 결과물을 추가했습니다.', data: toProjectDetailResponse(updated, context.workspaceRole) };
 }
 
 /** 동일 Workspace의 중복과 Channel별 단일 CURRENT 규칙을 확인해 게시 이력을 추가합니다. */
@@ -163,7 +165,7 @@ export async function createYouTubePublication(
     videoContentId: number,
     request: CreatePublicationRequest,
     context: YouTubeContext
-): Promise<ApiResponse<ProjectDetail>> {
+): Promise<ApiResponse<ProjectDetailResponse>> {
     await new Promise(resolve => setTimeout(resolve, 250));
     const target = findManageableContent(workspaceId, projectId, videoContentId, context);
     const videoId = normalizeVideoId(request.youtubeVideo);
@@ -237,7 +239,7 @@ export async function createYouTubePublication(
         publications: [...publications, publication]
     }));
     const updated = readProject(workspaceId, projectId) as ProjectDetail;
-    return { success: true, message: current ? '새 게시물을 등록하고 기존 게시물을 대체됨으로 변경했습니다.' : 'YouTube 게시물을 등록했습니다.', data: updated };
+    return { success: true, message: current ? '새 게시물을 등록하고 기존 게시물을 대체됨으로 변경했습니다.' : 'YouTube 게시물을 등록했습니다.', data: toProjectDetailResponse(updated, context.workspaceRole) };
 }
 
 /** 연결된 Project 사이에서 권한과 그룹 경계를 검증한 뒤 콘텐츠 성과의 집계 대상을 변경합니다. */
@@ -247,7 +249,7 @@ export async function changeVideoContentPrimaryProject(
     videoContentId: number,
     newPrimaryProjectId: number,
     context: YouTubeContext
-): Promise<ApiResponse<ProjectDetail>> {
+): Promise<ApiResponse<ProjectDetailResponse>> {
     await new Promise(resolve => setTimeout(resolve, 250));
     const target = findManageableContent(workspaceId, projectId, videoContentId, context);
     const oldPrimary = target ? readProject(workspaceId, target.content.primaryProjectId) : null;
@@ -279,7 +281,7 @@ export async function changeVideoContentPrimaryProject(
             reason: '사용자 지정 성과 집계 프로젝트 변경'
         }]
     });
-    return { success: true, message: '성과 집계 프로젝트를 변경했습니다.', data: readProject(workspaceId, projectId) as ProjectDetail };
+    return { success: true, message: '성과 집계 프로젝트를 변경했습니다.', data: toProjectDetailResponse(readProject(workspaceId, projectId) as ProjectDetail, context.workspaceRole) };
 }
 
 /** 선택한 게시물만 Mock 동기화하고 다른 게시물과 생명주기는 변경하지 않습니다. */
@@ -289,7 +291,7 @@ export async function syncYouTubePublication(
     videoContentId: number,
     publicationId: number,
     context: YouTubeContext
-): Promise<ApiResponse<ProjectDetail>> {
+): Promise<ApiResponse<ProjectDetailResponse>> {
     await new Promise(resolve => setTimeout(resolve, 350));
     const target = findManageableContent(workspaceId, projectId, videoContentId, context);
     const publication = target?.content.publications.find(item => item.publicationId === publicationId);
@@ -311,7 +313,7 @@ export async function syncYouTubePublication(
         item.publicationId === publicationId ? { ...item, performance } : item
     ));
     replaceVideoContent(videoContentId, recalculateContent({ ...target.content, publications }));
-    return { success: true, message: '게시물 성과를 동기화했습니다.', data: readProject(workspaceId, projectId) as ProjectDetail };
+    return { success: true, message: '게시물 성과를 동기화했습니다.', data: toProjectDetailResponse(readProject(workspaceId, projectId) as ProjectDetail, context.workspaceRole) };
 }
 
 /** 사용자 확인에 따라 게시물을 종료하고 사유별 누적 집계 포함 여부를 즉시 반영합니다. */
@@ -322,7 +324,7 @@ export async function removeYouTubePublication(
     publicationId: number,
     removalReason: YouTubeRemovalReason,
     context: YouTubeContext
-): Promise<ApiResponse<ProjectDetail>> {
+): Promise<ApiResponse<ProjectDetailResponse>> {
     await new Promise(resolve => setTimeout(resolve, 250));
     const target = findManageableContent(workspaceId, projectId, videoContentId, context);
     const publication = target?.content.publications.find(item => item.publicationId === publicationId);
@@ -346,7 +348,7 @@ export async function removeYouTubePublication(
         }]
     }));
     replaceVideoContent(videoContentId, recalculateContent({ ...target.content, publications }));
-    return { success: true, message: '게시물을 게시 종료 상태로 변경했습니다.', data: readProject(workspaceId, projectId) as ProjectDetail };
+    return { success: true, message: '게시물을 게시 종료 상태로 변경했습니다.', data: toProjectDetailResponse(readProject(workspaceId, projectId) as ProjectDetail, context.workspaceRole) };
 }
 
 /** 종료·대체 게시물을 CURRENT로 복원하고 같은 Channel의 기존 CURRENT는 명시적으로 대체합니다. */
@@ -357,7 +359,7 @@ export async function restoreYouTubePublication(
     publicationId: number,
     replaceCurrentPublicationId: number | null,
     context: YouTubeContext
-): Promise<ApiResponse<ProjectDetail>> {
+): Promise<ApiResponse<ProjectDetailResponse>> {
     await new Promise(resolve => setTimeout(resolve, 250));
     const target = findManageableContent(workspaceId, projectId, videoContentId, context);
     const publication = target?.content.publications.find(item => item.publicationId === publicationId);
@@ -391,5 +393,5 @@ export async function restoreYouTubePublication(
         return item;
     });
     replaceVideoContent(videoContentId, recalculateContent({ ...target.content, publications }));
-    return { success: true, message: '게시물을 다시 게시 중 상태로 복원했습니다.', data: readProject(workspaceId, projectId) as ProjectDetail };
+    return { success: true, message: '게시물을 다시 게시 중 상태로 복원했습니다.', data: toProjectDetailResponse(readProject(workspaceId, projectId) as ProjectDetail, context.workspaceRole) };
 }

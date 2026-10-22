@@ -18,9 +18,9 @@ import ProjectGroupModal from '../components/project-groups/ProjectGroupModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { registerUnsavedChangesGuard } from '../navigation/unsavedChangesGuard';
-import type { ProjectAccessRole, ProjectDetail, ProjectListItem, ProjectVideoType, VideoContent, YouTubePublication, YouTubeRemovalReason } from '../types/project';
+import type { ProjectAccessRole, ProjectDetailResponse, ProjectListItemResponse, ProjectVideoType, VideoContentResponse, YouTubePublicationResponse, YouTubeRemovalReason } from '../types/project';
 import type { ProjectStatus } from '../types/projectGroup';
-import type { WorkspaceChannel } from '../types/workspaceSettings';
+import type { WorkspaceChannelListItem } from '../types/workspaceSettings';
 import { formatMoney } from '../utils/decimal';
 import './ProjectGroupPage.css';
 import './ProjectsPage.css';
@@ -34,7 +34,7 @@ const STATUS_LABEL: Record<ProjectStatus, string> = { PLANNING: '준비 중', ED
 const EMPTY_FORM: FormValues = { title: '', content: '', channelId: '', projectGroupId: '', videoType: '', status: 'PLANNING', dueDate: '', plannedUploadDate: '' };
 
 /** 새 프로젝트에서 선택 가능한 채널이 하나뿐이면 해당 채널을 초기값으로 사용합니다. */
-function createProjectForm(channels: WorkspaceChannel[]): FormValues {
+function createProjectForm(channels: WorkspaceChannelListItem[]): FormValues {
     return {
         ...EMPTY_FORM,
         channelId: channels.length === 1 ? String(channels[0].channelId) : ''
@@ -42,7 +42,7 @@ function createProjectForm(channels: WorkspaceChannel[]): FormValues {
 }
 
 /** API 상세를 모달 입력 상태로 변환합니다. */
-function toForm(project: ProjectDetail): FormValues {
+function toForm(project: ProjectDetailResponse): FormValues {
     return { title: project.title, content: project.content ?? '', channelId: String(project.channelId), projectGroupId: project.projectGroupId ? String(project.projectGroupId) : '', videoType: project.videoType, status: project.status, dueDate: project.dueDate ?? '', plannedUploadDate: project.plannedUploadDate ?? '' };
 }
 
@@ -55,15 +55,15 @@ function ProjectsPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { currentWorkspace } = useWorkspace();
-    const [projects, setProjects] = useState<ProjectListItem[]>([]);
+    const [projects, setProjects] = useState<ProjectListItemResponse[]>([]);
     const [totalPages, setTotalPages] = useState(1);
-    const [detail, setDetail] = useState<ProjectDetail | null>(null);
-    const [channels, setChannels] = useState<WorkspaceChannel[]>([]);
+    const [detail, setDetail] = useState<ProjectDetailResponse | null>(null);
+    const [channels, setChannels] = useState<WorkspaceChannelListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
-    const [editingProject, setEditingProject] = useState<ProjectDetail | null>(null);
+    const [editingProject, setEditingProject] = useState<ProjectDetailResponse | null>(null);
     const [form, setForm] = useState<FormValues>(EMPTY_FORM);
     const [initialForm, setInitialForm] = useState<FormValues>(EMPTY_FORM);
     const [errors, setErrors] = useState<Errors>({});
@@ -74,14 +74,14 @@ function ProjectsPage() {
     const formRef = useRef<HTMLFormElement>(null);
     const isAdmin = currentWorkspace?.myRole !== 'MEMBER';
     const context = useMemo(() => ({ userId: user?.userId ?? 0, userName: user?.name ?? '', workspaceRole: currentWorkspace?.myRole ?? 'MEMBER' as const }), [currentWorkspace?.myRole, user]);
-    const groups = currentWorkspace ? getProjectGroupOptions(currentWorkspace.workspaceId) : [];
+    const groups = currentWorkspace ? getProjectGroupOptions(currentWorkspace.workspaceId, context) : [];
     const dirty = modalOpen && JSON.stringify(form) !== JSON.stringify(initialForm);
     const blocker = useBlocker(({ currentLocation, nextLocation }) => !allowNavigation.current && dirty && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search));
 
     /** 현재 제작팀의 활성 채널을 필터와 폼에 공급합니다. */
     const loadChannels = useCallback(async () => {
         if (!currentWorkspace) return;
-        const response = await getWorkspaceChannels(currentWorkspace.workspaceId, { activeOnly: true });
+        const response = await getWorkspaceChannels(currentWorkspace.workspaceId, { workspaceRole: currentWorkspace.myRole }, { activeOnly: true });
         setChannels(response.success ? response.data : []);
     }, [currentWorkspace]);
 
@@ -142,7 +142,7 @@ function ProjectsPage() {
     };
 
     /** 생성 또는 수정 모달을 확정된 초기 상태로 엽니다. */
-    const openForm = (project?: ProjectDetail) => {
+    const openForm = (project?: ProjectDetailResponse) => {
         const values = project ? toForm(project) : createProjectForm(channels);
         setEditingProject(project ?? null); setForm(values); setInitialForm(values); setErrors({}); setFeedback(null); setModalOpen(true);
     };
@@ -166,7 +166,7 @@ function ProjectsPage() {
         let confirmContentPerformanceMove = false;
         if (editingProject && isAdmin && Number(form.projectGroupId || 0) !== (editingProject.projectGroupId ?? 0)) {
             const hasFinance = [editingProject.workerAmount, editingProject.directExpenseAmount, editingProject.directRevenueAmount]
-                .some(value => value !== '0.00');
+                .some(value => value !== undefined && value !== '0.00');
             const hasContentPerformance = editingProject.videoContents.some(content => (
                 content.primaryProjectId === editingProject.projectId
                 && content.cumulativePerformance.includedPublicationCount > 0
@@ -263,7 +263,7 @@ function ProjectsPage() {
     };
 
     /** 같은 Channel의 CURRENT가 있으면 명시적 대체 확인 후 새 게시물을 등록합니다. */
-    const addPublication = async (content: VideoContent) => {
+    const addPublication = async (content: VideoContentResponse) => {
         if (!currentWorkspace || !detail) return;
         const draft = publicationDrafts[content.videoContentId] ?? { youtubeVideo: '', channelId: String(detail.channelId) };
         const channelId = Number(draft.channelId);
@@ -292,7 +292,7 @@ function ProjectsPage() {
     };
 
     /** 연결 Project 중 새 성과 집계 대상을 선택하고 집계 이동을 명시적으로 확인합니다. */
-    const changePrimaryProject = async (content: VideoContent) => {
+    const changePrimaryProject = async (content: VideoContentResponse) => {
         if (!currentWorkspace || !detail) return;
         const candidates = content.connectedProjectIds.filter(candidateId => candidateId !== content.primaryProjectId);
         const selected = Number(window.prompt(`새 성과 집계 프로젝트 ID를 입력해 주세요.\n선택 가능: ${candidates.join(', ')}`, String(candidates[0] ?? '')));
@@ -308,7 +308,7 @@ function ProjectsPage() {
     };
 
     /** 게시물별 동기화·종료·복원을 수행하고 전체 결과물 집계를 새 응답으로 교체합니다. */
-    const mutatePublication = async (content: VideoContent, publication: YouTubePublication, action: 'sync' | 'unavailable' | 'incorrect' | 'restore') => {
+    const mutatePublication = async (content: VideoContentResponse, publication: YouTubePublicationResponse, action: 'sync' | 'unavailable' | 'incorrect' | 'restore') => {
         if (!currentWorkspace || !detail) return;
         const base = [currentWorkspace.workspaceId, detail.projectId, content.videoContentId, publication.publicationId] as const;
         let response;
@@ -354,7 +354,7 @@ const PROJECT_ACCESS_LABEL: Record<ProjectAccessRole, string> = {
 };
 
 /** 접근 역할과 현재 상태를 조합해 실제 화면에서 가능한 기능 안내를 만듭니다. */
-function getProjectAccessGuide(project: ProjectListItem): ProjectAccessGuide {
+function getProjectAccessGuide(project: ProjectListItemResponse): ProjectAccessGuide {
     const role = project.myAccessRole;
     const label = PROJECT_ACCESS_LABEL[role];
     const canEdit = role !== 'PROJECT_VIEWER';
@@ -390,7 +390,7 @@ function getProjectAccessGuide(project: ProjectListItem): ProjectAccessGuide {
 }
 
 /** 역할 배지의 hover·focus 미리보기와 click·touch 고정 팝오버를 제공합니다. */
-function ProjectAccessBadge({ project, open, pinned, onPreview, onPreviewEnd, onToggle, onClose }: { project: ProjectListItem; open: boolean; pinned: boolean; onPreview: () => void; onPreviewEnd: () => void; onToggle: () => void; onClose: () => void }) {
+function ProjectAccessBadge({ project, open, pinned, onPreview, onPreviewEnd, onToggle, onClose }: { project: ProjectListItemResponse; open: boolean; pinned: boolean; onPreview: () => void; onPreviewEnd: () => void; onToggle: () => void; onClose: () => void }) {
     const wrapperRef = useRef<HTMLDivElement>(null);
     const guide = getProjectAccessGuide(project);
     const popoverId = `project-access-guide-${project.projectId}`;
@@ -457,7 +457,7 @@ function ProjectAccessBadge({ project, open, pinned, onPreview, onPreviewEnd, on
 }
 
 /** 프로젝트 URL 필터와 카드 목록을 표시합니다. */
-function ProjectList({ projects, channels, groups, loading, error, params, totalPages, onFilter, onResetFilters, onCreate }: { projects: ProjectListItem[]; channels: WorkspaceChannel[]; groups: ReturnType<typeof getProjectGroupOptions>; loading: boolean; error: string | null; params: URLSearchParams; totalPages: number; onFilter: (key: string, value: string) => void; onResetFilters: () => void; onCreate: () => void }) {
+function ProjectList({ projects, channels, groups, loading, error, params, totalPages, onFilter, onResetFilters, onCreate }: { projects: ProjectListItemResponse[]; channels: WorkspaceChannelListItem[]; groups: ReturnType<typeof getProjectGroupOptions>; loading: boolean; error: string | null; params: URLSearchParams; totalPages: number; onFilter: (key: string, value: string) => void; onResetFilters: () => void; onCreate: () => void }) {
     const [openAccess, setOpenAccess] = useState<OpenProjectAccess | null>(null);
     const archived = params.get('view') === 'archived';
     const page = Number(params.get('page')) || 1;
@@ -525,8 +525,8 @@ const PUBLICATION_STATUS_LABEL = { CURRENT: '게시 중', SUPERSEDED: '대체됨
 const COMPLETENESS_LABEL = { COMPLETE: '집계 완료', PARTIAL: '일부 미집계', UNAVAILABLE: '미집계' } as const;
 
 type ProjectDetailViewProps = {
-    detail: ProjectDetail | null;
-    channels: WorkspaceChannel[];
+    detail: ProjectDetailResponse | null;
+    channels: WorkspaceChannelListItem[];
     loading: boolean;
     error: string | null;
     feedback: Feedback | null;
@@ -540,13 +540,13 @@ type ProjectDetailViewProps = {
     onArchive: () => void;
     onDelete: () => void;
     onAddVideoContent: () => void;
-    onChangePrimaryProject: (content: VideoContent) => void;
-    onAddPublication: (content: VideoContent) => void;
-    onPublicationAction: (content: VideoContent, publication: YouTubePublication, action: 'sync' | 'unavailable' | 'incorrect' | 'restore') => void;
+    onChangePrimaryProject: (content: VideoContentResponse) => void;
+    onAddPublication: (content: VideoContentResponse) => void;
+    onPublicationAction: (content: VideoContentResponse, publication: YouTubePublicationResponse, action: 'sync' | 'unavailable' | 'incorrect' | 'restore') => void;
 };
 
 /** 현재·누적 집계값과 데이터 완전성을 한 카드에서 구분해 표시합니다. */
-function PerformanceSummary({ title, aggregate, canSeeRevenue }: { title: string; aggregate: VideoContent['currentPerformance']; canSeeRevenue: boolean }) {
+function PerformanceSummary({ title, aggregate, canSeeRevenue }: { title: string; aggregate: VideoContentResponse['currentPerformance']; canSeeRevenue: boolean }) {
     return (
         <article className="project-performance-summary">
             <header><h4>{title}</h4><span className={`project-completeness project-completeness--${aggregate.completeness.toLowerCase()}`}>{COMPLETENESS_LABEL[aggregate.completeness]}</span></header>
@@ -554,7 +554,7 @@ function PerformanceSummary({ title, aggregate, canSeeRevenue }: { title: string
                 <div><dt>조회수</dt><dd>{aggregate.completeness === 'UNAVAILABLE' ? '미집계' : aggregate.viewCount.toLocaleString()}</dd></div>
                 <div><dt>좋아요</dt><dd>{aggregate.completeness === 'UNAVAILABLE' ? '—' : aggregate.likeCount.toLocaleString()}</dd></div>
                 <div><dt>댓글</dt><dd>{aggregate.completeness === 'UNAVAILABLE' ? '—' : aggregate.commentCount.toLocaleString()}</dd></div>
-                {canSeeRevenue && <div><dt>예상 수익</dt><dd>{aggregate.completeness === 'UNAVAILABLE' ? '—' : `${formatMoney(aggregate.estimatedRevenue)}원`}</dd></div>}
+                {canSeeRevenue && <div><dt>예상 수익</dt><dd>{aggregate.completeness === 'UNAVAILABLE' ? '—' : `${formatMoney(aggregate.estimatedRevenue ?? '0.00')}원`}</dd></div>}
             </dl>
             <p>{aggregate.includedPublicationCount}개 포함 · {aggregate.missingPublicationCount}개 미집계</p>
         </article>
@@ -562,7 +562,7 @@ function PerformanceSummary({ title, aggregate, canSeeRevenue }: { title: string
 }
 
 /** 한 Channel의 게시물을 최신순 타임라인으로 표시하고 게시물별 동작을 제공합니다. */
-function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, onAction }: { content: VideoContent; publications: YouTubePublication[]; canEdit: boolean; canSeeRevenue: boolean; onAction: ProjectDetailViewProps['onPublicationAction'] }) {
+function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, onAction }: { content: VideoContentResponse; publications: YouTubePublicationResponse[]; canEdit: boolean; canSeeRevenue: boolean; onAction: ProjectDetailViewProps['onPublicationAction'] }) {
     return (
         <section className="project-publication-channel">
             <h4>📺 {publications[0].channelName}</h4>
@@ -580,7 +580,7 @@ function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, on
                                 <span>조회수 <strong>{performance ? performance.viewCount.toLocaleString() : '미집계'}</strong></span>
                                 <span>좋아요 <strong>{performance ? performance.likeCount.toLocaleString() : '—'}</strong></span>
                                 <span>댓글 <strong>{performance ? performance.commentCount.toLocaleString() : '—'}</strong></span>
-                                {canSeeRevenue && <span>예상 수익 <strong>{performance ? `${formatMoney((performance.viewCount * Number(publication.appliedRate)).toFixed(2))}원` : '—'}</strong></span>}
+                                {canSeeRevenue && <span>예상 수익 <strong>{performance ? `${formatMoney((performance.viewCount * Number(publication.appliedRate ?? 0)).toFixed(2))}원` : '—'}</strong></span>}
                             </div>
                             <p>{needsAttention ? `확인 필요 · ${performance?.lastErrorMessage ?? '동기화 실패'}` : performance?.lastSuccessAt ? `마지막 성공 ${new Date(performance.lastSuccessAt).toLocaleString('ko-KR')}` : '아직 동기화하지 않았습니다.'}</p>
                             {canSeeRevenue && <p>{publication.revenueOption === 'DEFAULT' ? '채널 기본 단가' : publication.revenueOption === 'CUSTOM' ? '개별 단가' : '수익 계산 안 함'} · 조회당 {publication.appliedRate}원</p>}
@@ -619,7 +619,7 @@ function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeR
                     const draft = publicationDrafts[content.videoContentId] ?? { youtubeVideo: '', channelId: String(detail.channelId) };
                     const publicationError = publicationErrors[content.videoContentId];
                     const publicationErrorId = `project-youtube-video-error-${content.videoContentId}`;
-                    const byChannel = [...content.publications.reduce((map, publication) => map.set(publication.channelId, [...(map.get(publication.channelId) ?? []), publication]), new Map<number, YouTubePublication[]>()).values()];
+                    const byChannel = [...content.publications.reduce((map, publication) => map.set(publication.channelId, [...(map.get(publication.channelId) ?? []), publication]), new Map<number, YouTubePublicationResponse[]>()).values()];
                     return (
                         <article className="project-video-content" key={content.videoContentId}>
                             <header><div><span>{content.videoType === 'LONG' ? '롱폼' : '쇼츠'}</span><h3>{content.title}</h3><p>성과 집계 프로젝트 #{content.primaryProjectId} · 연결 프로젝트 {content.connectedProjectIds.length}개</p></div><div className="project-video-content__actions">{content.primaryProjectId === detail.projectId && <strong className="project-primary-badge" title="이 영상의 성과가 현재 프로젝트와 프로젝트 그룹에 집계됩니다.">성과 집계 대상</strong>}{canEdit && content.connectedProjectIds.length > 1 && <button className="project-button" onClick={() => onChangePrimaryProject(content)}>집계 프로젝트 변경</button>}</div></header>
@@ -678,7 +678,7 @@ function ProjectChoiceField({ name, legend, value, options, error, onChange }: {
 }
 
 /** 생성과 수정에서 동일한 순서와 모바일 조작감을 공유하는 폼입니다. */
-function ProjectForm({ formRef, values, errors, channels, groups, edit, admin, submitting, onChange, onSubmit, onCancel }: { formRef: React.RefObject<HTMLFormElement | null>; values: FormValues; errors: Errors; channels: WorkspaceChannel[]; groups: ReturnType<typeof getProjectGroupOptions>; edit: boolean; admin: boolean; submitting: boolean; onChange: (field: keyof FormValues, value: string) => void; onSubmit: (event: React.SubmitEvent<HTMLFormElement>) => void; onCancel: () => void }) {
+function ProjectForm({ formRef, values, errors, channels, groups, edit, admin, submitting, onChange, onSubmit, onCancel }: { formRef: React.RefObject<HTMLFormElement | null>; values: FormValues; errors: Errors; channels: WorkspaceChannelListItem[]; groups: ReturnType<typeof getProjectGroupOptions>; edit: boolean; admin: boolean; submitting: boolean; onChange: (field: keyof FormValues, value: string) => void; onSubmit: (event: React.SubmitEvent<HTMLFormElement>) => void; onCancel: () => void }) {
     const statusOptions = Object.entries(STATUS_LABEL)
         .filter(([status]) => edit || status === 'PLANNING' || status === 'EDITING')
         .map(([status, label]) => ({

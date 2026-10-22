@@ -147,6 +147,7 @@ function WorkspaceSettingsPage() {
                     <ChannelManagement
                         key={`channels-${currentWorkspace.workspaceId}`}
                         workspaceId={currentWorkspace.workspaceId}
+                        workspaceRole={currentWorkspace.myRole}
                         onDirtyChange={setIsFormDirty}
                     />
                 )}
