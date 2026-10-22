@@ -6,6 +6,7 @@ import type {
     ApiSuccessResponse
 } from '../types';
 import type { UserRole } from '../../types/auth';
+import type { DashboardRequestContext } from './types';
 
 // Mock 시나리오
 type MockScenario =
@@ -115,6 +116,48 @@ type MockTodayDeadline = TodayDeadline & {
     archived: boolean;
 };
 
+// Task 저장소가 분리되기 전에도 인증 사용자별 담당 업무와 프로젝트 참여 범위를 검증합니다.
+const MOCK_TASK_WORKER_USER_IDS: Record<number, number> = {
+    101: 24601,
+    102: 24604,
+    103: 24602,
+    104: 24604,
+    105: 24601,
+    106: 24601,
+    108: 24601,
+    109: 24602,
+    111: 24604,
+    201: 24601,
+    202: 24601
+};
+
+const MOCK_PROJECT_PARTICIPANT_USER_IDS: Record<number, number[]> = {
+    11: [24601, 24604],
+    12: [24602],
+    13: [24602],
+    14: [24601, 24604],
+    15: [24601],
+    31: [24601, 24621],
+    32: [24601, 24621]
+};
+
+/** MEMBER는 자신이 참여한 프로젝트의 일정만 조회할 수 있습니다. */
+function canAccessScheduleProject(
+    projectId: number,
+    context: DashboardRequestContext
+) {
+    return context.workspaceRole !== 'MEMBER'
+        || MOCK_PROJECT_PARTICIPANT_USER_IDS[projectId]?.includes(context.userId) === true;
+}
+
+/** MY_TASK 필터는 인증 사용자에게 실제 배정된 Task인지 식별자로 확인합니다. */
+function isAssignedToCurrentUser(
+    taskId: number,
+    context: DashboardRequestContext
+) {
+    return MOCK_TASK_WORKER_USER_IDS[taskId] === context.userId;
+}
+
 // 성공 응답 데이터
 export type DashboardScheduleData = {
     calendarEvents: CalendarEvent[];
@@ -135,36 +178,36 @@ export type DashboardScheduleResponse = ApiResponse<DashboardScheduleData>;
 const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
     {
         taskId: 101,
-        projectId: 12,
-        projectTitle: '8월 여름 휴가 브이로그',
+        projectId: 11,
+        projectTitle: '카메라 롱폼 리뷰',
         taskTypeId: 2,
         taskTypeName: '종합 편집',
-        workerName: '박편집',
-        startDate: '2026-08-01',
-        endDate: '2026-08-07',
+        workerName: '테스트 사용자',
+        startDate: '2026-10-14',
+        endDate: '2026-10-22',
         workerAmount: '400000.00',
         taskStatus: 'PROGRESS',
         workspaceId: 1,
         channelId: 1,
-        projectStatus: 'EDITING',
+        projectStatus: 'REVIEW',
         workerRole: 'EDITOR',
         isMyTask: true,
         archived: false
     },
     {
         taskId: 102,
-        projectId: 12,
-        projectTitle: '8월 여름 휴가 브이로그',
+        projectId: 11,
+        projectTitle: '카메라 롱폼 리뷰',
         taskTypeId: 4,
         taskTypeName: '썸네일',
-        workerName: '이디자',
-        startDate: '2026-08-05',
-        endDate: '2026-08-10',
+        workerName: '이편집',
+        startDate: '2026-10-20',
+        endDate: '2026-10-24',
         workerAmount: '100000.00',
         taskStatus: 'WAITING',
         workspaceId: 1,
         channelId: 1,
-        projectStatus: 'EDITING',
+        projectStatus: 'REVIEW',
         workerRole: 'THUMBNAILER',
         isMyTask: false,
         archived: false
@@ -172,84 +215,84 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
     {
         taskId: 103,
         projectId: 13,
-        projectTitle: '신제품 카메라 리뷰',
+        projectTitle: '가을 굿즈 티저',
         taskTypeId: 1,
         taskTypeName: '가편집',
-        workerName: '김편집',
-        startDate: '2026-08-11',
-        endDate: '2026-08-13',
+        workerName: '윤공동',
+        startDate: '2026-10-20',
+        endDate: '2026-10-24',
         workerAmount: '150000.00',
-        taskStatus: 'COMPLETED',
-        workspaceId: 1,
-        channelId: 3,
-        projectStatus: 'REVIEW',
-        workerRole: 'EDITOR',
-        isMyTask: true,
-        archived: false
-    },
-    {
-        taskId: 104,
-        projectId: 13,
-        projectTitle: '신제품 카메라 리뷰',
-        taskTypeId: 2,
-        taskTypeName: '종합 편집',
-        workerName: '김편집',
-        startDate: '2026-08-14',
-        endDate: '2026-08-21',
-        workerAmount: '500000.00',
-        taskStatus: 'REVIEW',
-        workspaceId: 1,
-        channelId: 3,
-        projectStatus: 'REVIEW',
-        workerRole: 'EDITOR',
-        isMyTask: true,
-        archived: false
-    },
-    {
-        taskId: 105,
-        projectId: 14,
-        projectTitle: '9월 게임 신작 정리',
-        taskTypeId: 4,
-        taskTypeName: '썸네일',
-        workerName: '최썸네일',
-        startDate: '2026-08-27',
-        endDate: '2026-08-31',
-        workerAmount: '80000.00',
-        taskStatus: 'PROGRESS',
+        taskStatus: 'WAITING',
         workspaceId: 1,
         channelId: 2,
         projectStatus: 'PLANNING',
-        workerRole: 'THUMBNAILER',
+        workerRole: 'PLANNER',
         isMyTask: false,
         archived: false
     },
     {
-        taskId: 106,
-        projectId: 15,
-        projectTitle: '송년 특집 및 신년 카운트다운',
+        taskId: 104,
+        projectId: 14,
+        projectTitle: '10월 편집 비하인드',
         taskTypeId: 2,
         taskTypeName: '종합 편집',
-        workerName: '윤편집',
-        startDate: '2026-12-30',
-        endDate: '2027-01-01',
-        workerAmount: '650000.00',
-        taskStatus: 'PROGRESS',
+        workerName: '이편집',
+        startDate: '2026-10-20',
+        endDate: '2026-10-28',
+        workerAmount: '500000.00',
+        taskStatus: 'REVIEW',
         workspaceId: 1,
         channelId: 1,
-        projectStatus: 'UPLOADED',
+        projectStatus: 'EDITING',
+        workerRole: 'EDITOR',
+        isMyTask: false,
+        archived: false
+    },
+    {
+        taskId: 105,
+        projectId: 15,
+        projectTitle: '장비 세팅 Shorts',
+        taskTypeId: 4,
+        taskTypeName: '썸네일',
+        workerName: '테스트 사용자',
+        startDate: '2026-10-22',
+        endDate: '2026-10-24',
+        workerAmount: '80000.00',
+        taskStatus: 'PROGRESS',
+        workspaceId: 1,
+        channelId: 3,
+        projectStatus: 'PLANNING',
         workerRole: 'CREATOR',
         isMyTask: true,
         archived: false
     },
     {
-        taskId: 108,
-        projectId: 17,
-        projectTitle: '가을 신제품 언박싱',
+        taskId: 106,
+        projectId: 12,
+        projectTitle: '카메라 Shorts #1',
         taskTypeId: 2,
         taskTypeName: '종합 편집',
-        workerName: '김편집',
-        startDate: '2026-09-25',
-        endDate: '2026-09-29',
+        workerName: '테스트 사용자',
+        startDate: '2026-10-01',
+        endDate: '2026-10-03',
+        workerAmount: '650000.00',
+        taskStatus: 'PROGRESS',
+        workspaceId: 1,
+        channelId: 2,
+        projectStatus: 'UPLOADED',
+        workerRole: 'CREATOR',
+        isMyTask: true,
+        archived: true
+    },
+    {
+        taskId: 108,
+        projectId: 14,
+        projectTitle: '10월 편집 비하인드',
+        taskTypeId: 2,
+        taskTypeName: '종합 편집',
+        workerName: '테스트 사용자',
+        startDate: '2026-10-22',
+        endDate: '2026-10-28',
         workerAmount: '350000.00',
         taskStatus: 'PROGRESS',
         workspaceId: 1,
@@ -261,38 +304,20 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
     },
     {
         taskId: 109,
-        projectId: 18,
-        projectTitle: '가을 여행지 추천',
-        taskTypeId: 4,
-        taskTypeName: '썸네일',
-        workerName: '이디자',
-        startDate: '2026-09-27',
-        endDate: '2026-09-29',
+        projectId: 13,
+        projectTitle: '가을 굿즈 티저',
+        taskTypeId: 1,
+        taskTypeName: '기획',
+        workerName: '윤공동',
+        startDate: '2026-10-22',
+        endDate: '2026-10-24',
         workerAmount: '90000.00',
-        taskStatus: 'REVIEW',
+        taskStatus: 'WAITING',
         workspaceId: 1,
         channelId: 2,
-        projectStatus: 'REVIEW',
-        workerRole: 'THUMBNAILER',
+        projectStatus: 'PLANNING',
+        workerRole: 'PLANNER',
         isMyTask: false,
-        archived: false
-    },
-    {
-        taskId: 107,
-        projectId: 16,
-        projectTitle: '취소된 촬영 프로젝트',
-        taskTypeId: 1,
-        taskTypeName: '가편집',
-        workerName: '김편집',
-        startDate: '2026-09-07',
-        endDate: '2026-09-09',
-        workerAmount: '100000.00',
-        taskStatus: 'COMPLETED',
-        workspaceId: 1,
-        channelId: 1,
-        projectStatus: 'CANCELLED',
-        workerRole: 'EDITOR',
-        isMyTask: true,
         archived: false
     },
     {
@@ -302,8 +327,8 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         taskTypeId: 21,
         taskTypeName: '편집',
         workerName: '테스트 사용자',
-        startDate: '2026-09-14',
-        endDate: '2026-09-18',
+        startDate: '2026-10-20',
+        endDate: '2026-10-24',
         workerAmount: '250000.00',
         taskStatus: 'PROGRESS',
         workspaceId: 2,
@@ -320,8 +345,8 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         taskTypeId: 21,
         taskTypeName: '편집',
         workerName: '테스트 사용자',
-        startDate: '2026-09-26',
-        endDate: '2026-09-29',
+        startDate: '2026-10-22',
+        endDate: '2026-10-29',
         workerAmount: '180000.00',
         taskStatus: 'WAITING',
         workspaceId: 2,
@@ -337,12 +362,12 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
 const MOCK_TODAY_DEADLINES: MockTodayDeadline[] = [
     {
         taskId: 108,
-        projectId: 17,
-        projectTitle: '가을 신제품 언박싱',
+        projectId: 14,
+        projectTitle: '10월 편집 비하인드',
         taskTypeId: 2,
         taskTypeName: '종합 편집',
-        workerName: '김편집',
-        endDate: '2026-09-29',
+        workerName: '테스트 사용자',
+        endDate: '2026-10-22',
         taskStatus: 'PROGRESS',
         workspaceId: 1,
         channelId: 1,
@@ -353,47 +378,31 @@ const MOCK_TODAY_DEADLINES: MockTodayDeadline[] = [
     },
     {
         taskId: 109,
-        projectId: 18,
-        projectTitle: '가을 여행지 추천',
-        taskTypeId: 4,
-        taskTypeName: '썸네일',
-        workerName: '이디자',
-        endDate: '2026-09-29',
-        taskStatus: 'REVIEW',
+        projectId: 13,
+        projectTitle: '가을 굿즈 티저',
+        taskTypeId: 1,
+        taskTypeName: '기획',
+        workerName: '윤공동',
+        endDate: '2026-10-22',
+        taskStatus: 'WAITING',
         workspaceId: 1,
         channelId: 2,
-        projectStatus: 'REVIEW',
-        workerRole: 'THUMBNAILER',
+        projectStatus: 'PLANNING',
+        workerRole: 'PLANNER',
         isMyTask: false,
         archived: false
     },
     {
-        taskId: 110,
-        projectId: 19,
-        projectTitle: '취소된 라이브 방송',
-        taskTypeId: 1,
-        taskTypeName: '가편집',
-        workerName: '김편집',
-        endDate: '2026-09-29',
-        taskStatus: 'WAITING',
-        workspaceId: 1,
-        channelId: 1,
-        projectStatus: 'CANCELLED',
-        workerRole: 'EDITOR',
-        isMyTask: true,
-        archived: false
-    },
-    {
         taskId: 111,
-        projectId: 20,
-        projectTitle: '보관된 프로젝트',
+        projectId: 12,
+        projectTitle: '카메라 Shorts #1',
         taskTypeId: 2,
         taskTypeName: '종합 편집',
-        workerName: '박편집',
-        endDate: '2026-09-29',
+        workerName: '윤공동',
+        endDate: '2026-10-22',
         taskStatus: 'COMPLETED',
         workspaceId: 1,
-        channelId: 1,
+        channelId: 2,
         projectStatus: 'UPLOADED',
         workerRole: 'EDITOR',
         isMyTask: false,
@@ -406,7 +415,7 @@ const MOCK_TODAY_DEADLINES: MockTodayDeadline[] = [
         taskTypeId: 21,
         taskTypeName: '편집',
         workerName: '테스트 사용자',
-        endDate: '2026-09-29',
+        endDate: '2026-10-22',
         taskStatus: 'WAITING',
         workspaceId: 2,
         channelId: 21,
@@ -442,7 +451,8 @@ function matchesScheduleKeyword(
 function filterMockCalendarEvents(
     workspaceId: number,
     events: MockCalendarEvent[],
-    request: DashboardScheduleRequest
+    request: DashboardScheduleRequest,
+    context: DashboardRequestContext
 ): CalendarEvent[] {
     // 검색어 앞뒤 공백과 영문 대소문자 차이를 무시합니다.
     const keyword = request.keyword?.trim().toLowerCase() ?? '';
@@ -451,6 +461,11 @@ function filterMockCalendarEvents(
         .filter(event => {
             // 다른 Workspace의 일정과 보관된 프로젝트 일정은 기본 조회에서 제외합니다.
             if (event.workspaceId !== workspaceId || event.archived) {
+                return false;
+            }
+
+            // 화면 필터보다 먼저 인증 사용자의 프로젝트 접근 범위를 적용합니다.
+            if (!canAccessScheduleProject(event.projectId, context)) {
                 return false;
             }
 
@@ -480,7 +495,7 @@ function filterMockCalendarEvents(
 
             // 역할 필터는 일반 역할과 현재 사용자의 작업인 MY_TASK를 구분합니다.
             if (request.role === 'MY_TASK') {
-                if (!event.isMyTask) {
+                if (!isAssignedToCurrentUser(event.taskId, context)) {
                     return false;
                 }
             } else if (
@@ -525,13 +540,19 @@ function filterMockCalendarEvents(
 function filterMockTodayDeadlines(
     workspaceId: number,
     deadlines: MockTodayDeadline[],
-    request: DashboardScheduleRequest
+    request: DashboardScheduleRequest,
+    context: DashboardRequestContext
 ): TodayDeadline[] {
     const keyword = request.keyword?.trim().toLowerCase() ?? '';
 
     return deadlines
         .filter(deadline => {
             if (deadline.workspaceId !== workspaceId || deadline.archived) {
+                return false;
+            }
+
+            // Calendar와 동일한 인증 범위를 먼저 적용해 두 응답 배열의 경계를 맞춥니다.
+            if (!canAccessScheduleProject(deadline.projectId, context)) {
                 return false;
             }
 
@@ -551,7 +572,7 @@ function filterMockTodayDeadlines(
             }
 
             if (request.role === 'MY_TASK') {
-                if (!deadline.isMyTask) {
+                if (!isAssignedToCurrentUser(deadline.taskId, context)) {
                     return false;
                 }
             } else if (
@@ -596,7 +617,8 @@ function filterMockTodayDeadlines(
  */
 export async function getDashboardSchedule(
     workspaceId: number,
-    request: DashboardScheduleRequest
+    request: DashboardScheduleRequest,
+    context: DashboardRequestContext
 ): Promise<DashboardScheduleResponse> {
     // TODO:
     // 백엔드 완성 후
@@ -643,7 +665,8 @@ export async function getDashboardSchedule(
             calendarEvents: filterMockCalendarEvents(
                 workspaceId,
                 MOCK_CALENDAR_EVENTS,
-                request
+                request,
+                context
             ),
             todayDeadlines:
                 mockScenario === 'EMPTY_DEADLINES'
@@ -651,7 +674,8 @@ export async function getDashboardSchedule(
                     : filterMockTodayDeadlines(
                         workspaceId,
                         MOCK_TODAY_DEADLINES,
-                        request
+                        request,
+                        context
                     )
         }
     };

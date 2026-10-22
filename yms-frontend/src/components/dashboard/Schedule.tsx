@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
 import {
     getDashboardSchedule,
     type DashboardScheduleResponse,
@@ -10,15 +11,18 @@ import SchedulerCalendar, { type SchedulerDateRange, type SchedulerEventClickDat
 import { toFullCalendarEvents } from './schedulerCalendarAdapter';
 import DeadlineFeed from './DeadlineFeed';
 import FeedbackMessage from '../common/FeedbackMessage';
+import type { DashboardRequestContext } from '../../api/dashboard/types';
 
 import './Schedule.css';
 
 type DashboardScheduleProps = {
     workspaceId: number;
+    context: DashboardRequestContext;
     status: ScheduleStatusFilter;
     role: ScheduleRoleFilter;
     channelId: number | null;
     keyword: string;
+    children?: ReactNode;
 };
 
 /**
@@ -28,11 +32,15 @@ type DashboardScheduleProps = {
  */
 function DashboardSchedule({
     workspaceId,
+    context,
     status,
     role,
     channelId,
-    keyword
+    keyword,
+    children
 }: DashboardScheduleProps) {
+
+    const navigate = useNavigate();
 
     const [isLoading, setIsLoading] = useState(true);       // 초기 호출 동작 중 로딩
     const [mockData, setMockData] = useState<DashboardScheduleResponse | null>(null);
@@ -43,34 +51,23 @@ function DashboardSchedule({
         );
 
     /**
-     * 캘린더에서 선택된 작업 일정의 식별자를 전달받습니다.
-     * TODO #17 프로젝트 상세 화면 연결
-     * 현재 단계에서는 클릭 데이터가 정상 전달되는지만 검증하며,
-     * 실제 프로젝트 상세 페이지 이동은 #17 구현 시 연결합니다.
+     * 캘린더에서 선택된 일정이 속한 프로젝트 상세로 이동합니다.
+     * Task 상세 UI가 없는 동안에는 임시 Route를 만들지 않고 Project까지만 연결합니다.
      */
     const handleEventClick = (
         event: SchedulerEventClickData
     ) => {
-        console.log(
-            '[Scheduler Event Click]',
-            event
-        );
+        navigate(`/projects/${event.projectId}`);
     };
 
     /**
-     * TODO #17 SCR-08 프로젝트 상세 라우트가 추가되면 projectId와 taskId로 이동합니다.
-     * 현재는 피드 항목이 상세 화면 식별자를 정상 전달하는 연결 지점만 제공합니다.
+     * 오늘 마감 항목도 Calendar와 동일한 Project 상세 이동 규칙을 사용합니다.
+     * 전달받은 taskId는 향후 Task 상세 기능이 추가될 때 사용할 수 있도록 응답에는 유지합니다.
      */
     const handleDeadlineClick = (
         deadline: TodayDeadline
     ) => {
-        console.log(
-            '[Deadline Feed Click]',
-            {
-                projectId: deadline.projectId,
-                taskId: deadline.taskId
-            }
-        );
+        navigate(`/projects/${deadline.projectId}`);
     };
 
     /**
@@ -105,7 +102,8 @@ function DashboardSchedule({
                             role,
                             channelId: channelId ?? undefined,
                             keyword
-                        }
+                        },
+                        context
                     );
 
                 // Workspace나 필터가 다시 바뀌었다면 이전 요청의 응답은 무시합니다.
@@ -148,7 +146,8 @@ function DashboardSchedule({
         status,
         role,
         channelId,
-        keyword
+        keyword,
+        context
     ]);
 
     const handleRangeChange = (
@@ -205,12 +204,17 @@ function DashboardSchedule({
                 />
             </div>
 
-            {/* 같은 Schedule 응답의 마감 목록을 우측 피드로 전달해 중복 호출을 방지합니다. */}
-            <DeadlineFeed
-                deadlines={todayDeadlines}
-                isLoading={isLoading}
-                onDeadlineClick={handleDeadlineClick}
-            />
+            <aside className="dashboard-schedule-sidebar">
+                {/* 같은 Schedule 응답의 마감 목록을 우측 피드로 전달해 중복 호출을 방지합니다. */}
+                <DeadlineFeed
+                    deadlines={todayDeadlines}
+                    isLoading={isLoading}
+                    onDeadlineClick={handleDeadlineClick}
+                />
+
+                {/* 알림은 자체 상태를 유지하면서 Dashboard가 같은 보조 열에 조합합니다. */}
+                {children}
+            </aside>
         </div>
     );
 }

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router';
 
 import type { NotificationItem } from '../../api/notifications/notifications';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -18,6 +19,8 @@ const DASHBOARD_NOTIFICATION_LIMIT = 5;
  * 항목을 선택하면 읽음 처리하며 상세 화면 이동은 관련 라우트 추가 후 연결합니다.
  */
 function DashboardNotifications({ workspaceId }: DashboardNotificationsProps) {
+    const navigate = useNavigate();
+
     const {
         notifications,
         isLoading,
@@ -45,12 +48,15 @@ function DashboardNotifications({ workspaceId }: DashboardNotificationsProps) {
     /**
      * 대시보드에서 선택한 알림을 읽음 처리합니다.
      * 성공한 항목은 공통 상태가 갱신되면서 미확인 피드에서 자동으로 제거됩니다.
-     * 프로젝트 상세 라우트가 구현되면 이 처리 뒤 projectId로 이동합니다.
+     * 프로젝트 알림만 상세로 이동하고 정산·초대 알림은 이번 범위에서 읽음 처리만 합니다.
      */
     const handleNotificationSelect = async (notification: NotificationItem) => {
-        await readNotification(notification.notificationId);
+        const succeeded = await readNotification(notification.notificationId);
 
-        // TODO: SCR-08 등 관련 상세 라우트 구현 후 대상별 화면 이동을 연결합니다.
+        // 읽음 처리 실패 시 현재 화면과 알림을 유지하여 사용자가 실패를 확인할 수 있게 합니다.
+        if (succeeded && notification.projectId !== null) {
+            navigate(`/projects/${notification.projectId}`);
+        }
     };
 
     return (

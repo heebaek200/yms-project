@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import DashboardSummary from '../components/dashboard/Summary';
 import DashboardSchedule from '../components/dashboard/Schedule';
 import DashboardNotifications from '../components/dashboard/Notifications';
@@ -6,11 +7,14 @@ import type { ScheduleRoleFilter, ScheduleStatusFilter } from '../api/dashboard/
 import SchedulerFilter from '../components/dashboard/SchedulerFilter';
 import { getWorkspaceChannels } from '../api/workspaces/channels';
 import { useWorkspace } from '../hooks/useWorkspace';
+import { useAuth } from '../contexts/AuthContext';
 import type { ChannelSummary } from '../types/workspace';
 
 import './DashboardPage.css';
 
 function DashboardPage() {
+
+    const { user } = useAuth();
 
     const {
         currentWorkspace,
@@ -31,6 +35,12 @@ function DashboardPage() {
     const [keyword, setKeyword] = useState('');
 
     const [debouncedKeyword, setDebouncedKeyword] = useState('');
+
+    // 실제 서버의 인증 세션과 제작팀 멤버십을 대신해 Mock API에 동일한 권한 경계를 전달합니다.
+    const dashboardContext = useMemo(() => ({
+        userId: user?.userId ?? 0,
+        workspaceRole: currentWorkspace?.myRole ?? 'MEMBER' as const
+    }), [currentWorkspace?.myRole, user?.userId]);
 
     /**
      * 프로젝트 / 작업 검색어 입력이 멈춘 뒤 300ms가 지나면 실제 조회 검색어를 갱신합니다.
@@ -140,20 +150,20 @@ function DashboardPage() {
             <header className="dashboard-header">
                 <div>
                     <h1 className="dashboard-title">
-                        스케줄러
+                        대시보드
                     </h1>
 
                     <p className="dashboard-description">
-                        프로젝트 일정과 작업 현황을 한눈에 확인합니다.
+                        <strong>{currentWorkspace.name}</strong>의 프로젝트 일정과 작업 현황을 한눈에 확인합니다.
                     </p>
                 </div>
 
-                <button
-                    type="button"
+                <Link
+                    to="/projects?create=true"
                     className="dashboard-create-button"
                 >
                     새 프로젝트
-                </button>
+                </Link>
             </header>
 
 
@@ -174,6 +184,7 @@ function DashboardPage() {
                     <DashboardSummary
                         key={currentWorkspace.workspaceId}
                         workspaceId={currentWorkspace.workspaceId}
+                        context={dashboardContext}
                     />
                 </div>
             </section>
@@ -233,34 +244,32 @@ function DashboardPage() {
                     <DashboardSchedule
                         key={currentWorkspace.workspaceId}
                         workspaceId={currentWorkspace.workspaceId}
+                        context={dashboardContext}
                         status={status}
                         role={role}
                         channelId={channelId}
                         keyword={debouncedKeyword}
-                    />
-                </div>
-            </section>
-
-
-            {/* 새로운 알림 */}
-            <section
-                className="dashboard-notifications"
-                aria-labelledby="dashboard-notifications-title"
-            >
-                <div className="dashboard-section-header">
-                    <h2
-                        id="dashboard-notifications-title"
-                        className="dashboard-section-title"
                     >
-                        새로운 알림
-                    </h2>
-                </div>
+                        <section
+                            className="dashboard-notifications"
+                            aria-labelledby="dashboard-notifications-title"
+                        >
+                            <div className="dashboard-section-header">
+                                <h2
+                                    id="dashboard-notifications-title"
+                                    className="dashboard-section-title"
+                                >
+                                    최근 알림
+                                </h2>
+                            </div>
 
-                <div className="dashboard-notifications__content">
-                    {/* DashboardNotifications 컴포넌트 */}
-                    <DashboardNotifications
-                        workspaceId={currentWorkspace.workspaceId}
-                    />
+                            <div className="dashboard-notifications__content">
+                                <DashboardNotifications
+                                    workspaceId={currentWorkspace.workspaceId}
+                                />
+                            </div>
+                        </section>
+                    </DashboardSchedule>
                 </div>
             </section>
 

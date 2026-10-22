@@ -149,10 +149,57 @@ function ProjectsPage() {
     };
 
     /** 생성 또는 수정 모달을 확정된 초기 상태로 엽니다. */
-    const openForm = (project?: ProjectDetailResponse) => {
+    const openForm = useCallback((project?: ProjectDetailResponse) => {
         const values = project ? toForm(project) : createProjectForm(channels);
         setEditingProject(project ?? null); setForm(values); setInitialForm(values); setErrors({}); setFeedback(null); setModalOpen(true);
+    }, [channels]);
+
+    /** 새 프로젝트 Query를 제거해 닫기 또는 저장 이후 모달이 다시 열리지 않게 합니다. */
+    const clearCreateQuery = () => {
+        if (params.get('create') !== 'true') return;
+
+        const next = new URLSearchParams(params);
+        next.delete('create');
+
+        // 미저장 확인을 이미 마친 내부 상태 정리이므로 같은 탐색을 다시 차단하지 않습니다.
+        allowNavigation.current = true;
+        setParams(next, { replace: true });
+        window.setTimeout(() => {
+            allowNavigation.current = false;
+        }, 0);
     };
+
+    /** 목록의 생성 동작도 직접 링크·새로고침이 가능한 URL 상태로 전환합니다. */
+    const requestCreateForm = () => {
+        const next = new URLSearchParams(params);
+        next.set('create', 'true');
+        setParams(next);
+    };
+
+    /**
+     * `/projects?create=true` 직접 접근·새로고침에서는 생성 모달을 복원합니다.
+     * 뒤로 가기 등으로 Query가 사라지면 변경 없는 생성 모달도 함께 닫아 URL과 화면을 맞춥니다.
+     */
+    useEffect(() => {
+        // 저장 성공 직후에는 이전 create Query가 남은 중간 Render에서 모달을 다시 열지 않습니다.
+        if (projectId !== null || allowNavigation.current) {
+            return;
+        }
+
+        const createRequested = params.get('create') === 'true';
+
+        if (createRequested && !modalOpen) {
+            openForm();
+            return;
+        }
+
+        if (!createRequested && modalOpen && editingProject === null) {
+            setModalOpen(false);
+            setForm(EMPTY_FORM);
+            setInitialForm(EMPTY_FORM);
+            setErrors({});
+        }
+    }, [currentWorkspace?.workspaceId, editingProject, modalOpen, openForm, params, projectId]);
 
     /** 변경된 필드 값을 저장하고 해당 서버 오류를 지웁니다. */
     const change = (field: keyof FormValues, value: string) => {
@@ -164,6 +211,7 @@ function ProjectsPage() {
     const closeForm = () => {
         if (dirty && !window.confirm('저장하지 않은 변경사항이 있습니다. 변경사항을 버리고 닫을까요?')) return;
         setModalOpen(false); setEditingProject(null); setForm(EMPTY_FORM);
+        clearCreateQuery();
     };
 
     /** 입력값을 API 요청으로 변환해 생성 또는 수정을 수행합니다. */
@@ -361,7 +409,7 @@ function ProjectsPage() {
     const activeMember = detail?.members.find(member => member.userId === user?.userId && member.active);
     const canEdit = isAdmin || activeMember?.permission === 'EDIT';
     const canManage = isAdmin || activeMember?.isOwner === true;
-    return <section className="project-area-page"><ProjectAreaTabs />{projectId === null ? <ProjectList projects={projects} channels={channels} groups={groups} loading={loading} error={error} params={params} totalPages={totalPages} onFilter={setFilter} onResetFilters={() => setParams(new URLSearchParams(), { replace: true })} onCreate={() => openForm()} /> : <ProjectDetailView detail={detail} channels={channels} loading={loading} error={error} feedback={feedback} canSeeRevenue={isAdmin} canEdit={canEdit} canManage={canManage} publicationDrafts={publicationDrafts} publicationErrors={publicationErrors} onPublicationDraft={changePublicationDraft} onEdit={() => detail && openForm(detail)} onArchive={() => void archive()} onDelete={() => void remove()} onAddVideoContent={() => void addVideoContent()} onChangePrimaryProject={content => void changePrimaryProject(content)} onAddPublication={content => void addPublication(content)} onPublicationAction={(content, publication, action) => void mutatePublication(content, publication, action)} />}{modalOpen && <ProjectGroupModal titleId="project-form-title" title={editingProject ? '프로젝트 수정' : '새 프로젝트'} description="영상 제작 과정의 기본 정보와 시작 상태를 설정합니다." onRequestClose={closeForm}><ProjectForm formRef={formRef} values={form} errors={errors} channels={channels} groups={groups} edit={editingProject !== null} admin={isAdmin} submitting={submitting} onChange={change} onSubmit={submit} onCancel={closeForm} /></ProjectGroupModal>}</section>;
+    return <section className="project-area-page"><ProjectAreaTabs />{projectId === null ? <ProjectList projects={projects} channels={channels} groups={groups} loading={loading} error={error} params={params} totalPages={totalPages} onFilter={setFilter} onResetFilters={() => setParams(new URLSearchParams(), { replace: true })} onCreate={requestCreateForm} /> : <ProjectDetailView detail={detail} channels={channels} loading={loading} error={error} feedback={feedback} canSeeRevenue={isAdmin} canEdit={canEdit} canManage={canManage} publicationDrafts={publicationDrafts} publicationErrors={publicationErrors} onPublicationDraft={changePublicationDraft} onEdit={() => detail && openForm(detail)} onArchive={() => void archive()} onDelete={() => void remove()} onAddVideoContent={() => void addVideoContent()} onChangePrimaryProject={content => void changePrimaryProject(content)} onAddPublication={content => void addPublication(content)} onPublicationAction={(content, publication, action) => void mutatePublication(content, publication, action)} />}{modalOpen && <ProjectGroupModal titleId="project-form-title" title={editingProject ? '프로젝트 수정' : '새 프로젝트'} description="영상 제작 과정의 기본 정보와 시작 상태를 설정합니다." onRequestClose={closeForm}><ProjectForm formRef={formRef} values={form} errors={errors} channels={channels} groups={groups} edit={editingProject !== null} admin={isAdmin} submitting={submitting} onChange={change} onSubmit={submit} onCancel={closeForm} /></ProjectGroupModal>}</section>;
 }
 
 type ProjectAccessGuide = {

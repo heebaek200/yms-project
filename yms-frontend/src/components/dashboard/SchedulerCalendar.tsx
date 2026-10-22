@@ -1,5 +1,6 @@
 import FullCalendar from '@fullcalendar/react';
 import type { DatesSetInfo, EventClickInfo, EventInput } from '@fullcalendar/react';
+import { useState } from 'react';
 
 import themePlugin from '@fullcalendar/react/themes/classic';
 import dayGridPlugin from '@fullcalendar/react/daygrid';
@@ -51,6 +52,13 @@ function SchedulerCalendar({
     onRangeChange,
     onEventClick
 }: SchedulerCalendarProps) {
+
+    // 첫 진입 화면 폭만 초기 View 결정에 사용하여 이후 사용자의 View 선택을 보존합니다.
+    const [initialView] = useState(() => (
+        window.matchMedia('(max-width: 768px)').matches
+            ? 'listWeek'
+            : 'dayGridMonth'
+    ));
 
     const handleDatesSet = (
         info: DatesSetInfo
@@ -105,7 +113,7 @@ function SchedulerCalendar({
                     timeGridPlugin,
                     listPlugin
                 ]}
-                initialView="dayGridMonth"
+                initialView={initialView}
 
                 headerToolbar={{
                     left: 'prev,next today',
