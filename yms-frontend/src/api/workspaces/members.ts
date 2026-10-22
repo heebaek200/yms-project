@@ -6,6 +6,12 @@ import type {
 } from '../../types/workspaceSettings';
 import type { ApiResponse, ApiSuccessResponse } from '../types';
 import { updateMockWorkspaceRole } from './workspaces';
+import {
+    countOwnedProjects,
+    deactivateProjectMemberships
+} from '../projects/projectStore';
+
+type StoredWorkspaceMember = Omit<WorkspaceMember, 'ownedProjectCount'>;
 
 export type WorkspaceMemberListRequest = {
     keyword?: string;
@@ -19,7 +25,7 @@ export type WorkspaceMemberListResponse =
 export type WorkspaceMemberResponse = ApiResponse<WorkspaceMember>;
 
 // 권한 경계와 모든 필터를 한 화면에서 검증할 수 있는 제작팀별 Mock 멤버 저장소입니다.
-let mockMembers: Record<number, WorkspaceMember[]> = {
+let mockMembers: Record<number, StoredWorkspaceMember[]> = {
     1: [
         {
             workspaceMemberId: 101,
@@ -114,6 +120,31 @@ function getMemberStore(workspaceId: number) {
     return mockMembers[workspaceId];
 }
 
+/** 저장된 멤버에 비삭제 프로젝트 소유 수를 계산해 최신 API 응답을 만듭니다. */
+function toWorkspaceMember(
+    workspaceId: number,
+    member: StoredWorkspaceMember
+): WorkspaceMember {
+    return {
+        ...member,
+        ownedProjectCount: countOwnedProjects(
+            workspaceId,
+            member.workspaceMemberId
+        )
+    };
+}
+
+/** Project 생성·권한 검증에서 현재 사용자의 ACTIVE 멤버십을 조회합니다. */
+export function findActiveWorkspaceMemberByUserId(
+    workspaceId: number,
+    userId: number
+): WorkspaceMember | null {
+    const member = getMemberStore(workspaceId).find(item => (
+        item.userId === userId && item.status === 'ACTIVE'
+    ));
+    return member ? toWorkspaceMember(workspaceId, member) : null;
+}
+
 /**
  * 이름·이메일과 상태, 전문 역할, 제작팀 권한 조건을 AND로 적용해 멤버를 조회합니다.
  * 기본 상태는 ACTIVE이며 다중 전문 역할은 선택 역할을 하나라도 포함하면 일치합니다.
@@ -145,7 +176,10 @@ export async function getWorkspaceMembers(
             && matchesWorkspaceRole;
     });
 
-    return { success: true, data: members.map(member => ({ ...member })) };
+    return {
+        success: true,
+        data: members.map(member => toWorkspaceMember(workspaceId, member))
+    };
 }
 
 /** 이메일 기준으로 재초대 가능 여부를 판단할 때 사용할 기존 멤버를 조회합니다. */
@@ -194,11 +228,11 @@ export function activateMockWorkspaceMember(
         return {
             success: true,
             message: '기존 제작팀 멤버십을 다시 활성화했습니다.',
-            data: { ...existingMember }
+            data: toWorkspaceMember(workspaceId, existingMember)
         };
     }
 
-    const member: WorkspaceMember = {
+    const member: StoredWorkspaceMember = {
         workspaceMemberId: nextWorkspaceMemberId,
         userId: user.userId,
         name: user.name,
@@ -216,7 +250,7 @@ export function activateMockWorkspaceMember(
     return {
         success: true,
         message: '제작팀 멤버십을 생성했습니다.',
-        data: { ...member }
+        data: toWorkspaceMember(workspaceId, member)
     };
 }
 
@@ -282,7 +316,7 @@ export async function updateWorkspaceMemberRole(
     return {
         success: true,
         message: `${target.name} 님의 권한을 변경했습니다.`,
-        data: { ...target }
+        data: toWorkspaceMember(workspaceId, target)
     };
 }
 
@@ -339,12 +373,22 @@ export async function removeWorkspaceMember(
         };
     }
 
+    if (countOwnedProjects(workspaceId, target.workspaceMemberId) > 0) {
+        return {
+            success: false,
+            errorCode: 'PROJECT_OWNERSHIP_TRANSFER_REQUIRED',
+            message: '소유 중인 프로젝트의 소유자를 먼저 변경해 주세요.',
+            errors: null
+        };
+    }
+
     target.status = 'REMOVED';
     target.leftAt = new Date().toISOString();
+    deactivateProjectMemberships(workspaceId, target.workspaceMemberId);
 
     return {
         success: true,
         message: `${target.name} 님을 제작팀에서 제외했습니다.`,
-        data: { ...target }
+        data: toWorkspaceMember(workspaceId, target)
     };
 }

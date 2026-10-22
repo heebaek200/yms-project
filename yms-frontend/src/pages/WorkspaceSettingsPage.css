@@ -615,6 +615,7 @@
 }
 
 .settings-modal__close {
+    position: relative;
     flex-shrink: 0;
     width: 36px;
     height: 36px;
@@ -623,8 +624,6 @@
     border-radius: 50%;
     background: var(--color-background);
     color: var(--color-text-muted);
-    font-size: 23px;
-    line-height: 1;
 }
 
 .settings-modal__close:hover {
@@ -779,4 +778,21 @@
     .settings-modal__close {
         transition: none;
     }
+}
+.settings-rate-guide {
+    padding: 14px 16px;
+    border: 1px solid #e1e2e7;
+    border-radius: 12px;
+    background: rgba(248, 249, 251, .64);
+}
+
+.settings-rate-guide p { margin: 0; color: #777985; }
+.settings-rate-guide strong { display: block; margin: 6px 0; }
+/* 단가 오류 문구의 유무와 관계없이 두 입력 그룹을 위쪽에 맞춥니다. */
+.settings-form__columns { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 12px; }
+.settings-amount-input { display: flex; align-items: center; gap: 8px; }
+.settings-amount-input input { min-width: 0; }
+
+@media (max-width: 560px) {
+    .settings-form__columns { grid-template-columns: 1fr; }
 }

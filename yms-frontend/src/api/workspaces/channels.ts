@@ -1,8 +1,11 @@
 import type {
     ChannelIntegrationStatus,
-    WorkspaceChannel
+    WorkspaceChannel,
+    WorkspaceChannelListItem
 } from '../../types/workspaceSettings';
+import type { WorkspaceRole } from '../../types/workspace';
 import type { ApiResponse } from '../types';
+import { readProjects } from '../projects/projectStore';
 
 export type ChannelListRequest = {
     activeOnly?: boolean;
@@ -14,13 +17,15 @@ export type SaveChannelRequest = {
     youtubeChannelId?: string | null;
     youtubeChannelUrl?: string | null;
     description?: string | null;
+    longFormRate?: string;
+    shortFormRate?: string;
 };
 
 export type UpdateChannelRequest = SaveChannelRequest & {
     active: boolean;
 };
 
-export type ChannelListResponse = ApiResponse<WorkspaceChannel[]>;
+export type ChannelListResponse = ApiResponse<WorkspaceChannelListItem[]>;
 export type ChannelMutationResponse = ApiResponse<WorkspaceChannel>;
 export type ChannelDeleteResponse = ApiResponse<{ channelId: number }>;
 
@@ -28,6 +33,7 @@ type ChannelMockScenario = 'SUCCESS' | 'EMPTY' | 'SERVER_ERROR';
 
 let mockScenario: ChannelMockScenario = 'SUCCESS';
 let nextChannelId = 31;
+const RATE_PATTERN = /^\d+(\.\d{1,6})?$/;
 
 // 생성·수정 결과가 다음 조회에도 유지되도록 제작팀별 Mock 저장소를 관리합니다.
 let mockChannelsByWorkspace: Record<number, WorkspaceChannel[]> = {
@@ -39,7 +45,9 @@ let mockChannelsByWorkspace: Record<number, WorkspaceChannel[]> = {
             youtubeChannelUrl: 'https://youtube.com/@yms-main',
             description: '롱폼 콘텐츠를 운영하는 메인 채널입니다.',
             integrationStatus: 'CONNECTED',
-            active: true
+            active: true,
+            longFormRate: '3.00',
+            shortFormRate: '0.20'
         },
         {
             channelId: 2,
@@ -48,7 +56,9 @@ let mockChannelsByWorkspace: Record<number, WorkspaceChannel[]> = {
             youtubeChannelUrl: 'https://youtube.com/@yms-shorts',
             description: '쇼츠 실험 콘텐츠를 수동으로 관리합니다.',
             integrationStatus: 'MANUAL',
-            active: true
+            active: true,
+            longFormRate: '2.50',
+            shortFormRate: '0.18'
         },
         {
             channelId: 3,
@@ -57,7 +67,9 @@ let mockChannelsByWorkspace: Record<number, WorkspaceChannel[]> = {
             youtubeChannelUrl: 'https://youtube.com/@yms-tech',
             description: '최근 동기화 오류를 확인할 수 있는 테스트 채널입니다.',
             integrationStatus: 'ERROR',
-            active: true
+            active: true,
+            longFormRate: '4.00',
+            shortFormRate: '0.25'
         },
         {
             channelId: 4,
@@ -66,7 +78,9 @@ let mockChannelsByWorkspace: Record<number, WorkspaceChannel[]> = {
             youtubeChannelUrl: null,
             description: '기존 프로젝트 이력에만 남아 있는 비활성 채널입니다.',
             integrationStatus: 'MANUAL',
-            active: false
+            active: false,
+            longFormRate: '0',
+            shortFormRate: '0'
         }
     ],
     2: [
@@ -77,7 +91,9 @@ let mockChannelsByWorkspace: Record<number, WorkspaceChannel[]> = {
             youtubeChannelUrl: null,
             description: null,
             integrationStatus: 'MANUAL',
-            active: true
+            active: true,
+            longFormRate: '3.00',
+            shortFormRate: '0.20'
         }
     ]
 };
@@ -117,6 +133,8 @@ function validateChannelRequest(request: SaveChannelRequest) {
     const youtubeChannelId = normalizeOptionalValue(request.youtubeChannelId);
     const youtubeChannelUrl = normalizeOptionalValue(request.youtubeChannelUrl);
     const description = normalizeOptionalValue(request.description);
+    const longFormRate = request.longFormRate?.trim() || '0';
+    const shortFormRate = request.shortFormRate?.trim() || '0';
 
     if (!name) {
         errors.push({
@@ -156,20 +174,48 @@ function validateChannelRequest(request: SaveChannelRequest) {
         });
     }
 
+    // 단가는 계산 정밀도를 보존하도록 number가 아닌 최대 소수점 6자리 문자열로 검증합니다.
+    for (const [field, value] of [
+        ['longFormRate', longFormRate],
+        ['shortFormRate', shortFormRate]
+    ] as const) {
+        if (!RATE_PATTERN.test(value)) {
+            errors.push({
+                field,
+                value,
+                reason: '단가는 0 이상의 숫자로 입력해 주세요. 소수점 여섯째 자리까지 허용됩니다.'
+            });
+        }
+    }
+
     return {
         errors,
         normalized: {
             name,
             youtubeChannelId,
             youtubeChannelUrl,
-            description
+            description,
+            longFormRate,
+            shortFormRate
         }
     };
+}
+
+/** Project Mock이 생성 시점 Channel 단가를 조회할 수 있도록 복사본을 동기적으로 제공합니다. */
+export function findWorkspaceChannel(
+    workspaceId: number,
+    channelId: number
+): WorkspaceChannel | null {
+    const channel = (mockChannelsByWorkspace[workspaceId] ?? []).find(
+        item => item.channelId === channelId
+    );
+    return channel ? { ...channel } : null;
 }
 
 /** 현재 제작팀의 Channel을 활성 상태와 검색어 기준으로 조회합니다. */
 export async function getWorkspaceChannels(
     workspaceId: number,
+    context: { workspaceRole: WorkspaceRole },
     request: ChannelListRequest = {}
 ): Promise<ChannelListResponse> {
     // TODO: GET /api/workspaces/{workspaceId}/channels 호출로 교체합니다.
@@ -193,7 +239,12 @@ export async function getWorkspaceChannels(
     const channels = (mockChannelsByWorkspace[workspaceId] ?? [])
         .filter(channel => !activeOnly || channel.active)
         .filter(channel => !keyword || channel.name.toLocaleLowerCase().includes(keyword))
-        .map(channel => ({ ...channel }));
+        .map(channel => {
+            const { longFormRate, shortFormRate, ...publicChannel } = channel;
+            return context.workspaceRole === 'MEMBER'
+                ? publicChannel
+                : { ...publicChannel, longFormRate, shortFormRate };
+        });
 
     return { success: true, data: channels };
 }
@@ -354,7 +405,10 @@ export async function deleteWorkspaceChannel(
         };
     }
 
-    if (mockUsedChannelIdsByWorkspace[workspaceId]?.has(channelId)) {
+    const isUsedByProject = readProjects().some(project => (
+        project.workspaceId === workspaceId && project.channelId === channelId
+    ));
+    if (isUsedByProject || mockUsedChannelIdsByWorkspace[workspaceId]?.has(channelId)) {
         return {
             success: false,
             errorCode: 'CHANNEL_IN_USE',

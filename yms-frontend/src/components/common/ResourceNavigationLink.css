@@ -1,0 +1,56 @@
+/* 프로젝트와 프로젝트 그룹의 같은 이동 의미를 하나의 글래스 링크 스타일로 통일합니다. */
+.resource-navigation-link,
+.project-card__link,
+.project-detail-nav a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-sizing: border-box;
+    border: 1px solid var(--color-border, #dddfe6);
+    border-radius: 10px;
+    background: rgb(255 255 255 / 0.55);
+    color: var(--color-text, #292a31);
+    font-weight: 750;
+    line-height: 1.25;
+    text-decoration: none;
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.resource-navigation-link--back,
+.project-detail-nav a {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+.resource-navigation-link--detail,
+.project-card__link {
+    min-height: 34px;
+    padding: 7px 10px;
+    font-size: 12px;
+}
+
+.resource-navigation-link:hover,
+.project-card__link:hover,
+.project-detail-nav a:hover {
+    border-color: var(--color-primary, #f04b55);
+    background: var(--color-surface-hover, rgb(255 255 255 / 0.78));
+    color: var(--color-primary, #f04b55);
+}
+
+.resource-navigation-link--back:hover,
+.project-detail-nav a:hover { transform: translateX(-2px); }
+.resource-navigation-link--detail:hover,
+.project-card__link:hover { transform: translateX(2px); }
+.resource-navigation-link:focus-visible,
+.project-card__link:focus-visible,
+.project-detail-nav a:focus-visible { outline: 2px solid var(--color-primary, #f04b55); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .resource-navigation-link,
+    .project-card__link,
+    .project-detail-nav a { transition: none; }
+}

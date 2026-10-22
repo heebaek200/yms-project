@@ -396,6 +396,21 @@ function MemberManagement({
         void saveRoleChange();
     };
 
+    /** 소유 프로젝트가 있는 멤버는 고위험 제외 확인 모달을 열기 전에 차단합니다. */
+    const openRemoveMemberModal = (member: WorkspaceMember) => {
+        if (member.ownedProjectCount > 0) {
+            setMemberFeedback({
+                type: 'error',
+                message: `소유 중인 프로젝트 ${member.ownedProjectCount}개의 소유자를 먼저 변경해 주세요.`
+            });
+            return;
+        }
+
+        setRemovingMember(member);
+        setOwnerRemovalEmail('');
+        setModalError(null);
+    };
+
     /** 확인 모달에서 선택한 멤버를 제외하고 현재 필터 목록을 다시 조회합니다. */
     const handleRemoveMember = async () => {
         if (!removingMember || !user) {
@@ -670,11 +685,7 @@ function MemberManagement({
                                         <button
                                             type="button"
                                             className="settings-button settings-button--danger"
-                                            onClick={() => {
-                                                setRemovingMember(member);
-                                                setOwnerRemovalEmail('');
-                                                setModalError(null);
-                                            }}
+                                            onClick={() => openRemoveMemberModal(member)}
                                         >
                                             제작팀에서 제외
                                         </button>

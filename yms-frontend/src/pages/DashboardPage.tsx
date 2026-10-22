@@ -68,7 +68,8 @@ function DashboardPage() {
                 setChannelErrorMessage(null);
 
                 const response = await getWorkspaceChannels(
-                    currentWorkspace.workspaceId
+                    currentWorkspace.workspaceId,
+                    { workspaceRole: currentWorkspace.myRole }
                 );
 
                 if (isCurrentRequest) {

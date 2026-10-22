@@ -92,7 +92,6 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | --- | --- | --- | --- |
 | users | Master | 적용 | 계정 정보 변경 추적 필요. 단, 회원 탈퇴 정책은 아직 확정하지 않았으므로 탈퇴 상태 컬럼은 추가하지 않음 |
 | user_roles | Master | 적용 | 전문 역할 변경이 담당자 검색과 업무 배정에 영향 |
-| creator_revenue_settings | Master | 적용 | 기본 단가 변경이 이후 Project 초기값에 영향 |
 | workspaces | Master | 적용 | 조직 정보 및 관리 주체 변경 추적 필요 |
 | workspace_members | Master | 적용 | OWNER / ADMIN / MEMBER 권한 변경은 추적 가치가 큼 |
 | channels | Master | 적용 | 채널 ID 및 연동 상태 변경이 Project와 YouTube 연동에 영향 |
@@ -101,6 +100,7 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | project_groups | Transaction | 미적용 | 범용 Audit은 두지 않되 프로젝트 그룹 생성자 / 생성 시각은 업무 발생 정보로 보존 |
 | video_projects | Transaction | 미적용 | 범용 Audit은 두지 않되 최초 생성자 / 생성 시각과 보관 / 삭제 라이프사이클 정보는 보존 |
 | project_members | Transaction | 미적용 | 참여 / 제외 시각과 활성 상태로 충분 |
+| project_status_histories | Transaction | 미적용 | 변경 전후 상태, 변경자와 변경 시각이 자체 이력 |
 | project_tasks | Transaction | 미적용 | 일정, 상태, 완료 시각이 핵심. 정산 확정 후 금액은 Settlement Item에서 스냅샷 보존 |
 | chat_messages | Transaction | 미적용 | 발신자와 전송 시각 자체가 감사 정보 역할 |
 | chat_room_reads | Transaction | 미적용 | 현재 읽음 위치를 보관하는 상태 데이터 |
@@ -109,6 +109,11 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | revenues | Transaction | **최소 추적 예외 적용** | 실제 수익 수정은 재무 성과에 직접 영향하므로 등록자 / 수정자와 시각 유지 |
 | settlements | Transaction | 미적용 | 생성 / 확정 / 지급 단계별 행위자와 시각을 명시적으로 보관 |
 | settlement_items | Transaction | 미적용 | CONFIRMED 시점의 불변 스냅샷 성격 |
+| video_contents | Transaction | 미적용 | 생성 시각과 논리 삭제 라이프사이클 정보는 별도 보존 |
+| project_video_contents | Mapping | 미적용 | Project와 영상 결과물의 연결 사실만 관리 |
+| video_content_primary_project_histories | Transaction | 미적용 | 대표 Project 및 성과 귀속 변경 사건을 보존 |
+| youtube_publications | Transaction | 미적용 | 게시물과 대체 관계, 생성 시각을 업무 데이터로 보존 |
+| youtube_publication_status_histories | Transaction | 미적용 | 게시물 상태·종료 사유·대체 관계 변경 사건을 보존 |
 | video_performances | Transaction | 미적용 | 외부 API 동기화 상태와 마지막 성공 / 시도 시각이 핵심 |
 
 ---
@@ -119,7 +124,6 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | --- | --- | --- |
 | 사용자 | users | 사용자 계정 및 기본 프로필 |
 | 사용자 | user_roles | 전역 고정 전문 역할의 사용자별 다중 매핑 |
-| 사용자 | creator_revenue_settings | CREATOR의 기본 조회수 1회당 수익 단가 |
 | Workspace | workspaces | 조직 / 팀 단위 최상위 업무 영역 |
 | Workspace | workspace_members | Workspace 참여자 및 권한 |
 | Workspace | workspace_invitations | 이메일 기반 Workspace 초대 |
@@ -127,6 +131,10 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | ProjectGroup | project_groups | 여러 Project를 묶는 선택적 상위 업무 단위 |
 | Project | video_projects | 영상 제작 프로젝트 |
 | Project | project_members | Project 참여자 및 EDIT / VIEW 권한 |
+| Project | project_status_histories | Project 상태 변경 이력 |
+| VideoContent | video_contents | 완성된 논리적 영상 결과물 |
+| VideoContent | project_video_contents | Project와 영상 결과물의 다대다 연결 |
+| VideoContent | video_content_primary_project_histories | 대표 Project 및 ProjectGroup 귀속 변경 이력 |
 | Task | task_types | Workspace별 확장 가능한 작업 종류 |
 | Task | project_tasks | 실제 세부 작업과 담당자 / 일정 / 지급액 |
 | Chat | chat_messages | Project 실시간 채팅 메시지 |
@@ -136,9 +144,11 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | Finance | revenues | 실제 발생 수익 |
 | Settlement | settlements | 작업자 단위 정산 Header |
 | Settlement | settlement_items | 정산에 포함된 Task 금액 스냅샷 |
-| YouTube | video_performances | YouTube API 최신 성과 데이터 |
+| YouTube | youtube_publications | 영상 결과물의 실제 YouTube 게시 이력 |
+| YouTube | youtube_publication_status_histories | 게시물 생명주기 변경 이력 |
+| YouTube | video_performances | YouTube 게시물별 최신 성과 데이터 |
 
-총 20개 테이블을 초기 설계 범위로 정의합니다.
+총 25개 테이블을 초기 설계 범위로 정의합니다.
 
 ---
 
@@ -181,27 +191,8 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 - `UNIQUE(user_id, role_name)`
 - 역할을 다시 선택하는 경우 새 행을 만들기보다 `is_active`를 재활성화합니다.
 - 역할명은 애플리케이션 Enum으로 관리합니다.
-- CREATOR는 조회수 기반 예상 수익 기본 단가 기능을 제공하는 기능 역할이며 나머지 전문 역할은 담당자 검색과 필터에 사용합니다.
+- 모든 전문 역할은 담당자 검색과 필터에 동일하게 사용하며 특정 역할에 기능이나 재무 권한을 부여하지 않습니다.
 - 세부 업무 종류는 `task_types`에서 Workspace별로 확장하며 전문 역할을 사용자 정의하지 않습니다.
-
-## 4.3. creator_revenue_settings
-
-CREATOR 개인의 기본 조회수 1회당 예상 수익 단가를 관리합니다.
-
-| 컬럼 | 타입 | 제약 | 설명 |
-| --- | --- | --- | --- |
-| creator_revenue_setting_id | BIGINT | PK | 설정 ID |
-| user_id | BIGINT | FK → users, UNIQUE | CREATOR 사용자 |
-| long_form_rate | DECIMAL(12,6) | NOT NULL | 롱폼 조회수 1회당 기본 단가 |
-| short_form_rate | DECIMAL(12,6) | NOT NULL | 쇼츠 조회수 1회당 기본 단가 |
-| created_by | BIGINT | NULL | 등록 사용자 |
-| created_at | DATETIME | NOT NULL | 등록 시각 |
-| updated_by | BIGINT | NULL | 수정 사용자 |
-| updated_at | DATETIME | NULL | 수정 시각 |
-
-프로필 단가는 Project 생성 시 기본값으로만 사용합니다.
-
-기존 Project의 `applied_revenue_per_view`는 프로필 단가 변경에 의해 자동 수정되지 않습니다.
 
 ---
 
@@ -251,7 +242,9 @@ Workspace 삭제 시 하위 업무 이력까지 즉시 물리 삭제하지 않�
 - 복수 OWNER를 허용하며 OWNER만 다른 ACTIVE 멤버에게 OWNER 권한을 부여할 수 있습니다.
 - OWNER는 다른 ACTIVE OWNER가 있을 때만 자신의 권한을 ADMIN 또는 MEMBER로 변경할 수 있습니다.
 - ADMIN은 일반 MEMBER만 제외할 수 있으며 OWNER·ADMIN 권한 변경과 제외는 허용하지 않습니다.
-- 재참여 시 중복 행을 만들지 않고 기존 멤버 상태를 ACTIVE, Workspace 권한을 MEMBER로 변경합니다.
+- `deleted_at IS NULL`인 Project를 소유한 멤버는 LEFT 또는 REMOVED로 변경할 수 없습니다. 보관 여부와 Project 상태는 이 검사에서 제외 조건이 아닙니다.
+- 멤버를 LEFT 또는 REMOVED로 변경할 때 해당 멤버의 ACTIVE `project_members`를 같은 트랜잭션에서 비활성화하고 `left_at`을 기록합니다.
+- 재참여 시 중복 행을 만들지 않고 기존 멤버 상태를 ACTIVE, Workspace 권한을 MEMBER로 변경하지만 이전 Project 소유권과 `project_members` 상태를 자동 복구하지 않습니다.
 - 자기 자신을 제외하는 제작팀 나가기 기능은 현재 범위에 포함하지 않습니다.
 
 ## 5.3. workspace_invitations
@@ -287,6 +280,8 @@ Workspace에서 관리하는 YouTube 채널입니다.
 | youtube_channel_url | VARCHAR(255) | NULL | 채널 URL |
 | description | VARCHAR(500) | NULL | 설명 |
 | integration_status | VARCHAR(20) | NOT NULL | MANUAL / CONNECTED / DISCONNECTED / ERROR |
+| long_form_rate | DECIMAL(12,6) | NOT NULL, DEFAULT 0 | 롱폼 조회수 1회당 기본 단가 |
+| short_form_rate | DECIMAL(12,6) | NOT NULL, DEFAULT 0 | 쇼츠 조회수 1회당 기본 단가 |
 | is_active | BOOLEAN | NOT NULL | 신규 Project에서 사용 가능 여부 |
 | created_by | BIGINT | NULL | 등록 사용자 |
 | created_at | DATETIME | NOT NULL | 등록 시각 |
@@ -300,7 +295,8 @@ Workspace에서 관리하는 YouTube 채널입니다.
 - ID나 URL을 참고 정보로 입력했더라도 실제 연동 절차가 완료되지 않았으면 `integration_status=MANUAL`을 유지합니다.
 - Project와 Channel을 직접 참조하는 비용·수익 등 업무 데이터에서 사용하지 않는 Channel만 물리 삭제할 수 있습니다.
 - 업무 데이터가 연결된 Channel은 삭제하지 않고 비활성화하며 기존 이력을 유지합니다.
-- 수익 기본 단가는 Channel이 아니라 CREATOR 프로필 설정에 둡니다.
+- 두 기본 단가는 0 이상, 소수점 여섯째 자리까지 저장하고 미입력 값은 0으로 정규화합니다.
+- Channel 기본 단가 변경은 기존 YouTubePublication의 `applied_revenue_per_view`를 자동 변경하지 않습니다.
 
 ---
 
@@ -344,18 +340,16 @@ Workspace에서 관리하는 YouTube 채널입니다.
 | channel_id | BIGINT | FK → channels | 담당 Channel |
 | project_group_id | BIGINT | FK → project_groups, NULL | 선택적 ProjectGroup |
 | owner_member_id | BIGINT | FK → workspace_members | Project 소유자 |
-| title | VARCHAR(200) | NOT NULL | 프로젝트 제목 |
+| title | VARCHAR(150) | NOT NULL | 프로젝트 제목 |
 | content | TEXT | NULL | 기획 내용 |
-| video_type | VARCHAR(20) | NOT NULL | LONG / SHORTS |
+| default_video_type | VARCHAR(20) | NOT NULL | 새 VideoContent의 초기 LONG / SHORTS 값 |
 | status | VARCHAR(20) | NOT NULL | PLANNING / EDITING / REVIEW / UPLOADED / CANCELLED |
-| youtube_video_id | VARCHAR(64) | NULL | 연결 YouTube Video ID |
-| revenue_option | VARCHAR(20) | NOT NULL | DEFAULT / CUSTOM / DISABLED |
-| applied_revenue_per_view | DECIMAL(12,6) | NOT NULL | 조회수 1회당 적용 단가 스냅샷 |
 | due_date | DATE | NULL | 제작 마감일 |
 | planned_upload_date | DATE | NULL | 업로드 예정일 |
-| uploaded_at | DATETIME | NULL | 실제 업로드 일시 |
 | created_by_member_id | BIGINT | FK → workspace_members | Project 최초 생성자 |
 | created_at | DATETIME | NOT NULL | Project 생성 시각 |
+| updated_at | DATETIME | NOT NULL | Project 최종 수정 시각과 목록 기본 정렬 기준 |
+| archived_by_member_id | BIGINT | FK → workspace_members, NULL | 보관 처리 사용자 |
 | archived_at | DATETIME | NULL | 보관 시각 |
 | deleted_by_member_id | BIGINT | FK → workspace_members, NULL | 삭제 처리 사용자 |
 | deleted_at | DATETIME | NULL | 논리 삭제 시각 |
@@ -365,18 +359,79 @@ Workspace에서 관리하는 YouTube 채널입니다.
 - Project는 반드시 하나의 Channel에 속합니다.
 - ProjectGroup은 선택값이며 한 Project는 최대 하나의 ProjectGroup에만 속합니다.
 - ProjectGroup 연결 생성, 변경과 해제는 Workspace OWNER와 ADMIN만 수행합니다.
-- ProjectGroup을 변경하면 Project 직접 Expense, Revenue와 Task 지급 금액은 Project를 따라 새 그룹의 집계에 반영합니다.
+- ProjectGroup을 변경하면 Project 직접 Expense, Revenue와 Task 지급 금액은 Project를 따라 새 그룹의 집계에 반영합니다. 해당 Project가 대표인 VideoContent의 콘텐츠 성과도 새 그룹으로 이동하므로 동기화된 성과 또는 계산 가능한 예상 플랫폼 수익이 있으면 변경 전에 영향을 확인합니다.
 - `workspace_id`는 Channel을 통해 유추할 수 있지만 tenant 범위 조회와 권한 검증을 위해 명시적으로 유지합니다.
-- `owner_member_id`는 동일 Workspace의 ACTIVE 멤버여야 합니다.
+- 논리 삭제되지 않은 Project의 `owner_member_id`는 동일 Workspace의 ACTIVE 멤버여야 합니다. 논리 삭제 Project는 당시 소유자를 이력으로 유지하므로 LEFT 또는 REMOVED 멤버를 참조할 수 있습니다.
 - Owner는 `project_members`에도 EDIT 권한 참여자로 등록하는 것을 애플리케이션 규칙으로 둡니다.
 - 현재 Owner에 해당하는 Project Member는 비활성화하거나 VIEW로 낮출 수 없습니다.
-- Owner 변경 시 새 Owner를 먼저 ACTIVE Project Member로 등록하고 EDIT 권한을 보장한 뒤 `owner_member_id`를 변경합니다.
+- Owner 변경 시 같은 Workspace의 ACTIVE 멤버를 대상으로 ACTIVE Project Member를 생성·재활성화하고 EDIT 권한을 보장한 뒤 `owner_member_id`를 변경합니다.
+- 이전 Owner가 ACTIVE Workspace Member이면 일반 EDIT Project Member로 남습니다. 이후 제작팀에서 제외·탈퇴하면 다른 Project 참여와 함께 비활성화합니다.
 - `created_by_member_id`와 `created_at`은 Owner 변경과 무관하게 최초 생성 정보를 유지합니다.
-- YouTube Video ID 중복은 Workspace 내부에서만 차단하며 `UNIQUE(workspace_id, youtube_video_id)`를 사용합니다.
 - 삭제는 하위 Task, Chat, Expense, Revenue 이력을 보존하기 위해 논리 삭제를 사용합니다.
 - 보관과 삭제는 Project 진행 상태와 별도입니다.
+- 생성 시 status는 PLANNING 또는 EDITING만 허용하며 별도 입력이 없으면 PLANNING을 사용합니다.
+- `channel_id`와 `default_video_type`은 새 VideoContent 및 YouTubePublication 입력의 기본값이며 실제 결과물 유형이나 게시 Channel을 확정하지 않습니다.
+- UPLOADED / CANCELLED만 보관할 수 있고 활성 상태로 변경하면 `archived_by_member_id`와 `archived_at`을 null로 되돌립니다.
+- 삭제된 Project의 실제 Expense, Revenue와 확정 Settlement는 집계에서 유지하고 콘텐츠 성과와 예상 수익 집계에서는 제외합니다.
 
-## 6.3. project_members
+## 6.3. video_contents
+
+사용자에게 한 편의 콘텐츠로 인식되는 완성 영상 결과물입니다. 제작 과정인 Project와 실제 플랫폼 업로드인 YouTubePublication 사이의 논리적 단위입니다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| video_content_id | BIGINT | PK | 영상 결과물 ID |
+| workspace_id | BIGINT | FK → workspaces | 소속 Workspace |
+| primary_project_id | BIGINT | FK → video_projects | 콘텐츠 성과 집계 기준 대표 Project |
+| title | VARCHAR(150) | NOT NULL | 영상 결과물 제목 |
+| video_type | VARCHAR(20) | NOT NULL | LONG / SHORTS |
+| created_at | DATETIME | NOT NULL | 생성 시각 |
+| deleted_at | DATETIME | NULL | 논리 삭제 시각 |
+
+정책:
+
+- VideoContent는 게시 전에도 생성할 수 있으며 하나 이상의 Project와 연결되어야 합니다.
+- `primary_project_id`는 `project_video_contents`에 연결된 Project 중 하나여야 하며 같은 Workspace에 속해야 합니다.
+- 연결된 모든 Project 상세에서 결과물과 공개 성과를 조회할 수 있지만 Project 및 ProjectGroup 집계에는 대표 Project만 사용합니다.
+- 대표를 같은 ProjectGroup 안에서 변경하거나 양쪽 모두 그룹이 없으면 현재·새 Project를 모두 관리할 수 있는 프로젝트 소유자, EDIT 참여자와 Workspace 관리자가 변경할 수 있습니다. ProjectGroup 경계가 달라지는 변경은 OWNER와 ADMIN만 수행합니다.
+- Project 삭제 시 연결과 결과물 이력은 보존하되 삭제 Project를 집계 대상으로 사용하지 않습니다. 다른 활성 연결 Project가 있으면 사용자가 새 대표를 지정한 뒤 삭제하고, 없으면 기존 `primary_project_id`를 역사적 대표로 유지한 채 활성 집계에서 제외합니다.
+
+## 6.4. project_video_contents
+
+Project와 VideoContent의 다대다 관계를 관리합니다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| project_id | BIGINT | PK, FK → video_projects | 연결 Project |
+| video_content_id | BIGINT | PK, FK → video_contents | 연결 영상 결과물 |
+| linked_at | DATETIME | NOT NULL | 연결 시각 |
+
+정책:
+
+- 복합 PK `PRIMARY KEY(project_id, video_content_id)`로 중복 연결을 차단합니다.
+- 하나의 Project는 0개 이상의 VideoContent와 연결할 수 있고 하나의 VideoContent는 1개 이상의 Project와 연결할 수 있습니다.
+- 양쪽 데이터는 반드시 같은 Workspace에 속해야 하며 서비스 계층에서 검증합니다.
+- VideoContent의 마지막 Project 연결은 해제할 수 없습니다. Project 논리 삭제는 연결 행을 제거하지 않으므로 별도로 허용합니다.
+
+## 6.5. video_content_primary_project_histories
+
+VideoContent의 대표 Project와 ProjectGroup별 성과 귀속이 변경된 사건을 보존합니다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| primary_project_history_id | BIGINT | PK | 대표 Project 변경 이력 ID |
+| video_content_id | BIGINT | FK → video_contents | 대상 영상 결과물 |
+| from_project_id | BIGINT | FK → video_projects, NULL | 이전 대표 Project, 최초 지정이면 NULL |
+| to_project_id | BIGINT | FK → video_projects | 새 대표 Project |
+| from_project_group_id | BIGINT | NULL | 변경 당시 이전 ProjectGroup ID 스냅샷 |
+| to_project_group_id | BIGINT | NULL | 변경 당시 새 ProjectGroup ID 스냅샷 |
+| change_reason | VARCHAR(255) | NULL | 변경 사유 |
+| changed_by_member_id | BIGINT | FK → workspace_members | 변경 사용자 |
+| changed_at | DATETIME | NOT NULL | 변경 시각 |
+
+ProjectGroup ID는 현재 귀속을 다시 계산하기 위한 FK가 아니라 변경 당시 성과 이동 범위를 설명하는 스냅샷입니다. 대표 변경과 이력 추가는 같은 트랜잭션에서 수행합니다.
+
+## 6.6. project_members
 
 Project에 참여하는 Workspace Member와 프로젝트 권한을 관리합니다.
 
@@ -396,6 +451,22 @@ Project에 참여하는 Workspace Member와 프로젝트 권한을 관리합니�
 - Project와 Workspace Member가 동일 Workspace에 속하는지는 서비스 계층에서 재검증합니다.
 - VIEW는 조회 및 채팅 가능, Project / Task 수정 불가입니다.
 - 현재 Project Owner에 해당하는 Project Member는 제거하거나 비활성화할 수 없으며 VIEW로 권한을 낮출 수도 없습니다. 소유권 이전을 먼저 완료해야 합니다.
+- LEFT 또는 REMOVED 멤버가 Workspace에 재참여해도 기존 Project Member 행을 자동 재활성화하지 않습니다.
+
+## 6.7. project_status_histories
+
+Project 상태 변경을 감사 가능한 업무 이력으로 보존합니다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| project_status_history_id | BIGINT | PK | 상태 변경 이력 ID |
+| project_id | BIGINT | FK → video_projects | 대상 Project |
+| from_status | VARCHAR(20) | NULL | 생성 전에는 NULL, 그 외 변경 전 상태 |
+| to_status | VARCHAR(20) | NOT NULL | 변경 후 상태 |
+| changed_by_member_id | BIGINT | FK → workspace_members | 변경 사용자 |
+| changed_at | DATETIME | NOT NULL | 변경 시각 |
+
+Project 생성 시 최초 상태도 `from_status=NULL`로 기록합니다. 상태는 양방향 변경을 허용하며 CANCELLED에서 재개하는 경우도 같은 이력으로 남깁니다.
 
 ---
 
@@ -651,14 +722,65 @@ Task의 `worker_amount`는 이미 Project 비용에 포함되므로 동일 금�
 
 # 11. YouTube 성과 도메인
 
-## 11.1. video_performances
+## 11.1. youtube_publications
 
-YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐츠 성과를 저장합니다.
+VideoContent가 YouTube에 실제로 게시된 개별 이력을 관리합니다. 같은 결과물을 수정하여 재업로드하거나 기존 게시물을 일부 공개로 돌린 경우에도 기존 행을 덮어쓰지 않습니다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| publication_id | BIGINT | PK | YouTube 게시물 ID |
+| workspace_id | BIGINT | FK → workspaces | 소속 Workspace |
+| video_content_id | BIGINT | FK → video_contents | 게시된 영상 결과물 |
+| channel_id | BIGINT | FK → channels | 실제 게시 Channel |
+| youtube_video_id | VARCHAR(64) | NOT NULL | 정규화한 YouTube Video ID |
+| lifecycle_status | VARCHAR(20) | NOT NULL | CURRENT / SUPERSEDED / REMOVED |
+| removal_reason | VARCHAR(20) | NULL | REMOVED 사유: UNAVAILABLE / INCORRECT |
+| superseded_by_publication_id | BIGINT | FK → youtube_publications, NULL | 이 게시물을 대체한 새 게시물 |
+| revenue_option | VARCHAR(20) | NOT NULL | DEFAULT / CUSTOM / DISABLED |
+| applied_revenue_per_view | DECIMAL(12,6) | NOT NULL | 게시물별 조회수 1회당 적용 단가 스냅샷 |
+| published_at | DATETIME | NULL | 실제 게시 일시 |
+| created_at | DATETIME | NOT NULL | 등록 시각 |
+
+정책:
+
+- `UNIQUE(workspace_id, youtube_video_id)`로 같은 Workspace의 중복 등록을 차단합니다.
+- 처음 등록할 때 대표 Project의 담당 Channel을 기본값으로 제안하지만 실제 `channel_id`는 사용자가 선택한 게시 Channel을 저장합니다.
+- 같은 VideoContent는 0개 이상의 YouTubePublication을 가질 수 있으며 재업로드는 기존 행 수정이 아닌 새 행 추가로 처리합니다.
+- 같은 `video_content_id`와 `channel_id` 조합에는 CURRENT 게시물을 최대 하나만 허용합니다. 조건부 UNIQUE를 지원하지 않는 데이터베이스에서는 같은 조합의 행을 잠근 뒤 서비스 계층에서 재검증하며 가능한 경우 생성 컬럼 또는 부분 UNIQUE 인덱스를 보조로 사용합니다.
+- `superseded_by_publication_id`는 같은 Workspace, VideoContent와 Channel의 다른 게시물만 참조할 수 있고 자기 자신과 순환 관계를 허용하지 않습니다.
+- SUPERSEDED는 유효한 대체 게시물 관계가 있어야 합니다. 같은 Channel에 새 게시물을 추가해도 사용자가 대체를 명시하지 않으면 기존 CURRENT 상태를 자동 변경하지 않습니다.
+- REMOVED는 `removal_reason`이 필수이며 UNAVAILABLE은 누적 집계에 포함하고 INCORRECT는 모든 집계에서 제외합니다. CURRENT와 SUPERSEDED의 `removal_reason`은 NULL입니다.
+- SUPERSEDED와 REMOVED는 명시적 복원으로 CURRENT가 될 수 있습니다. 다른 CURRENT가 있으면 교체 확인 후 상태, 대체 관계와 이력을 한 트랜잭션에서 갱신합니다.
+- `DEFAULT`는 게시 Channel과 VideoContent 영상 유형에 맞는 Channel 기본 단가를 스냅샷하고, `DISABLED`는 적용 단가를 0으로 저장합니다.
+- 실제 게시물 삭제나 공개 범위 변경과 YMS 내부 행의 물리 삭제를 동일하게 취급하지 않습니다. 외부 API 오류나 영상 없음 응답만으로 생명주기 상태를 자동 변경하지 않고 마지막 성공값을 유지합니다.
+
+## 11.2. youtube_publication_status_histories
+
+게시물 생명주기, 종료 사유와 대체 관계가 변경된 업무 사건을 보존합니다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| publication_status_history_id | BIGINT | PK | 게시물 상태 변경 이력 ID |
+| publication_id | BIGINT | FK → youtube_publications | 대상 게시물 |
+| from_status | VARCHAR(20) | NULL | 이전 상태, 최초 생성이면 NULL |
+| to_status | VARCHAR(20) | NOT NULL | 변경 상태 |
+| from_removal_reason | VARCHAR(20) | NULL | 변경 전 REMOVED 사유 |
+| to_removal_reason | VARCHAR(20) | NULL | 변경 후 REMOVED 사유 |
+| related_publication_id | BIGINT | FK → youtube_publications, NULL | 대체 또는 복원에 관련된 게시물 |
+| change_reason | VARCHAR(255) | NULL | 사용자 입력 또는 시스템 기록 사유 |
+| changed_by_member_id | BIGINT | FK → workspace_members | 변경 사용자 |
+| changed_at | DATETIME | NOT NULL | 변경 시각 |
+
+현재 `superseded_by_publication_id`는 활성 대체 관계만 나타내며 과거 A → B → A 같은 전환은 이력 테이블로 재구성합니다. 이력은 조회수 스냅샷이 아니라 상태 변경 사건만 기록합니다.
+
+## 11.3. video_performances
+
+YouTube API에서 마지막으로 성공적으로 동기화한 YouTubePublication의 콘텐츠 성과를 저장합니다.
 
 | 컬럼 | 타입 | 제약 | 설명 |
 | --- | --- | --- | --- |
 | video_performance_id | BIGINT | PK | 성과 ID |
-| project_id | BIGINT | FK → video_projects, UNIQUE | 연결 Project |
+| publication_id | BIGINT | FK → youtube_publications, UNIQUE | 연결 YouTube 게시물 |
 | view_count | BIGINT | NOT NULL | 최신 누적 조회수 |
 | like_count | BIGINT | NULL | 최신 좋아요 수 |
 | comment_count | BIGINT | NULL | 최신 댓글 수 |
@@ -672,12 +794,21 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 ```text
 예상 YouTube 플랫폼 수익
 = video_performances.view_count
-× video_projects.applied_revenue_per_view
+× youtube_publications.applied_revenue_per_view
 ```
 
 따라서 기존 설계의 `calculated_revenue` 컬럼은 제거합니다.
 
 조회수 변화 이력 그래프가 필요해질 경우 초기 테이블을 비대하게 만들지 않고 향후 `video_performance_snapshots`를 별도로 추가합니다.
+
+집계 정책:
+
+- 현재 성과는 CURRENT 게시물의 마지막 성공값을 합산합니다.
+- 누적 게시 성과는 CURRENT, SUPERSEDED와 REMOVED / UNAVAILABLE의 마지막 성공값을 합산합니다.
+- REMOVED / INCORRECT는 모든 집계에서 제외합니다.
+- 성공한 성과 행이 없는 게시물은 0이 아니라 미집계로 취급합니다.
+- 예상 플랫폼 수익은 게시물별 `view_count × applied_revenue_per_view`를 계산한 뒤 합산합니다.
+- 합계와 함께 COMPLETE / PARTIAL / UNAVAILABLE 집계 상태, 포함·미집계 게시물 수와 게시물별 마지막 성공 시각을 제공합니다. 초기에는 마지막 성공 시각에 대한 임의의 만료 기간을 두지 않습니다.
 
 ---
 
@@ -690,6 +821,11 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 - Project의 `channel_id`
 - Project의 `project_group_id`
 - Project의 `owner_member_id`
+- VideoContent의 `primary_project_id`
+- ProjectVideoContent의 `project_id`와 `video_content_id`
+- VideoContentPrimaryProjectHistory의 이전·새 Project와 ProjectGroup 스냅샷
+- YouTubePublication의 `video_content_id`, `channel_id`와 `superseded_by_publication_id`
+- YouTubePublicationStatusHistory의 게시물, 대체 게시물과 변경자
 - Project Member의 `workspace_member_id`
 - Task의 `task_type_id`
 - Expense / Revenue의 Channel / ProjectGroup / Project 대상
@@ -701,15 +837,17 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 
 - `users.email`
 - `user_roles(user_id, role_name)`
-- `creator_revenue_settings.user_id`
 - `workspace_members(workspace_id, user_id)`
 - `channels(workspace_id, youtube_channel_id)`
 - `task_types(workspace_id, name)`
-- `video_projects(workspace_id, youtube_video_id)`
+- `project_video_contents(project_id, video_content_id)`
+- `youtube_publications(workspace_id, youtube_video_id)`
 - `project_members(project_id, workspace_member_id)`
 - `chat_room_reads.project_member_id`
 - `settlement_items.project_task_id`
-- `video_performances.project_id`
+- `video_performances.publication_id`
+
+동일한 `video_content_id`, `channel_id` 조합에는 `lifecycle_status = 'CURRENT'`인 행을 최대 하나만 허용합니다. 지원 DBMS에서는 조건부 UNIQUE 인덱스로 강제하고, 그렇지 않으면 동일 조합을 잠근 뒤 서비스 계층에서 검증합니다.
 
 ## 12.3. 권장 조회 인덱스
 
@@ -719,6 +857,12 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 - `video_projects(workspace_id, status, archived_at)`
 - `video_projects(channel_id, status)`
 - `video_projects(project_group_id, status)`
+- `video_contents(workspace_id, primary_project_id)`
+- `project_video_contents(video_content_id, project_id)`
+- `video_content_primary_project_histories(video_content_id, changed_at)`
+- `youtube_publications(video_content_id, channel_id, lifecycle_status)`
+- `youtube_publications(channel_id, published_at)`
+- `youtube_publication_status_histories(publication_id, changed_at)`
 - `project_tasks(project_id, status)`
 - `project_tasks(assignee_project_member_id, end_date, status)`
 - `chat_messages(project_id, chat_message_id)`
@@ -737,6 +881,7 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 - Project가 연결된 ProjectGroup은 상태를 COMPLETED / CANCELLED로 변경하고 즉시 물리 삭제하지 않습니다.
 - Settlement Item이 연결된 Task는 물리 삭제하지 않습니다.
 - Project는 Task, Chat, Expense, Revenue 이력을 보존하기 위해 논리 삭제합니다.
+- 삭제 Project가 VideoContent의 마지막 활성 연결이면 역사적 대표 Project 참조와 연결을 유지하며, 대표 변경 및 게시물 생명주기 이력은 물리 삭제하지 않습니다.
 - Expense / Revenue의 잘못된 입력은 삭제 대신 VOIDED 처리합니다.
 - Workspace 삭제 시 하위 데이터를 연쇄 삭제하지 않고 Workspace 자체를 논리 삭제합니다.
 - 단순 읽음 상태나 재생성 가능한 보조 데이터처럼 명확히 안전한 경우에만 개별적으로 CASCADE 적용을 검토합니다.
@@ -752,7 +897,6 @@ YouTube API에서 마지막으로 성공적으로 동기화한 Project의 콘텐
 ```mermaid
 erDiagram
     USERS ||--o{ USER_ROLES : has
-    USERS ||--o| CREATOR_REVENUE_SETTINGS : configures
     USERS ||--o{ WORKSPACE_MEMBERS : joins
     WORKSPACES ||--o{ WORKSPACE_MEMBERS : contains
     WORKSPACES ||--o{ WORKSPACE_INVITATIONS : issues
@@ -762,13 +906,20 @@ erDiagram
     WORKSPACES ||--o{ TASK_TYPES : defines
     WORKSPACES ||--o{ PROJECT_GROUPS : owns
     WORKSPACES ||--o{ VIDEO_PROJECTS : owns
+    WORKSPACES ||--o{ VIDEO_CONTENTS : owns
 
     CHANNELS ||--o{ VIDEO_PROJECTS : contains
     PROJECT_GROUPS o|--o{ VIDEO_PROJECTS : groups
     WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : owns
 
     VIDEO_PROJECTS ||--o{ PROJECT_MEMBERS : has
+    VIDEO_PROJECTS ||--o{ PROJECT_VIDEO_CONTENTS : contributes
+    VIDEO_CONTENTS ||--|{ PROJECT_VIDEO_CONTENTS : built_from
+    VIDEO_PROJECTS ||--o{ VIDEO_CONTENTS : primarily_attributes
+    VIDEO_CONTENTS ||--o{ VIDEO_CONTENT_PRIMARY_PROJECT_HISTORIES : records_primary_changes
+    VIDEO_PROJECTS ||--o{ PROJECT_STATUS_HISTORIES : changes
     WORKSPACE_MEMBERS ||--o{ PROJECT_MEMBERS : participates
+    WORKSPACE_MEMBERS ||--o{ PROJECT_STATUS_HISTORIES : records
     VIDEO_PROJECTS ||--o{ PROJECT_TASKS : contains
     PROJECT_MEMBERS ||--o{ PROJECT_TASKS : assigned
     TASK_TYPES ||--o{ PROJECT_TASKS : classifies
@@ -794,7 +945,10 @@ erDiagram
     SETTLEMENTS ||--o{ SETTLEMENT_ITEMS : contains
     PROJECT_TASKS ||--o| SETTLEMENT_ITEMS : settled_as
 
-    VIDEO_PROJECTS ||--o| VIDEO_PERFORMANCES : measures
+    VIDEO_CONTENTS ||--o{ YOUTUBE_PUBLICATIONS : published_as
+    CHANNELS ||--o{ YOUTUBE_PUBLICATIONS : publishes
+    YOUTUBE_PUBLICATIONS ||--o{ YOUTUBE_PUBLICATION_STATUS_HISTORIES : records_status_changes
+    YOUTUBE_PUBLICATIONS ||--o| VIDEO_PERFORMANCES : measures
 ```
 
 ---
@@ -817,13 +971,6 @@ erDiagram
         bigint user_id FK
         varchar role_name
         boolean is_active
-    }
-
-    CREATOR_REVENUE_SETTINGS {
-        bigint creator_revenue_setting_id PK
-        bigint user_id FK,UK
-        decimal long_form_rate
-        decimal short_form_rate
     }
 
     WORKSPACES {
@@ -855,7 +1002,6 @@ erDiagram
     }
 
     USERS ||--o{ USER_ROLES : has
-    USERS ||--o| CREATOR_REVENUE_SETTINGS : configures
     USERS ||--o{ WORKSPACE_MEMBERS : joins
     WORKSPACES ||--o{ WORKSPACE_MEMBERS : contains
     WORKSPACES ||--o{ WORKSPACE_INVITATIONS : issues
@@ -884,6 +1030,8 @@ erDiagram
         varchar name
         varchar youtube_channel_id
         varchar integration_status
+        decimal long_form_rate
+        decimal short_form_rate
     }
 
     PROJECT_GROUPS {
@@ -905,15 +1053,53 @@ erDiagram
         bigint owner_member_id FK
         bigint created_by_member_id FK
         varchar title
-        varchar video_type
+        varchar default_video_type
         varchar status
-        varchar youtube_video_id
-        decimal applied_revenue_per_view
         date due_date
         date planned_upload_date
-        datetime uploaded_at
         datetime created_at
+        datetime updated_at
+        bigint archived_by_member_id FK
         datetime archived_at
+        bigint deleted_by_member_id FK
+        datetime deleted_at
+    }
+
+    VIDEO_CONTENTS {
+        bigint video_content_id PK
+        bigint workspace_id FK
+        bigint primary_project_id FK
+        varchar title
+        varchar video_type
+        datetime created_at
+        datetime deleted_at
+    }
+
+    PROJECT_VIDEO_CONTENTS {
+        bigint project_id PK,FK
+        bigint video_content_id PK,FK
+        datetime linked_at
+    }
+
+    VIDEO_CONTENT_PRIMARY_PROJECT_HISTORIES {
+        bigint primary_project_history_id PK
+        bigint video_content_id FK
+        bigint from_project_id FK
+        bigint to_project_id FK
+        bigint from_project_group_id
+        bigint to_project_group_id
+        varchar change_reason
+        bigint changed_by_member_id FK
+        datetime changed_at
+    }
+
+    PROJECT_STATUS_HISTORIES {
+        bigint project_status_history_id PK
+        bigint project_id FK
+        varchar from_status
+        varchar to_status
+        bigint changed_by_member_id FK
+        datetime changed_at
     }
 
     PROJECT_MEMBERS {
@@ -947,14 +1133,24 @@ erDiagram
     WORKSPACES ||--o{ CHANNELS : owns
     WORKSPACES ||--o{ PROJECT_GROUPS : owns
     WORKSPACES ||--o{ VIDEO_PROJECTS : owns
+    WORKSPACES ||--o{ VIDEO_CONTENTS : owns
     WORKSPACES ||--o{ TASK_TYPES : defines
     CHANNELS ||--o{ VIDEO_PROJECTS : contains
     PROJECT_GROUPS o|--o{ VIDEO_PROJECTS : groups
     WORKSPACE_MEMBERS ||--o{ PROJECT_GROUPS : creates
     WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : owns
     WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : creates
+    WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : archives
+    WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : deletes
     VIDEO_PROJECTS ||--o{ PROJECT_MEMBERS : has
+    VIDEO_PROJECTS ||--o{ PROJECT_VIDEO_CONTENTS : contributes
+    VIDEO_CONTENTS ||--|{ PROJECT_VIDEO_CONTENTS : built_from
+    VIDEO_PROJECTS ||--o{ VIDEO_CONTENTS : primarily_attributes
+    VIDEO_CONTENTS ||--o{ VIDEO_CONTENT_PRIMARY_PROJECT_HISTORIES : records_primary_changes
+    WORKSPACE_MEMBERS ||--o{ VIDEO_CONTENT_PRIMARY_PROJECT_HISTORIES : records
+    VIDEO_PROJECTS ||--o{ PROJECT_STATUS_HISTORIES : changes
     WORKSPACE_MEMBERS ||--o{ PROJECT_MEMBERS : participates
+    WORKSPACE_MEMBERS ||--o{ PROJECT_STATUS_HISTORIES : records
     VIDEO_PROJECTS ||--o{ PROJECT_TASKS : contains
     PROJECT_MEMBERS ||--o{ PROJECT_TASKS : assigned
     TASK_TYPES ||--o{ PROJECT_TASKS : classifies
@@ -1106,19 +1302,66 @@ erDiagram
     PROJECT_TASKS ||--o| SETTLEMENT_ITEMS : settled_as
 ```
 
-## 14.5. YouTube Performance
+## 14.5. VideoContent 및 YouTube Performance
 
 ```mermaid
 erDiagram
     VIDEO_PROJECTS {
         bigint project_id PK
+        bigint workspace_id FK
+        bigint channel_id FK
+        varchar default_video_type
+    }
+
+    VIDEO_CONTENTS {
+        bigint video_content_id PK
+        bigint workspace_id FK
+        bigint primary_project_id FK
+        varchar title
+        varchar video_type
+    }
+
+    PROJECT_VIDEO_CONTENTS {
+        bigint project_id PK,FK
+        bigint video_content_id PK,FK
+        datetime linked_at
+    }
+
+    CHANNELS {
+        bigint channel_id PK
+        bigint workspace_id FK
+    }
+
+    YOUTUBE_PUBLICATIONS {
+        bigint publication_id PK
+        bigint workspace_id FK
+        bigint video_content_id FK
+        bigint channel_id FK
         varchar youtube_video_id
+        varchar lifecycle_status
+        varchar removal_reason
+        bigint superseded_by_publication_id FK
+        varchar revenue_option
         decimal applied_revenue_per_view
+        datetime published_at
+    }
+
+    YOUTUBE_PUBLICATION_STATUS_HISTORIES {
+        bigint publication_status_history_id PK
+        bigint publication_id FK
+        varchar from_status
+        varchar to_status
+        varchar from_removal_reason
+        varchar to_removal_reason
+        bigint related_publication_id FK
+        bigint changed_by_member_id FK
+        varchar change_reason
+        datetime changed_at
     }
 
     VIDEO_PERFORMANCES {
         bigint video_performance_id PK
-        bigint project_id FK,UK
+        bigint publication_id FK,UK
         bigint view_count
         bigint like_count
         bigint comment_count
@@ -1127,7 +1370,13 @@ erDiagram
         datetime last_success_at
     }
 
-    VIDEO_PROJECTS ||--o| VIDEO_PERFORMANCES : measures
+    VIDEO_PROJECTS ||--o{ PROJECT_VIDEO_CONTENTS : contributes
+    VIDEO_CONTENTS ||--|{ PROJECT_VIDEO_CONTENTS : built_from
+    VIDEO_PROJECTS ||--o{ VIDEO_CONTENTS : primarily_attributes
+    VIDEO_CONTENTS ||--o{ YOUTUBE_PUBLICATIONS : published_as
+    CHANNELS ||--o{ YOUTUBE_PUBLICATIONS : publishes
+    YOUTUBE_PUBLICATIONS ||--o{ YOUTUBE_PUBLICATION_STATUS_HISTORIES : records_status_changes
+    YOUTUBE_PUBLICATIONS ||--o| VIDEO_PERFORMANCES : measures
 ```
 
 ---
@@ -1182,15 +1431,29 @@ ROI = (실제 수익 - 실제 비용) ÷ 실제 비용 × 100
 
 실제 비용이 0원인 경우 ROI는 계산하지 않습니다.
 
-## YouTube 예상 플랫폼 수익
+## YouTube 콘텐츠 성과와 예상 플랫폼 수익
 
 ```text
-예상 플랫폼 수익
-= 최신 view_count
-× Project의 applied_revenue_per_view
+현재 성과
+= CURRENT 게시물의 마지막 성공 성과 합계
+
+누적 게시 성과
+= CURRENT 게시물의 마지막 성공 성과
++ SUPERSEDED 게시물의 마지막 성공 성과
++ REMOVED / UNAVAILABLE 게시물의 마지막 성공 성과
+
+현재 또는 누적 예상 플랫폼 수익
+= 집계 대상 게시물별 (
+    마지막 성공 view_count
+    × YouTubePublication의 applied_revenue_per_view
+  ) 합계
 ```
 
-예상 플랫폼 수익은 실제 Revenue가 아니며 실제 ROI 계산에 포함하지 않습니다.
+REMOVED / INCORRECT 게시물은 현재·누적 집계에서 모두 제외합니다. 한 번도 동기화에 성공하지 않은 게시물은 0이 아니라 미집계로 처리하고, 합계와 함께 COMPLETE / PARTIAL / UNAVAILABLE 상태 및 포함·미집계 게시물 수를 제공합니다. 마지막 성공값에는 임의의 만료 기간을 적용하지 않으며 마지막 성공 시각, 마지막 시도 시각과 오류를 함께 표시합니다.
+
+예상 플랫폼 수익은 실제 Revenue가 아니며 실제 ROI 계산에 포함하지 않습니다. 조회수, 좋아요, 댓글과 예상 플랫폼 수익은 같은 현재·누적 게시물 포함 기준을 사용합니다.
+
+Project 및 ProjectGroup별 콘텐츠 성과와 예상 플랫폼 수익은 `video_contents.primary_project_id`를 통해서만 집계합니다. 같은 VideoContent에 여러 Project가 연결되어 있어도 성과를 각 Project에 반복 합산하지 않습니다. 연결된 다른 Project 상세에서는 해당 결과물과 게시물의 성과를 참고 정보로 조회할 수 있습니다.
 
 ---
 
@@ -1199,7 +1462,10 @@ ROI = (실제 수익 - 실제 비용) ÷ 실제 비용 × 100
 초기 블로그 설계와 비교한 핵심 변경은 다음과 같습니다.
 
 - `users → project` 중심 구조에서 **Workspace 중심 구조**로 변경
-- `user_channel_config`를 제거하고 개인 기본 단가를 `creator_revenue_settings`로 분리
+- 개인별 수익 단가 설정을 제거하고 Channel별 롱폼·쇼츠 기본 단가로 이동
+- 제작 과정인 Project와 완성 영상 결과물인 `video_contents`, 실제 YouTube 업로드인 `youtube_publications`를 분리
+- Project와 VideoContent를 `project_video_contents` 다대다 관계로 변경하여 분할 제작과 합본 제작을 모두 표현
+- 재업로드는 기존 Video ID 교체가 아니라 동일 VideoContent의 새 YouTubePublication으로 보존
 - 실제 Channel 엔티티인 `channels` 추가
 - Workspace 권한을 위한 `workspace_members` 추가
 - 미가입 사용자 초대를 포함한 `workspace_invitations` 추가
@@ -1222,7 +1488,7 @@ ROI = (실제 수익 - 실제 비용) ÷ 실제 비용 × 100
 - 모든 테이블에 일괄 적용하던 감사 / Soft Delete 컬럼 정책을 데이터 성격에 따라 분리
 - ProjectGroup / Project의 최초 생성자와 생성 시각을 업무 발생 정보로 보존
 - Project Owner와 Project Member의 정합성 및 소유권 이전 순서 명시
-- YouTube Video ID 중복 범위를 전역이 아닌 Workspace 단위로 제한
+- YouTube Video ID 중복 범위를 `youtube_publications`의 Workspace 단위로 제한
 - Expense / Revenue는 물리 삭제 대신 ACTIVE / VOIDED 상태로 관리
 - Settlement 집계 기간의 기준을 Task `completed_at`으로 확정
 - 핵심 업무 FK의 기본 삭제 정책을 RESTRICT / NO ACTION으로 명시

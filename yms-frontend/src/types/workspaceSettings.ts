@@ -19,6 +19,14 @@ export type WorkspaceChannel = ChannelSummary & {
     description: string | null;
     integrationStatus: ChannelIntegrationStatus;
     active: boolean;
+    longFormRate: string;
+    shortFormRate: string;
+};
+
+// 일반 업무 화면의 Channel 응답은 관리자 전용 기본 단가를 생략합니다.
+export type WorkspaceChannelListItem = Omit<WorkspaceChannel, 'longFormRate' | 'shortFormRate'> & {
+    longFormRate?: string;
+    shortFormRate?: string;
 };
 
 // 제작팀에서 자유롭게 확장하는 작업 종류 정보입니다.
@@ -42,6 +50,7 @@ export type WorkspaceMember = {
     status: WorkspaceMemberStatus;
     joinedAt: string;
     leftAt: string | null;
+    ownedProjectCount: number;
 };
 
 // 제작팀이 발송한 초대 내역입니다. EXPIRED는 PENDING과 만료 시각으로 계산합니다.
