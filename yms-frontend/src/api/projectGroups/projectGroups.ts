@@ -23,6 +23,7 @@ import {
     sumMoney
 } from '../../utils/decimal';
 import { readDeletedProjectFinanceByGroup, readProjects } from '../projects/projectStore';
+import { requiresContentPerformanceMoveConfirmation } from '../projects/projectGroupChangePolicy';
 
 export type ProjectGroupListRequest = {
     status?: ProjectGroupStatus | 'ALL';
@@ -37,6 +38,7 @@ export type SaveProjectGroupRequest = {
     startDate?: string | null;
     endDate?: string | null;
     projectIds?: number[];
+    confirmContentPerformanceMove?: boolean;
 };
 
 export type UpdateProjectGroupRequest = SaveProjectGroupRequest & {
@@ -48,6 +50,13 @@ type ProjectGroupDetailResponse = ApiResponse<ProjectGroupDetail>;
 type ProjectGroupMutationResponse = ApiResponse<ProjectGroupDetail>;
 type ProjectGroupDeleteResponse = ApiResponse<{ projectGroupId: number }>;
 type ProjectListResponse = ApiResponse<ProjectGroupProject[]>;
+type AddProjectsToProjectGroupRequest = {
+    projectIds: number[];
+    confirmContentPerformanceMove?: boolean;
+};
+type ProjectGroupContentMoveConfirmationRequest = {
+    confirmContentPerformanceMove?: boolean;
+};
 
 type ProjectGroupMockScenario = 'SUCCESS' | 'EMPTY' | 'SERVER_ERROR';
 
@@ -320,6 +329,23 @@ export async function createWorkspaceProjectGroup(
         };
     }
 
+    const requestedProjects = readProjects().filter(project => (
+        project.workspaceId === workspaceId
+        && requestedProjectIds.includes(project.projectId)
+    ));
+    if (
+        requiresContentPerformanceMoveConfirmation(requestedProjects, 'NEW')
+        && !request.confirmContentPerformanceMove
+    ) {
+        return {
+            success: false,
+            errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED',
+            message: '프로젝트 그룹을 만들고 연결하면 선택한 프로젝트의 콘텐츠 성과가 새 그룹에 집계됩니다.',
+            errors: null
+        };
+    }
+
+    // 모든 연결 대상 검증을 마친 뒤 그룹 생성과 일괄 연결을 연속해서 반영합니다.
     const group = insertProjectGroup({
         workspaceId,
         ...validation.normalized,
@@ -443,7 +469,7 @@ export async function getUngroupedProjects(
 export async function addProjectsToProjectGroup(
     workspaceId: number,
     projectGroupId: number,
-    projectIds: number[]
+    request: AddProjectsToProjectGroupRequest
 ): Promise<ProjectGroupMutationResponse> {
     await waitForMockResponse();
     const group = readProjectGroup(workspaceId, projectGroupId);
@@ -469,7 +495,7 @@ export async function addProjectsToProjectGroup(
     const availableIds = new Set(
         readUngroupedProjects(workspaceId).map(project => project.projectId)
     );
-    if (projectIds.some(projectId => !availableIds.has(projectId))) {
+    if (request.projectIds.some(projectId => !availableIds.has(projectId))) {
         return {
             success: false,
             errorCode: 'PROJECT_ALREADY_GROUPED',
@@ -478,7 +504,24 @@ export async function addProjectsToProjectGroup(
         };
     }
 
-    attachProjects(projectGroupId, projectIds);
+    const requestedProjects = readProjects().filter(project => (
+        project.workspaceId === workspaceId
+        && request.projectIds.includes(project.projectId)
+    ));
+    if (
+        requiresContentPerformanceMoveConfirmation(requestedProjects, projectGroupId)
+        && !request.confirmContentPerformanceMove
+    ) {
+        return {
+            success: false,
+            errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED',
+            message: '프로젝트를 연결하면 해당 콘텐츠 성과가 이 프로젝트 그룹에 집계됩니다.',
+            errors: null
+        };
+    }
+
+    // 일괄 대상 전체의 검증이 성공한 뒤 한 번에 연결하여 부분 적용을 방지합니다.
+    attachProjects(projectGroupId, request.projectIds);
     const updatedGroup = readProjectGroup(workspaceId, projectGroupId);
     return {
         success: true,
@@ -491,7 +534,8 @@ export async function addProjectsToProjectGroup(
 export async function removeProjectFromProjectGroup(
     workspaceId: number,
     projectGroupId: number,
-    projectId: number
+    projectId: number,
+    request: ProjectGroupContentMoveConfirmationRequest = {}
 ): Promise<ProjectGroupMutationResponse> {
     await waitForMockResponse();
     const group = readProjectGroup(workspaceId, projectGroupId);
@@ -504,6 +548,24 @@ export async function removeProjectFromProjectGroup(
             success: false,
             errorCode: 'PROJECT_NOT_FOUND',
             message: '현재 프로젝트 그룹에서 프로젝트를 찾을 수 없습니다.',
+            errors: null
+        };
+    }
+
+    const storedProject = readProjects().find(item => (
+        item.workspaceId === workspaceId
+        && item.projectId === projectId
+        && item.projectGroupId === projectGroupId
+    ));
+    if (
+        storedProject
+        && requiresContentPerformanceMoveConfirmation([storedProject], null)
+        && !request.confirmContentPerformanceMove
+    ) {
+        return {
+            success: false,
+            errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED',
+            message: '프로젝트 그룹 연결을 해제하면 해당 콘텐츠 성과가 이 그룹의 집계에서 제외됩니다.',
             errors: null
         };
     }

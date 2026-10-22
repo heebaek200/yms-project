@@ -640,7 +640,7 @@ function ProjectGroupPage() {
         try {
             setGroupErrors({});
             setModalError(null);
-            const response = detail
+            let response = detail
                 ? await updateWorkspaceProjectGroup(
                     currentWorkspace.workspaceId,
                     detail.projectGroupId,
@@ -650,6 +650,24 @@ function ProjectGroupPage() {
                     currentWorkspace.workspaceId,
                     groupForm
                 );
+
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+            // 새 그룹 연결로 콘텐츠 성과가 이동할 때만 확인한 뒤 생성 요청을 다시 보냅니다.
+            if (
+                !detail
+                && !response.success
+                && response.errorCode === 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED'
+            ) {
+                if (!window.confirm(`${response.message}\n\n계속 만들까요?`)) {
+                    return;
+                }
+                response = await createWorkspaceProjectGroup(
+                    currentWorkspace.workspaceId,
+                    { ...groupForm, confirmContentPerformanceMove: true }
+                );
+            }
 
             if (!isCurrentViewContext(requestContextKey)) {
                 return;
@@ -720,11 +738,29 @@ function ProjectGroupPage() {
         const requestContextKey = activeViewContextRef.current;
         try {
             setModalError(null);
-            const response = await addProjectsToProjectGroup(
+            let response = await addProjectsToProjectGroup(
                 currentWorkspace.workspaceId,
                 detail.projectGroupId,
-                groupForm.projectIds
+                { projectIds: groupForm.projectIds }
             );
+
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+            // 일괄 연결 전체를 재시도하여 확인 전 일부 Project만 연결되는 상황을 막습니다.
+            if (!response.success && response.errorCode === 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED') {
+                if (!window.confirm(`${response.message}\n\n계속 연결할까요?`)) {
+                    return;
+                }
+                response = await addProjectsToProjectGroup(
+                    currentWorkspace.workspaceId,
+                    detail.projectGroupId,
+                    {
+                        projectIds: groupForm.projectIds,
+                        confirmContentPerformanceMove: true
+                    }
+                );
+            }
 
             if (!isCurrentViewContext(requestContextKey)) {
                 return;
@@ -769,11 +805,26 @@ function ProjectGroupPage() {
 
         const requestContextKey = activeViewContextRef.current;
         try {
-            const response = await removeProjectFromProjectGroup(
+            let response = await removeProjectFromProjectGroup(
                 currentWorkspace.workspaceId,
                 detail.projectGroupId,
                 project.projectId
             );
+            if (!isCurrentViewContext(requestContextKey)) {
+                return;
+            }
+            // 콘텐츠 성과도 그룹 집계에서 빠질 때는 그 영향을 별도로 확인하고 재시도합니다.
+            if (!response.success && response.errorCode === 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED') {
+                if (!window.confirm(`${response.message}\n\n계속 연결을 해제할까요?`)) {
+                    return;
+                }
+                response = await removeProjectFromProjectGroup(
+                    currentWorkspace.workspaceId,
+                    detail.projectGroupId,
+                    project.projectId,
+                    { confirmContentPerformanceMove: true }
+                );
+            }
             if (!isCurrentViewContext(requestContextKey)) {
                 return;
             }

@@ -32,6 +32,7 @@ type ChangePrimaryProjectRequest = {
 };
 
 const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
+const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com']);
 let nextVideoContentId = 102;
 let nextPublicationId = 1003;
 
@@ -42,11 +43,16 @@ function normalizeVideoId(value: string): string | null {
 
     try {
         const url = new URL(trimmed);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+
+        const pathParts = url.pathname.split('/').filter(Boolean);
         const id = url.hostname === 'youtu.be'
-            ? url.pathname.split('/').filter(Boolean)[0]
-            : url.pathname.startsWith('/shorts/')
-                ? url.pathname.split('/')[2]
-                : url.searchParams.get('v');
+            ? pathParts.length === 1 ? pathParts[0] : null
+            : YOUTUBE_HOSTS.has(url.hostname) && url.pathname === '/watch'
+                ? url.searchParams.get('v')
+                : YOUTUBE_HOSTS.has(url.hostname) && pathParts.length === 2 && pathParts[0] === 'shorts'
+                    ? pathParts[1]
+                    : null;
         return id && VIDEO_ID_PATTERN.test(id) ? id : null;
     } catch {
         return null;
@@ -187,7 +193,13 @@ export async function createYouTubePublication(
         publication.channelId === channel.channelId
         && publication.lifecycleStatus === 'CURRENT'
     ));
-    if (current && request.supersedesPublicationId !== current.publicationId) {
+    if (
+        request.supersedesPublicationId != null
+        && request.supersedesPublicationId !== current?.publicationId
+    ) {
+        return { success: false, errorCode: 'INVALID_PUBLICATION_REPLACEMENT', message: '대체할 게시 중 영상을 다시 확인해 주세요.', errors: null };
+    }
+    if (current && request.supersedesPublicationId == null) {
         return { success: false, errorCode: 'CURRENT_PUBLICATION_EXISTS', message: `${channel.name}에는 게시 중인 영상이 있습니다. 기존 게시물을 대체할지 확인해 주세요.`, errors: null };
     }
 

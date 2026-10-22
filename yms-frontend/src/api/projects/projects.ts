@@ -26,6 +26,7 @@ import {
     toProjectDetailResponse,
     toProjectListItemResponse
 } from './projectResponses';
+import { requiresContentPerformanceMoveConfirmation } from './projectGroupChangePolicy';
 
 export type ProjectListRequest = {
     view?: 'active' | 'archived';
@@ -218,11 +219,10 @@ export async function updateWorkspaceProject(workspaceId: number, projectId: num
         request.projectGroupId !== project.projectGroupId
     )) return { success: false, errorCode: 'PROJECT_GROUP_EDIT_FORBIDDEN', message: '프로젝트 그룹은 제작팀 소유자 또는 관리자만 변경할 수 있습니다.', errors: null };
 
-    const contentPerformanceMoves = request.projectGroupId !== project.projectGroupId
-        && project.videoContents.some(videoContent => (
-            videoContent.primaryProjectId === projectId
-            && videoContent.cumulativePerformance.includedPublicationCount > 0
-        ));
+    const contentPerformanceMoves = requiresContentPerformanceMoveConfirmation(
+        [project],
+        request.projectGroupId ?? null
+    );
     if (contentPerformanceMoves && !request.confirmContentPerformanceMove) {
         return { success: false, errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED', message: '프로젝트 그룹을 변경하면 이 프로젝트가 성과 집계 대상인 영상 결과물의 콘텐츠 성과도 이동합니다.', errors: null };
     }

@@ -829,7 +829,8 @@ POST /api/workspaces/{workspaceId}/project-groups
   "description": "롱폼 1편 + Shorts 2편",
   "startDate": "2026-09-01",
   "endDate": "2026-09-30",
-  "projectIds": [12, 13, 14]
+  "projectIds": [12, 13, 14],
+  "confirmContentPerformanceMove": true
 }
 ~~~
 
@@ -840,8 +841,9 @@ POST /api/workspaces/{workspaceId}/project-groups
 - name: 필수, 앞뒤 공백 제거 후 1자 이상 150자 이하
 - 같은 Workspace에서 앞뒤 공백을 제거하고 영문 대소문자를 구분하지 않은 이름 중복 → 409
 - projectIds: 선택, 같은 Workspace에 속하고 아직 다른 ProjectGroup에 연결되지 않은 Project만 허용
+- confirmContentPerformanceMove: 선택 Project가 대표인 VideoContent의 콘텐츠 성과를 새 그룹으로 이동하는 경우의 명시적 확인값
 
-생성 상태는 PLANNING입니다.
+생성 상태는 PLANNING입니다. 콘텐츠 성과 이동이 필요한데 확인값이 없으면 `409 CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED`를 반환하며 ProjectGroup을 생성하지 않습니다. 여러 Project를 선택한 경우 모든 대상을 먼저 검증하고 ProjectGroup 생성과 연결을 한 번에 반영하여 부분 적용을 금지합니다.
 
 ## 7.3. ProjectGroup 상세
 
@@ -886,19 +888,24 @@ POST /api/workspaces/{workspaceId}/project-groups/{projectGroupId}/projects
 
 ~~~json
 {
-  "projectIds": [12, 13]
+  "projectIds": [12, 13],
+  "confirmContentPerformanceMove": true
 }
 ~~~
 
 OWNER와 ADMIN만 호출할 수 있습니다. 같은 Workspace에 속하고 다른 ProjectGroup에 연결되지 않은 Project만 연결할 수 있습니다.
 
+선택 Project가 대표인 VideoContent에 동기화된 성과 또는 계산 가능한 예상 플랫폼 수익이 있으면 확인값이 없을 때 `409 CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED`를 반환합니다. 모든 Project와 확인값 검증이 끝난 뒤 전체 연결을 한 번에 반영하며 하나라도 실패하면 일부만 연결하지 않습니다.
+
 다른 ProjectGroup에 속한 Project의 이동은 Project 수정 API에서 projectGroupId를 변경합니다. 변경 전 사용자 확인을 거치며 Project 직접 비용·수익의 집계 대상도 함께 바뀝니다.
 
 ## 7.6. ProjectGroup에서 Project 연결 해제
 
-DELETE /api/workspaces/{workspaceId}/project-groups/{projectGroupId}/projects/{projectId}
+DELETE /api/workspaces/{workspaceId}/project-groups/{projectGroupId}/projects/{projectId}?confirmContentPerformanceMove=true
 
 Project 자체와 Project 직접 Expense / Revenue는 유지하고 projectGroupId만 null로 변경합니다.
+
+해제 대상 Project가 대표인 VideoContent에 동기화된 성과 또는 계산 가능한 예상 플랫폼 수익이 있으면 확인값이 없을 때 `409 CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED`를 반환하고 연결을 유지합니다.
 
 ## 7.7. ProjectGroup 삭제
 
@@ -1380,9 +1387,9 @@ POST /api/video-contents/{videoContentId}/youtube-publications
 }
 ~~~
 
-`watch`, `youtu.be`, `shorts` URL 또는 11자리 Video ID를 받아 정규화한 ID를 저장합니다. 동일 Workspace 안에서 이미 등록된 YouTube Video ID는 다시 등록할 수 없습니다. channelId를 생략하면 대표 Project의 담당 Channel을 기본값으로 사용합니다.
+HTTP·HTTPS의 `youtube.com`, `www.youtube.com`, `m.youtube.com`, `music.youtube.com`, `youtu.be` 호스트에서 제공되는 `watch`, `shorts`, 단축 URL 또는 11자리 Video ID를 받아 정규화한 ID를 저장합니다. 호스트 이름은 정확히 일치해야 하며 YouTube가 아닌 호스트에서 같은 형식의 ID를 제공해도 `INVALID_YOUTUBE_VIDEO`로 거부합니다. 동일 Workspace 안에서 이미 등록된 YouTube Video ID는 다시 등록할 수 없습니다. channelId를 생략하면 대표 Project의 담당 Channel을 기본값으로 사용합니다.
 
-재업로드는 기존 게시물의 Video ID를 교체하지 않고 새 YouTubePublication으로 생성합니다. 서로 다른 Channel에는 CURRENT 게시물을 각각 둘 수 있지만 같은 VideoContent와 Channel에는 CURRENT를 최대 하나만 허용합니다. 같은 Channel의 기존 CURRENT가 있을 때는 `supersedesPublicationId`를 명시하여 대체 의사를 확인해야 합니다. 대체 대상은 같은 Workspace, VideoContent와 Channel에 있어야 하며, 등록·기존 게시물의 SUPERSEDED 전환·대체 관계 및 상태 이력 기록을 하나의 트랜잭션에서 처리합니다. 게시물 등록과 Project 상태 변경 및 성과 동기화는 서로 자동 실행하지 않습니다.
+재업로드는 기존 게시물의 Video ID를 교체하지 않고 새 YouTubePublication으로 생성합니다. 서로 다른 Channel에는 CURRENT 게시물을 각각 둘 수 있지만 같은 VideoContent와 Channel에는 CURRENT를 최대 하나만 허용합니다. 같은 Channel의 기존 CURRENT가 있을 때는 `supersedesPublicationId`를 명시하여 대체 의사를 확인해야 합니다. 값이 전달되면 대체 대상은 같은 Workspace, VideoContent와 Channel의 실제 CURRENT 게시물과 정확히 일치해야 하며, CURRENT가 없거나 ID가 다르면 `INVALID_PUBLICATION_REPLACEMENT`로 거부합니다. 등록·기존 게시물의 SUPERSEDED 전환·대체 관계 및 상태 이력 기록을 하나의 트랜잭션에서 처리합니다. 게시물 등록과 Project 상태 변경 및 성과 동기화는 서로 자동 실행하지 않습니다.
 
 ## 11.4. YouTube 게시물 생명주기 변경
 
