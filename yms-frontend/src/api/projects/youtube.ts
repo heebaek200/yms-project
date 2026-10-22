@@ -26,6 +26,10 @@ type CreatePublicationRequest = {
     youtubeVideo: string;
     supersedesPublicationId?: number | null;
 };
+type ChangePrimaryProjectRequest = {
+    newPrimaryProjectId: number;
+    confirmContentPerformanceMove?: boolean;
+};
 
 const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 let nextVideoContentId = 102;
@@ -247,14 +251,14 @@ export async function changeVideoContentPrimaryProject(
     workspaceId: number,
     projectId: number,
     videoContentId: number,
-    newPrimaryProjectId: number,
+    request: ChangePrimaryProjectRequest,
     context: YouTubeContext
 ): Promise<ApiResponse<ProjectDetailResponse>> {
     await new Promise(resolve => setTimeout(resolve, 250));
     const target = findManageableContent(workspaceId, projectId, videoContentId, context);
     const oldPrimary = target ? readProject(workspaceId, target.content.primaryProjectId) : null;
-    const newPrimary = target ? readProject(workspaceId, newPrimaryProjectId) : null;
-    if (!target || !oldPrimary || !newPrimary || !target.content.connectedProjectIds.includes(newPrimaryProjectId)) {
+    const newPrimary = target ? readProject(workspaceId, request.newPrimaryProjectId) : null;
+    if (!target || !oldPrimary || !newPrimary || !target.content.connectedProjectIds.includes(request.newPrimaryProjectId)) {
         return { success: false, errorCode: 'PROJECT_NOT_LINKED_TO_VIDEO_CONTENT', message: '연결된 활성 프로젝트만 성과 집계 대상으로 지정할 수 있습니다.', errors: null };
     }
 
@@ -265,15 +269,27 @@ export async function changeVideoContentPrimaryProject(
     if (!crossesGroupBoundary && (!canManage(oldPrimary, context) || !canManage(newPrimary, context))) {
         return { success: false, errorCode: 'PRIMARY_PROJECT_EDIT_FORBIDDEN', message: '현재와 새 성과 집계 프로젝트를 모두 관리할 수 있어야 합니다.', errors: null };
     }
+    if (
+        crossesGroupBoundary
+        && target.content.cumulativePerformance.includedPublicationCount > 0
+        && !request.confirmContentPerformanceMove
+    ) {
+        return {
+            success: false,
+            errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED',
+            message: '성과 집계 프로젝트를 바꾸면 콘텐츠 성과가 새 프로젝트 그룹으로 이동합니다. 실제 비용·수익은 이동하지 않습니다.',
+            errors: null
+        };
+    }
 
-    // 성과가 있으면 화면의 사전 확인을 거치되 Mock API도 변경 이력을 항상 남깁니다.
+    // API 검증을 통과한 변경만 반영하고 이전·새 그룹 스냅샷을 이력으로 보존합니다.
     const now = new Date().toISOString();
     replaceVideoContent(videoContentId, {
         ...target.content,
-        primaryProjectId: newPrimaryProjectId,
+        primaryProjectId: request.newPrimaryProjectId,
         primaryProjectHistory: [...target.content.primaryProjectHistory, {
             fromProjectId: oldPrimary.projectId,
-            toProjectId: newPrimaryProjectId,
+            toProjectId: request.newPrimaryProjectId,
             fromProjectGroupId: oldPrimary.projectGroupId,
             toProjectGroupId: newPrimary.projectGroupId,
             changedByName: context.userName,

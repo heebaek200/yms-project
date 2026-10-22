@@ -393,7 +393,7 @@ export async function updateWorkspaceProjectGroup(
     };
 }
 
-/** 연결 Project와 직접 재무 항목이 없는 빈 ProjectGroup만 삭제합니다. */
+/** 활성·삭제 Project 이력과 직접 재무 항목이 모두 없는 빈 ProjectGroup만 삭제합니다. */
 export async function deleteWorkspaceProjectGroup(
     workspaceId: number,
     projectGroupId: number
@@ -413,7 +413,8 @@ export async function deleteWorkspaceProjectGroup(
     const hasProjects = readProjectsByGroup(projectGroupId).length > 0;
     const hasFinancialEntries = group.directExpenses.length > 0
         || group.directRevenues.length > 0;
-    if (hasProjects || hasFinancialEntries) {
+    const hasDeletedProjectFinance = readDeletedProjectFinanceByGroup(projectGroupId).length > 0;
+    if (hasProjects || hasFinancialEntries || hasDeletedProjectFinance) {
         return {
             success: false,
             errorCode: 'PROJECT_GROUP_IN_USE',

@@ -127,6 +127,7 @@
 .project-video-content > header p { font-size: .82rem; }
 .project-primary-badge { padding: 5px 10px; border-radius: 999px; background: #eee8ff; color: #6d46c7; font-size: .75rem; white-space: nowrap; }
 .project-video-content__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.project-action-tooltip { display: inline-flex; }
 
 /* 현재와 누적을 같은 구조로 보여 주어 값의 기준만 비교할 수 있게 합니다. */
 .project-performance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }

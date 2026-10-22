@@ -46,6 +46,13 @@ function toForm(project: ProjectDetailResponse): FormValues {
     return { title: project.title, content: project.content ?? '', channelId: String(project.channelId), projectGroupId: project.projectGroupId ? String(project.projectGroupId) : '', videoType: project.videoType, status: project.status, dueDate: project.dueDate ?? '', plannedUploadDate: project.plannedUploadDate ?? '' };
 }
 
+/** 보관 해제는 항상 허용하고 새 보관은 완료·취소 상태로 제한합니다. */
+function isArchiveActionAvailable(project: ProjectDetailResponse): boolean {
+    return project.archivedAt !== null
+        || project.status === 'UPLOADED'
+        || project.status === 'CANCELLED';
+}
+
 /** URL 필터 목록과 권한별 프로젝트 상세·수정 기능을 제공합니다. */
 function ProjectsPage() {
     const { projectId: rawId } = useParams();
@@ -190,6 +197,7 @@ function ProjectsPage() {
     /** 보관 또는 복원 결과를 상세에 반영합니다. */
     const archive = async () => {
         if (!currentWorkspace || !detail) return;
+        if (!isArchiveActionAvailable(detail)) return;
         const next = detail.archivedAt === null;
         if (!window.confirm(next ? '이 프로젝트를 보관할까요?' : '이 프로젝트를 활성 목록으로 복원할까요?')) return;
         const response = await setWorkspaceProjectArchived(currentWorkspace.workspaceId, detail.projectId, next, context);
@@ -298,7 +306,7 @@ function ProjectsPage() {
         setFeedback({ type: 'error', message: response.message });
     };
 
-    /** 연결 Project 중 새 성과 집계 대상을 선택하고 집계 이동을 명시적으로 확인합니다. */
+    /** 연결 Project 중 새 집계 대상을 선택하고 실제 그룹 간 성과 이동이 있을 때만 재확인합니다. */
     const changePrimaryProject = async (content: VideoContentResponse) => {
         if (!currentWorkspace || !detail) return;
         const candidates = content.connectedProjectIds.filter(candidateId => candidateId !== content.primaryProjectId);
@@ -307,9 +315,25 @@ function ProjectsPage() {
             setFeedback({ type: 'error', message: '연결된 다른 프로젝트 중에서 새 성과 집계 프로젝트를 선택해 주세요.' });
             return;
         }
-        if (content.cumulativePerformance.includedPublicationCount > 0 && !window.confirm('성과 집계 프로젝트를 바꾸면 콘텐츠 성과가 새 프로젝트와 프로젝트 그룹으로 이동합니다. 실제 비용·수익은 이동하지 않습니다. 계속할까요?')) return;
 
-        const response = await changeVideoContentPrimaryProject(currentWorkspace.workspaceId, detail.projectId, content.videoContentId, selected, context);
+        let response = await changeVideoContentPrimaryProject(
+            currentWorkspace.workspaceId,
+            detail.projectId,
+            content.videoContentId,
+            { newPrimaryProjectId: selected },
+            context
+        );
+        // Mock API가 그룹 간 성과 이동을 감지한 경우에만 사용자 확인 후 같은 요청을 재시도합니다.
+        if (!response.success && response.errorCode === 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED') {
+            if (!window.confirm(`${response.message}\n\n계속 변경할까요?`)) return;
+            response = await changeVideoContentPrimaryProject(
+                currentWorkspace.workspaceId,
+                detail.projectId,
+                content.videoContentId,
+                { newPrimaryProjectId: selected, confirmContentPerformanceMove: true },
+                context
+            );
+        }
         if (response.success) setDetail(response.data);
         setFeedback({ type: response.success ? 'success' : 'error', message: response.message ?? '' });
     };
@@ -607,13 +631,15 @@ function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeR
     if (!detail || error) return <FeedbackMessage type="error" message={error ?? '프로젝트를 찾을 수 없습니다.'} />;
 
     const back = (location.state as { listSearch?: string } | null)?.listSearch;
+    const archiveActionAvailable = isArchiveActionAvailable(detail);
+    const archiveUnavailableMessage = '업로드 완료 또는 제작 취소 상태에서 보관할 수 있습니다.';
     return (
         <>
             <div className="project-detail-nav"><Link to={`/projects${back ? `?${back}` : ''}`}>← 프로젝트 목록</Link></div>
             {feedback && <FeedbackMessage type={feedback.type} message={feedback.message} />}
             <header className="project-detail-header">
                 <div><p className="project-group-eyebrow">{detail.videoType === 'LONG' ? 'LONG FORM DEFAULT' : 'SHORTS DEFAULT'}</p><h1>{detail.title}</h1><p>{detail.channelName} · 소유자 {detail.ownerName}</p></div>
-                <div className="project-actions"><span className={`project-status project-status--${detail.status.toLowerCase()}`}>{STATUS_LABEL[detail.status]}</span>{canEdit && <button className="project-button" onClick={onEdit}>수정</button>}{canManage && <button className="project-button" onClick={onArchive}>{detail.archivedAt ? '복원' : '보관'}</button>}{canManage && <button className="project-button project-button--danger" onClick={onDelete}>삭제</button>}</div>
+                <div className="project-actions"><span className={`project-status project-status--${detail.status.toLowerCase()}`}>{STATUS_LABEL[detail.status]}</span>{canEdit && <button className="project-button" onClick={onEdit}>수정</button>}{canManage && <span className="project-action-tooltip" title={archiveActionAvailable ? undefined : archiveUnavailableMessage}><button className="project-button" disabled={!archiveActionAvailable} aria-label={archiveActionAvailable ? undefined : `보관: ${archiveUnavailableMessage}`} onClick={onArchive}>{detail.archivedAt ? '복원' : '보관'}</button></span>}{canManage && <button className="project-button project-button--danger" onClick={onDelete}>삭제</button>}</div>
             </header>
             <div className="project-detail-grid">
                 <article><h2>기본 정보</h2><p>{detail.content ?? '등록된 내용이 없습니다.'}</p><dl><div><dt>마감일</dt><dd>{detail.dueDate ?? '미정'}</dd></div><div><dt>업로드 예정일</dt><dd>{detail.plannedUploadDate ?? '미정'}</dd></div><div><dt>프로젝트 그룹</dt><dd>{detail.projectGroupName ?? '없음'}</dd></div></dl></article>
