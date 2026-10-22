@@ -6,6 +6,7 @@ import type {
     ApiSuccessResponse
 } from '../types';
 import type { UserRole } from '../../types/auth';
+import { readProject } from '../projects/projectStore';
 import type { DashboardRequestContext } from './types';
 
 // Mock 시나리오
@@ -63,8 +64,8 @@ export type DashboardScheduleRequest = {
     keyword?: string;
 };
 
-// Calendar에 표시할 작업 일정
-export type CalendarEvent = {
+// 모든 제작팀 권한에 공통으로 제공하는 Calendar 작업 일정입니다.
+type CalendarEventBase = {
     taskId: number;
     projectId: number;
     projectTitle: string;
@@ -73,25 +74,29 @@ export type CalendarEvent = {
     workerName: string;
     startDate: string;
     endDate: string;
-    workerAmount: string;
     taskStatus: TaskStatus;
 };
+
+// 일반 MEMBER 응답은 작업 금액 필드를 구조 자체에서 제외합니다.
+export type MemberCalendarEvent = CalendarEventBase & {
+    workerAmount?: never;
+};
+
+// 제작팀 OWNER와 ADMIN 응답에만 작업 금액을 제공합니다.
+export type ManagerCalendarEvent = CalendarEventBase & {
+    workerAmount: string;
+};
+
+export type CalendarEvent = MemberCalendarEvent | ManagerCalendarEvent;
 
 type WorkerRole = Exclude<ScheduleRoleFilter, 'ALL' | 'MY_TASK'>;
 
 /**
  * Schedule Mock API 내부에서 필터 조건을 판단하기 위한 일정 타입입니다.
- * 실제 Dashboard Schedule API 응답에는 포함되지 않는 Workspace, Channel,
- * 프로젝트 상태와 보관 여부 등의 테스트용 메타데이터를 보관합니다.
- * 필터링이 끝난 뒤에는 CalendarEvent 형태로 반환합니다.
+ * Project 소속·상태·보관 여부는 공통 Project 저장소에서 읽고 여기에는 Task 역할만 보관합니다.
  */
-type MockCalendarEvent = CalendarEvent & {
-    workspaceId: number;
-    channelId: number;
-    projectStatus: ProjectStatus;
+type MockCalendarEvent = ManagerCalendarEvent & {
     workerRole: WorkerRole;
-    isMyTask: boolean;
-    archived: boolean;
 };
 
 // 우측 마감 업무 피드
@@ -106,14 +111,9 @@ export type TodayDeadline = {
     taskStatus: TaskStatus;
 };
 
-// 응답에는 노출하지 않을 Workspace 및 필터 메타데이터를 Mock 타입에만 보관합니다.
+// 응답에는 노출하지 않을 Task 역할을 Mock 타입에만 보관합니다.
 type MockTodayDeadline = TodayDeadline & {
-    workspaceId: number;
-    channelId: number;
-    projectStatus: ProjectStatus;
     workerRole: WorkerRole;
-    isMyTask: boolean;
-    archived: boolean;
 };
 
 // Task 저장소가 분리되기 전에도 인증 사용자별 담당 업무와 프로젝트 참여 범위를 검증합니다.
@@ -131,23 +131,29 @@ const MOCK_TASK_WORKER_USER_IDS: Record<number, number> = {
     202: 24601
 };
 
-const MOCK_PROJECT_PARTICIPANT_USER_IDS: Record<number, number[]> = {
-    11: [24601, 24604],
-    12: [24602],
-    13: [24602],
-    14: [24601, 24604],
-    15: [24601],
-    31: [24601, 24621],
-    32: [24601, 24621]
-};
-
-/** MEMBER는 자신이 참여한 프로젝트의 일정만 조회할 수 있습니다. */
-function canAccessScheduleProject(
+/**
+ * 일정이 속한 Project를 공통 저장소에서 조회하고 현재 사용자의 접근 가능 범위를 검증합니다.
+ * 삭제·보관 Project를 제외하고 MEMBER에게는 최신 ACTIVE 참여 관계가 있는 Project만 반환합니다.
+ */
+function readAccessibleScheduleProject(
+    workspaceId: number,
     projectId: number,
     context: DashboardRequestContext
 ) {
-    return context.workspaceRole !== 'MEMBER'
-        || MOCK_PROJECT_PARTICIPANT_USER_IDS[projectId]?.includes(context.userId) === true;
+    const project = readProject(workspaceId, projectId);
+
+    if (!project || project.archivedAt !== null) {
+        return null;
+    }
+
+    if (context.workspaceRole !== 'MEMBER') {
+        return project;
+    }
+
+    return project.members.some(member => (
+        member.userId === context.userId
+        && member.active
+    )) ? project : null;
 }
 
 /** MY_TASK 필터는 인증 사용자에게 실제 배정된 Task인지 식별자로 확인합니다. */
@@ -159,20 +165,29 @@ function isAssignedToCurrentUser(
 }
 
 // 성공 응답 데이터
-export type DashboardScheduleData = {
-    calendarEvents: CalendarEvent[];
+export type DashboardScheduleData<TEvent extends CalendarEvent = CalendarEvent> = {
+    calendarEvents: TEvent[];
     todayDeadlines: TodayDeadline[];
 };
+
+export type MemberDashboardScheduleData = DashboardScheduleData<MemberCalendarEvent>;
+export type ManagerDashboardScheduleData = DashboardScheduleData<ManagerCalendarEvent>;
 
 // 성공 응답
 export type DashboardScheduleSuccessResponse =
     ApiSuccessResponse<DashboardScheduleData>;
+export type MemberDashboardScheduleSuccessResponse =
+    ApiSuccessResponse<MemberDashboardScheduleData>;
+export type ManagerDashboardScheduleSuccessResponse =
+    ApiSuccessResponse<ManagerDashboardScheduleData>;
 
 // 실패 응답
 export type DashboardScheduleFailureResponse = ApiFailureResponse;
 
 // 최종 응답 타입
 export type DashboardScheduleResponse = ApiResponse<DashboardScheduleData>;
+export type MemberDashboardScheduleResponse = ApiResponse<MemberDashboardScheduleData>;
+export type ManagerDashboardScheduleResponse = ApiResponse<ManagerDashboardScheduleData>;
 
 // Workspace와 Channel 조건을 함께 검증할 수 있도록 구성한 일정 Mock 데이터
 const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
@@ -187,12 +202,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-22',
         workerAmount: '400000.00',
         taskStatus: 'PROGRESS',
-        workspaceId: 1,
-        channelId: 1,
-        projectStatus: 'REVIEW',
-        workerRole: 'EDITOR',
-        isMyTask: true,
-        archived: false
+        workerRole: 'EDITOR'
     },
     {
         taskId: 102,
@@ -205,12 +215,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-24',
         workerAmount: '100000.00',
         taskStatus: 'WAITING',
-        workspaceId: 1,
-        channelId: 1,
-        projectStatus: 'REVIEW',
-        workerRole: 'THUMBNAILER',
-        isMyTask: false,
-        archived: false
+        workerRole: 'THUMBNAILER'
     },
     {
         taskId: 103,
@@ -223,12 +228,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-24',
         workerAmount: '150000.00',
         taskStatus: 'WAITING',
-        workspaceId: 1,
-        channelId: 2,
-        projectStatus: 'PLANNING',
-        workerRole: 'PLANNER',
-        isMyTask: false,
-        archived: false
+        workerRole: 'PLANNER'
     },
     {
         taskId: 104,
@@ -241,12 +241,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-28',
         workerAmount: '500000.00',
         taskStatus: 'REVIEW',
-        workspaceId: 1,
-        channelId: 1,
-        projectStatus: 'EDITING',
-        workerRole: 'EDITOR',
-        isMyTask: false,
-        archived: false
+        workerRole: 'EDITOR'
     },
     {
         taskId: 105,
@@ -259,12 +254,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-24',
         workerAmount: '80000.00',
         taskStatus: 'PROGRESS',
-        workspaceId: 1,
-        channelId: 3,
-        projectStatus: 'PLANNING',
-        workerRole: 'CREATOR',
-        isMyTask: true,
-        archived: false
+        workerRole: 'CREATOR'
     },
     {
         taskId: 106,
@@ -277,12 +267,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-03',
         workerAmount: '650000.00',
         taskStatus: 'PROGRESS',
-        workspaceId: 1,
-        channelId: 2,
-        projectStatus: 'UPLOADED',
-        workerRole: 'CREATOR',
-        isMyTask: true,
-        archived: true
+        workerRole: 'CREATOR'
     },
     {
         taskId: 108,
@@ -295,12 +280,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-28',
         workerAmount: '350000.00',
         taskStatus: 'PROGRESS',
-        workspaceId: 1,
-        channelId: 1,
-        projectStatus: 'EDITING',
-        workerRole: 'EDITOR',
-        isMyTask: true,
-        archived: false
+        workerRole: 'EDITOR'
     },
     {
         taskId: 109,
@@ -313,12 +293,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-24',
         workerAmount: '90000.00',
         taskStatus: 'WAITING',
-        workspaceId: 1,
-        channelId: 2,
-        projectStatus: 'PLANNING',
-        workerRole: 'PLANNER',
-        isMyTask: false,
-        archived: false
+        workerRole: 'PLANNER'
     },
     {
         taskId: 201,
@@ -331,12 +306,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-24',
         workerAmount: '250000.00',
         taskStatus: 'PROGRESS',
-        workspaceId: 2,
-        channelId: 21,
-        projectStatus: 'EDITING',
-        workerRole: 'EDITOR',
-        isMyTask: true,
-        archived: false
+        workerRole: 'EDITOR'
     },
     {
         taskId: 202,
@@ -349,12 +319,7 @@ const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
         endDate: '2026-10-29',
         workerAmount: '180000.00',
         taskStatus: 'WAITING',
-        workspaceId: 2,
-        channelId: 21,
-        projectStatus: 'EDITING',
-        workerRole: 'EDITOR',
-        isMyTask: true,
-        archived: false
+        workerRole: 'EDITOR'
     }
 ];
 
@@ -369,12 +334,7 @@ const MOCK_TODAY_DEADLINES: MockTodayDeadline[] = [
         workerName: '테스트 사용자',
         endDate: '2026-10-22',
         taskStatus: 'PROGRESS',
-        workspaceId: 1,
-        channelId: 1,
-        projectStatus: 'EDITING',
-        workerRole: 'EDITOR',
-        isMyTask: true,
-        archived: false
+        workerRole: 'EDITOR'
     },
     {
         taskId: 109,
@@ -385,12 +345,7 @@ const MOCK_TODAY_DEADLINES: MockTodayDeadline[] = [
         workerName: '윤공동',
         endDate: '2026-10-22',
         taskStatus: 'WAITING',
-        workspaceId: 1,
-        channelId: 2,
-        projectStatus: 'PLANNING',
-        workerRole: 'PLANNER',
-        isMyTask: false,
-        archived: false
+        workerRole: 'PLANNER'
     },
     {
         taskId: 111,
@@ -401,12 +356,7 @@ const MOCK_TODAY_DEADLINES: MockTodayDeadline[] = [
         workerName: '윤공동',
         endDate: '2026-10-22',
         taskStatus: 'COMPLETED',
-        workspaceId: 1,
-        channelId: 2,
-        projectStatus: 'UPLOADED',
-        workerRole: 'EDITOR',
-        isMyTask: false,
-        archived: true
+        workerRole: 'EDITOR'
     },
     {
         taskId: 202,
@@ -417,12 +367,7 @@ const MOCK_TODAY_DEADLINES: MockTodayDeadline[] = [
         workerName: '테스트 사용자',
         endDate: '2026-10-22',
         taskStatus: 'WAITING',
-        workspaceId: 2,
-        channelId: 21,
-        projectStatus: 'EDITING',
-        workerRole: 'EDITOR',
-        isMyTask: true,
-        archived: false
+        workerRole: 'EDITOR'
     }
 ];
 
@@ -443,6 +388,40 @@ function matchesScheduleKeyword(
         || item.taskTypeName.toLowerCase().includes(keyword);
 }
 
+/** CANCELLED 기본 제외를 포함하여 Calendar와 오늘 마감에 같은 Project 상태 필터를 적용합니다. */
+function matchesProjectStatus(
+    projectStatus: ProjectStatus,
+    requestedStatus?: ScheduleStatusFilter
+) {
+    if (requestedStatus === 'CANCELLED') {
+        return projectStatus === 'CANCELLED';
+    }
+
+    if (projectStatus === 'CANCELLED') {
+        return false;
+    }
+
+    return !requestedStatus
+        || requestedStatus === 'ALL'
+        || projectStatus === requestedStatus;
+}
+
+/** 내부 작업 금액은 유지하면서 제작팀 권한에 맞는 Calendar 응답 객체를 새로 구성합니다. */
+function toCalendarEventResponse(
+    event: MockCalendarEvent,
+    context: DashboardRequestContext
+): CalendarEvent {
+    const { workerRole: _workerRole, ...managerEvent } = event;
+
+    if (context.workspaceRole !== 'MEMBER') {
+        return managerEvent;
+    }
+
+    // MEMBER 응답에는 undefined 값조차 남기지 않고 재무 필드 자체를 제거합니다.
+    const { workerAmount: _workerAmount, ...memberEvent } = managerEvent;
+    return memberEvent;
+}
+
 /**
  * Dashboard Schedule 요청 조건에 맞는 Mock 일정을 추출합니다.
  * 날짜 범위는 시작일과 종료일을 모두 포함하며,
@@ -459,13 +438,9 @@ function filterMockCalendarEvents(
 
     return events
         .filter(event => {
-            // 다른 Workspace의 일정과 보관된 프로젝트 일정은 기본 조회에서 제외합니다.
-            if (event.workspaceId !== workspaceId || event.archived) {
-                return false;
-            }
-
-            // 화면 필터보다 먼저 인증 사용자의 프로젝트 접근 범위를 적용합니다.
-            if (!canAccessScheduleProject(event.projectId, context)) {
+            // Project 저장소의 최신 Workspace·보관·참여 상태를 화면 필터보다 먼저 검증합니다.
+            const project = readAccessibleScheduleProject(workspaceId, event.projectId, context);
+            if (!project) {
                 return false;
             }
 
@@ -478,18 +453,8 @@ function filterMockCalendarEvents(
                 return false;
             }
 
-            // CANCELLED는 명시적으로 선택한 경우에만 조회합니다.
-            if (request.status === 'CANCELLED') {
-                if (event.projectStatus !== 'CANCELLED') {
-                    return false;
-                }
-            } else if (event.projectStatus === 'CANCELLED') {
-                return false;
-            } else if (
-                request.status
-                && request.status !== 'ALL'
-                && event.projectStatus !== request.status
-            ) {
+            // Project의 최신 상태를 사용해 취소 및 상태 필터를 판정합니다.
+            if (!matchesProjectStatus(project.status, request.status)) {
                 return false;
             }
 
@@ -509,7 +474,7 @@ function filterMockCalendarEvents(
             // Channel을 선택하지 않은 경우 모든 Channel의 일정을 허용합니다.
             if (
                 request.channelId !== undefined
-                && event.channelId !== request.channelId
+                && project.channelId !== request.channelId
             ) {
                 return false;
             }
@@ -521,16 +486,8 @@ function filterMockCalendarEvents(
 
             return true;
         })
-        // Mock 필터 전용 메타데이터는 실제 API 응답에서 제거합니다.
-        .map(({
-            workspaceId: _workspaceId,
-            channelId: _channelId,
-            projectStatus: _projectStatus,
-            workerRole: _workerRole,
-            isMyTask: _isMyTask,
-            archived: _archived,
-            ...event
-        }) => event);
+        // Task 역할과 권한 없는 재무 정보는 실제 API 응답 경계에서 제거합니다.
+        .map(event => toCalendarEventResponse(event, context));
 }
 
 /**
@@ -547,27 +504,13 @@ function filterMockTodayDeadlines(
 
     return deadlines
         .filter(deadline => {
-            if (deadline.workspaceId !== workspaceId || deadline.archived) {
+            // Calendar와 같은 Project 저장소를 사용해 두 응답 배열의 권한 경계를 맞춥니다.
+            const project = readAccessibleScheduleProject(workspaceId, deadline.projectId, context);
+            if (!project) {
                 return false;
             }
 
-            // Calendar와 동일한 인증 범위를 먼저 적용해 두 응답 배열의 경계를 맞춥니다.
-            if (!canAccessScheduleProject(deadline.projectId, context)) {
-                return false;
-            }
-
-            // CANCELLED는 사용자가 해당 상태를 명시적으로 선택한 경우에만 표시합니다.
-            if (request.status === 'CANCELLED') {
-                if (deadline.projectStatus !== 'CANCELLED') {
-                    return false;
-                }
-            } else if (deadline.projectStatus === 'CANCELLED') {
-                return false;
-            } else if (
-                request.status
-                && request.status !== 'ALL'
-                && deadline.projectStatus !== request.status
-            ) {
+            if (!matchesProjectStatus(project.status, request.status)) {
                 return false;
             }
 
@@ -586,7 +529,7 @@ function filterMockTodayDeadlines(
             // 선택한 Channel이 있으면 해당 Channel에 속한 마감 업무만 유지합니다.
             if (
                 request.channelId !== undefined
-                && deadline.channelId !== request.channelId
+                && project.channelId !== request.channelId
             ) {
                 return false;
             }
@@ -598,16 +541,8 @@ function filterMockTodayDeadlines(
 
             return true;
         })
-        // 필터링에만 사용한 Mock 메타데이터를 제거하고 실제 응답 타입으로 변환합니다.
-        .map(({
-            workspaceId: _workspaceId,
-            channelId: _channelId,
-            projectStatus: _projectStatus,
-            workerRole: _workerRole,
-            isMyTask: _isMyTask,
-            archived: _archived,
-            ...deadline
-        }) => deadline);
+        // 필터링에만 사용한 Task 역할을 제거하고 실제 응답 타입으로 변환합니다.
+        .map(({ workerRole: _workerRole, ...deadline }) => deadline);
 }
 
 /**
@@ -615,6 +550,21 @@ function filterMockTodayDeadlines(
  * 날짜 및 화면 필터를 Mock 데이터에 적용하여 실제 API와 같은 응답 구조를 반환하며,
  * 백엔드 연동 시 동일한 경로와 Query Parameter를 사용하는 HTTP 호출로 교체합니다.
  */
+export function getDashboardSchedule(
+    workspaceId: number,
+    request: DashboardScheduleRequest,
+    context: DashboardRequestContext & { workspaceRole: 'MEMBER' }
+): Promise<MemberDashboardScheduleResponse>;
+export function getDashboardSchedule(
+    workspaceId: number,
+    request: DashboardScheduleRequest,
+    context: DashboardRequestContext & { workspaceRole: 'OWNER' | 'ADMIN' }
+): Promise<ManagerDashboardScheduleResponse>;
+export function getDashboardSchedule(
+    workspaceId: number,
+    request: DashboardScheduleRequest,
+    context: DashboardRequestContext
+): Promise<DashboardScheduleResponse>;
 export async function getDashboardSchedule(
     workspaceId: number,
     request: DashboardScheduleRequest,

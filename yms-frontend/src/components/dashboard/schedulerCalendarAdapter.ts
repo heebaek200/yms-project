@@ -4,7 +4,7 @@ import { Temporal } from 'temporal-polyfill';
 
 /*
  FullCalendar 의 인터페이스 id / title / start / end 등
- YMS의 인터페이스 taskId / projectId / taskTypeName / workerName / workerAmount / taskStatus 등
+ YMS의 인터페이스 taskId / projectId / taskTypeName / workerName / 선택적 workerAmount / taskStatus 등
  데이터 중간 계층 변환 기능
  */
 
@@ -57,11 +57,15 @@ export function toFullCalendarEvent(
             taskTypeId: event.taskTypeId,
             taskTypeName: event.taskTypeName,
             workerName: event.workerName,
-            workerAmount: event.workerAmount,
             taskStatus: event.taskStatus,
 
             startDate: event.startDate,
-            endDate: event.endDate
+            endDate: event.endDate,
+
+            // Schedule API가 OWNER·ADMIN에게 반환한 경우에만 재무 필드를 전달합니다.
+            ...(event.workerAmount === undefined
+                ? {}
+                : { workerAmount: event.workerAmount })
         }
     };
 }
