@@ -5,6 +5,7 @@ import {
     type DashboardSummaryData
 } from '../../api/dashboard/summary';
 import FeedbackMessage from '../common/FeedbackMessage';
+import type { DashboardRequestContext } from '../../api/dashboard/types';
 
 import './Summary.css';
 
@@ -35,9 +36,10 @@ const SUMMARY_ITEMS: SummaryItem[] = [
 
 type DashboardSummaryProps = {
     workspaceId: number;
+    context: DashboardRequestContext;
 };
 
-function DashboardSummary({ workspaceId }: DashboardSummaryProps) {
+function DashboardSummary({ workspaceId, context }: DashboardSummaryProps) {
 
     const [isLoading, setIsLoading] = useState(true);
     const [summaryData, setSummaryData] = useState<DashboardSummaryData | null>(null);
@@ -55,7 +57,7 @@ function DashboardSummary({ workspaceId }: DashboardSummaryProps) {
                 setSummaryData(null);
                 setErrorMessage(null);
 
-                const response = await getDashboardSummary(workspaceId);
+                const response = await getDashboardSummary(workspaceId, context);
 
                 // Workspace가 바뀐 뒤 도착한 이전 응답은 화면에 반영하지 않습니다.
                 if (!isCurrentRequest) {
@@ -87,7 +89,7 @@ function DashboardSummary({ workspaceId }: DashboardSummaryProps) {
         return () => {
             isCurrentRequest = false;
         };
-    }, [workspaceId]);
+    }, [context, workspaceId]);
 
     if (errorMessage) {
         return (

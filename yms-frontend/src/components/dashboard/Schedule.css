@@ -10,6 +10,15 @@
     min-width: 0;
 }
 
+/* 오늘 마감과 최근 알림은 Calendar 오른쪽에서 하나의 보조 정보 열을 이룹니다. */
+.dashboard-schedule-sidebar {
+    display: grid;
+    align-content: start;
+    gap: 24px;
+
+    min-width: 0;
+}
+
 /* 좁은 화면에서는 Calendar 다음에 마감 피드가 이어지는 단일 열로 전환합니다. */
 @media (max-width: 900px) {
     .dashboard-schedule-layout {

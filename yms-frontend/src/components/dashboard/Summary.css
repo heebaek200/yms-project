@@ -103,3 +103,17 @@
         animation: none;
     }
 }
+
+/* 모바일에서도 주요 수치를 한눈에 비교할 수 있도록 두 열을 유지합니다. */
+@media (max-width: 768px) {
+    .dashboard-summary-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* 매우 좁은 화면에서는 카드 수치가 겹치지 않도록 한 열로 전환합니다. */
+@media (max-width: 420px) {
+    .dashboard-summary-cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

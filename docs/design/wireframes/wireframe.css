@@ -468,6 +468,11 @@ button {
         grid-template-columns: 1fr;
     }
 
+    /* SCR-05 요약은 모바일에서도 한눈에 비교할 수 있도록 2열을 유지합니다. */
+    .dashboard-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .screen-frame,
     .auth-card {
         padding: 16px;
@@ -501,5 +506,12 @@ button {
     .chat-room-list {
         border-right: 0;
         border-bottom: 1px solid #999;
+    }
+}
+
+@media (max-width: 420px) {
+    /* 매우 좁은 화면에서는 수치가 겹치지 않도록 요약 카드를 1열로 전환합니다. */
+    .dashboard-summary {
+        grid-template-columns: 1fr;
     }
 }

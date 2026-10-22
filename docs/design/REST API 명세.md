@@ -654,7 +654,7 @@ DELETE /api/workspaces/{workspaceId}/task-types/{taskTypeId}
 
 GET /api/workspaces/{workspaceId}/dashboard/summary
 
-현재 사용자의 Workspace 내 업무 기준으로 집계합니다.
+현재 사용자의 Workspace 내 업무 기준으로 집계합니다. 사용자 식별자와 제작팀 권한은 인증 세션 및 제작팀 멤버십에서 결정하며 Query Parameter로 전달받지 않습니다.
 
 응답:
 
@@ -670,7 +670,7 @@ GET /api/workspaces/{workspaceId}/dashboard/summary
 }
 ~~~
 
-일반 MEMBER는 자신이 접근 가능한 Project와 Task 범위에서 집계합니다.
+OWNER와 ADMIN은 현재 제작팀의 관리 가능 업무 범위에서 집계합니다. 일반 MEMBER는 자신이 참여한 Project와 접근 가능한 Task 범위에서 집계하며, 클라이언트가 별도 필터를 조작해도 범위를 넓힐 수 없습니다.
 
 ## 6.2. 스케줄러 조회
 
@@ -688,6 +688,10 @@ Query:
 | keyword | N | Project / Task 검색, 최대 50자 |
 
 보관된 Project와 CANCELLED Project는 기본 조회에서 제외하고 명시적인 조건에서만 포함합니다.
+
+사용자 식별자와 제작팀 권한은 인증 세션 및 제작팀 멤버십에서 결정합니다. OWNER와 ADMIN은 현재 제작팀의 관리 가능 일정을 조회하고 MEMBER는 자신이 참여한 Project와 접근 가능한 Task 일정만 조회합니다. `role=MY_TASK`는 권한 범위를 확장하지 않으며 허용된 일정 중 현재 사용자에게 배정된 Task만 반환합니다. Workspace, 권한, 날짜 범위와 모든 필터를 적용한 뒤 `calendarEvents`와 `todayDeadlines`를 같은 기준으로 생성합니다.
+
+`calendarEvents.workerAmount`는 OWNER와 ADMIN 응답에만 포함합니다. MEMBER는 자신이 참여하거나 담당하는 일정이라도 Schedule 응답에서 작업 금액을 받지 않으며, 본인의 지급 예정 금액은 별도의 개인 정산 API에서 확인합니다.
 
 응답 예:
 
