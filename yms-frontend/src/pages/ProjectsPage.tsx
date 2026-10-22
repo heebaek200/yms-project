@@ -215,7 +215,14 @@ function ProjectsPage() {
             }
         }
         if (!window.confirm('프로젝트를 삭제할까요? 비용·수익·정산과 영상 게시 이력은 유지됩니다.')) return;
-        const response = await deleteWorkspaceProject(currentWorkspace.workspaceId, detail.projectId, context, { primaryProjectReassignments });
+        let response = await deleteWorkspaceProject(currentWorkspace.workspaceId, detail.projectId, context, { primaryProjectReassignments });
+        if (!response.success && response.errorCode === 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED') {
+            if (!window.confirm(`${response.message}\n\n계속 삭제할까요?`)) return;
+            response = await deleteWorkspaceProject(currentWorkspace.workspaceId, detail.projectId, context, {
+                primaryProjectReassignments,
+                confirmContentPerformanceMove: true
+            });
+        }
         if (response.success) navigate('/projects', { replace: true }); else setFeedback({ type: 'error', message: response.message });
     };
 

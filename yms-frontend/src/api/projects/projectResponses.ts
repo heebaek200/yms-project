@@ -2,8 +2,10 @@ import type { WorkspaceRole } from '../../types/workspace';
 import type {
     PerformanceAggregate,
     PerformanceAggregateResponse,
+    ProjectAccessRole,
     ProjectDetail,
     ProjectDetailResponse,
+    ProjectListItemResponse,
     YouTubePublication,
     YouTubePublicationResponse
 } from '../../types/project';
@@ -67,5 +69,38 @@ export function toProjectDetailResponse(
         directExpenseAmount,
         directRevenueAmount,
         videoContents: responseVideoContents
+    };
+}
+
+/** 내부 상세 객체를 펼치지 않고 프로젝트 목록에 허용된 필드만 명시적으로 선택합니다. */
+export function toProjectListItemResponse(
+    project: ProjectDetail,
+    access: { isParticipant: boolean; myAccessRole: ProjectAccessRole },
+    currentPerformance: PerformanceAggregate,
+    workspaceRole: WorkspaceRole
+): ProjectListItemResponse {
+    return {
+        projectId: project.projectId,
+        title: project.title,
+        content: project.content,
+        channelId: project.channelId,
+        channelName: project.channelName,
+        projectGroupId: project.projectGroupId,
+        projectGroupName: project.projectGroupName,
+        videoType: project.videoType,
+        status: project.status,
+        ownerName: project.ownerName,
+        dueDate: project.dueDate,
+        plannedUploadDate: project.plannedUploadDate,
+        archivedAt: project.archivedAt,
+        updatedAt: project.updatedAt,
+        taskCount: project.taskCount,
+        completedTaskCount: project.completedTaskCount,
+        isParticipant: access.isParticipant,
+        myAccessRole: access.myAccessRole,
+        currentPerformance: toPerformanceAggregateResponse(
+            currentPerformance,
+            workspaceRole
+        )
     };
 }

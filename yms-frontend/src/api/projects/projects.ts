@@ -23,8 +23,8 @@ import {
     replaceProject
 } from './projectStore';
 import {
-    toPerformanceAggregateResponse,
-    toProjectDetailResponse
+    toProjectDetailResponse,
+    toProjectListItemResponse
 } from './projectResponses';
 
 export type ProjectListRequest = {
@@ -57,6 +57,7 @@ export type DeleteProjectRequest = {
         videoContentId: number;
         newPrimaryProjectId: number;
     }>;
+    confirmContentPerformanceMove?: boolean;
 };
 
 type ProjectMutationContext = {
@@ -163,16 +164,18 @@ export async function getWorkspaceProjects(
         .filter(project => request.participation !== 'MINE' || project.members.some(member => member.userId === context.userId && member.active))
         .filter(project => !keyword || project.title.toLocaleLowerCase().includes(keyword) || project.content?.toLocaleLowerCase().includes(keyword))
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-    const items = filtered.slice((page - 1) * pageSize, page * pageSize).map(project => ({
-        ...project,
-        isParticipant: project.members.some(member => member.userId === context.userId && member.active),
-        currentPerformance: toPerformanceAggregateResponse(
+    const items = filtered.slice((page - 1) * pageSize, page * pageSize).map(project => (
+        toProjectListItemResponse(
+            project,
+            {
+                isParticipant: project.members.some(member => member.userId === context.userId && member.active),
+                // canViewProject를 통과한 항목은 프로젝트 관계 또는 제작팀 관리 역할 중 하나가 반드시 존재합니다.
+                myAccessRole: getProjectAccessRole(project, context) as ProjectAccessRole
+            },
             getProjectCurrentPerformance(project),
             context.workspaceRole
-        ),
-        // canViewProject를 통과한 항목은 프로젝트 관계 또는 제작팀 관리 역할 중 하나가 반드시 존재합니다.
-        myAccessRole: getProjectAccessRole(project, context) as ProjectAccessRole
-    }));
+        )
+    ));
 
     return { success: true, data: { items, page, pageSize, totalCount: filtered.length, totalPages: Math.max(1, Math.ceil(filtered.length / pageSize)) } };
 }
@@ -269,6 +272,11 @@ export async function deleteWorkspaceProject(workspaceId: number, projectId: num
         const crossesGroupBoundary = project.projectGroupId !== replacement.projectGroupId;
         if (crossesGroupBoundary && context.workspaceRole === 'MEMBER') return { success: false, errorCode: 'PRIMARY_PROJECT_GROUP_PERMISSION_REQUIRED', message: '프로젝트 그룹 경계를 넘는 집계 프로젝트 변경은 제작팀 소유자 또는 관리자만 할 수 있습니다.', errors: null };
         if (!crossesGroupBoundary && !canEditProject(replacement, context)) return { success: false, errorCode: 'PRIMARY_PROJECT_EDIT_FORBIDDEN', message: '새 성과 집계 프로젝트를 관리할 권한이 없습니다.', errors: null };
+        if (
+            crossesGroupBoundary
+            && content.cumulativePerformance.includedPublicationCount > 0
+            && !request.confirmContentPerformanceMove
+        ) return { success: false, errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED', message: '프로젝트를 삭제하면 영상 결과물의 콘텐츠 성과가 새 프로젝트 그룹으로 이동합니다. 실제 비용·수익은 이동하지 않습니다.', errors: null };
 
         // 모든 검증이 끝난 뒤 아래에서 일괄 적용할 수 있도록 다음 루프까지 변경하지 않습니다.
     }
