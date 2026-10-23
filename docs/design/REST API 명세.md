@@ -1077,7 +1077,33 @@ DELETE /api/projects/{projectId}
 
 새 대표가 같은 ProjectGroup에 있거나 양쪽 모두 그룹이 없으면 삭제 요청자에게 두 Project의 관리 권한이 있어야 합니다. 그룹 경계를 넘으면 Workspace OWNER 또는 ADMIN만 수행할 수 있습니다. 콘텐츠 성과 또는 계산 가능한 예상 플랫폼 수익이 다른 그룹으로 이동할 때 `confirmContentPerformanceMove`가 없으면 영향 정보를 포함한 409를 반환합니다. 하위 업무 이력과 대표 변경 이력을 유지하고 deleted_at / deleted_by_member_id를 기록합니다. 삭제 Project는 업무 목록, 보관함, 일정, 검색과 콘텐츠 성과에서 제외하지만 실제 Expense, Revenue와 확정 Settlement는 재무 합계에서 유지합니다.
 
-## 8.7. Project Member 추가
+## 8.7. Project Member 목록 및 추가 후보 조회
+
+GET /api/projects/{projectId}/members
+
+현재 Project의 활성 참여자를 먼저 반환하고 현재 참여 종료자는 별도 목록으로 구분합니다. 이름, 이메일, 전문 역할, EDIT / VIEW 권한, 참여 상태, 소유자 여부, 현재 참여·종료 시각을 제공합니다. Project 참여자와 Workspace OWNER / ADMIN이 조회할 수 있습니다.
+
+Task 담당자 후보를 조회할 때는 `active=true&permissionLevel=EDIT` 조건을 사용합니다. 이 목록은 #18의 Task 생성·수정 화면에서 재사용하며 VIEW와 참여 종료 사용자는 기존 담당 이력에만 표시합니다.
+
+GET /api/projects/{projectId}/member-candidates
+
+같은 Workspace의 ACTIVE Member 중 현재 ACTIVE Project Member가 아닌 사용자를 반환합니다. 현재 비활성 Project Member인 멤버에는 기존 `projectMemberId`를 함께 제공하여 재참여임을 구분합니다.
+
+GET /api/projects/{projectId}/members/{projectMemberId}/histories
+
+Project Owner와 Workspace OWNER / ADMIN만 호출할 수 있습니다. Project Member의 BASELINE·참여·재참여·권한 변경·참여 종료 이력과 해당 멤버가 이전 또는 신규 Owner였던 소유권 이전 이력을 시간순으로 조합해 반환합니다. 화면 응답에는 처리자 이름을 제공하되 이메일은 포함하지 않습니다.
+
+기존 Project Member의 BASELINE은 기존 `joinedAt`, 현재 권한·활성 상태와 SYSTEM 처리자를 사용합니다. 알 수 없는 과거 권한 변경이나 재참여는 생성하지 않습니다.
+
+### Project Member 변경 API 공통 동시성 규칙
+
+Project Member 추가·재참여·권한 변경·제외·소유권 이전과 Workspace 멤버 제외·탈퇴는 Workspace 단위 직렬화 경계에서 처리합니다. 실제 데이터베이스에서는 관련 `workspace_members`를 ID 오름차순으로 잠그고 `video_projects`, `project_members`를 각각 ID 오름차순으로 잠급니다.
+
+각 요청은 잠금 이후 요청자 권한, Workspace Member 상태, Project 보관·삭제 상태와 Project Member의 최신 상태를 다시 검증합니다. 저장 직전에는 `video_projects.owner_member_id`가 같은 Project의 ACTIVE EDIT Project Member를 가리키는지 재검증합니다. 먼저 완료된 요청으로 조건이 달라졌으면 현재 요청 전체를 롤백하고 최신 목록 재조회가 필요한 409를 반환합니다.
+
+Mock API는 같은 규칙을 Workspace 단위 변경 큐로 구현합니다. 큐 안에서 최신 저장 상태를 다시 읽고 추가 비동기 대기 없이 한 번에 검증·변경하며, 비동기 조회 전에 읽은 Project 전체 객체로 최신 상태를 덮어쓰지 않습니다.
+
+## 8.8. Project Member 추가
 
 POST /api/projects/{projectId}/members
 
@@ -1085,16 +1111,22 @@ POST /api/projects/{projectId}/members
 
 ~~~json
 {
-  "workspaceMemberId": 25,
+  "workspaceMemberIds": [25, 26],
   "permissionLevel": "EDIT"
 }
 ~~~
 
-Workspace에 속하지 않은 사용자를 직접 Project Member로 추가할 수 없습니다.
+한 명만 추가할 때도 길이 1의 `workspaceMemberIds` 배열을 사용합니다. Workspace에 속하지 않은 사용자, 비활성 Workspace Member 또는 이미 ACTIVE인 Project Member를 직접 추가할 수 없습니다.
 
 프로젝트 소유자와 Workspace OWNER / ADMIN만 추가할 수 있습니다. 화면에서는 제작팀 초대와 혼동하지 않도록 `참여자 추가`로 표시하며 검색 결과가 없으면 새 멤버 초대를 제작팀 관리자에게 요청하도록 안내합니다.
 
-## 8.8. Project Member 권한 수정
+요청 대상 전체를 공통 직렬화·잠금 경계에서 검증한 뒤 하나의 트랜잭션으로 추가합니다. 한 명이라도 검증에 실패하면 아무도 추가하지 않고 충돌 대상을 반환합니다. 현재 참여 종료 상태이면 기존 Project Member를 재활성화하고 요청 권한과 새 참여 시각을 기록하며 `leftAt`을 비웁니다.
+
+EDIT로 재참여하면 여전히 같은 Project Member를 담당자로 참조하는 미완료 Task의 담당 자격이 자동 회복됩니다. 응답에는 `restoredIncompleteTaskCount`를 포함하여 화면이 영향을 안내할 수 있게 합니다. 다른 담당자로 변경된 Task와 완료 Task는 변경하지 않으며 VIEW 재참여는 담당 자격을 회복하지 않습니다.
+
+최초 추가는 JOINED, 기존 Project Member 재활성화는 REJOINED 이력을 같은 트랜잭션에서 기록합니다.
+
+## 8.9. Project Member 권한 수정
 
 PATCH /api/projects/{projectId}/members/{projectMemberId}
 
@@ -1110,7 +1142,11 @@ PATCH /api/projects/{projectId}/members/{projectMemberId}
 
 프로젝트 소유자와 Workspace OWNER / ADMIN만 권한을 변경할 수 있습니다. EDIT 참여자는 참여자와 권한을 조회할 수 있지만 변경할 수 없습니다.
 
-## 8.9. Project Member 제거
+VIEW에서 EDIT로 변경하는 요청은 즉시 처리할 수 있습니다. EDIT에서 VIEW로 변경해도 기존 Task 담당자 참조는 보존하며, 미완료 Task에는 담당자 재지정 필요 상태를 응답합니다.
+
+성공한 변경은 PERMISSION_CHANGED 이력을 같은 트랜잭션에서 기록합니다.
+
+## 8.10. Project Member 제거
 
 DELETE /api/projects/{projectId}/members/{projectMemberId}
 
@@ -1118,7 +1154,11 @@ DELETE /api/projects/{projectId}/members/{projectMemberId}
 
 프로젝트 소유자와 Workspace OWNER / ADMIN만 제거할 수 있습니다.
 
-## 8.10. Project Owner 이전
+제거는 Project Member를 삭제하지 않고 비활성화하여 `leftAt`을 기록합니다. 기존 Task 담당자 참조와 완료 이력은 보존하며 미완료 Task에는 담당자 재지정 필요 상태를 응답합니다. Workspace OWNER·ADMIN이 자신의 Project Member를 제거해도 Workspace 관리 권한은 유지되지만 프로젝트 채팅 참여는 종료됩니다.
+
+성공한 제거는 LEFT 이력을 같은 트랜잭션에서 기록합니다. Workspace 제외·탈퇴로 비활성화된 경우 `changeSource=WORKSPACE_MEMBERSHIP`을 사용합니다.
+
+## 8.11. Project Owner 이전
 
 POST /api/projects/{projectId}/transfer-owner
 
@@ -1126,17 +1166,19 @@ POST /api/projects/{projectId}/transfer-owner
 
 ~~~json
 {
-  "newOwnerWorkspaceMemberId": 25
+  "newOwnerProjectMemberId": 45
 }
 ~~~
 
-현재 Project 소유자와 Workspace OWNER / ADMIN만 논리 삭제되지 않은 Project의 소유권을 이전할 수 있습니다. 새 Owner는 같은 Workspace의 ACTIVE Member여야 합니다.
+현재 Project 소유자와 Workspace OWNER / ADMIN만 논리 삭제되지 않은 Project의 소유권을 이전할 수 있습니다. 새 Owner는 같은 Project의 다른 ACTIVE EDIT Project Member여야 합니다. 보관 Project에서도 이 조건을 만족하는 소유권 이전만 허용하고 보관 상태는 유지합니다.
 
-새 Owner가 Project Member가 아니면 ACTIVE·EDIT로 생성하고, 비활성 참여자이면 재활성화하며, VIEW이면 EDIT로 변경한 뒤 소유권을 이전합니다. 이 과정은 하나의 트랜잭션에서 처리합니다.
+VIEW 참여자, 참여 종료 사용자나 Project 미참여자를 자동 추가·재활성화·승격하지 않습니다. 화면에서는 대상 이름과 이메일 및 이전 영향을 표시하고 대상 이메일을 정확히 입력한 경우에만 요청을 전송합니다.
 
 응답 성공 후 기존 Owner는 일반 EDIT Member로 남습니다.
 
-소유권 이전과 Workspace 멤버 제외는 대상 Workspace Member를 먼저 잠근 뒤 Project를 확인하는 동일한 잠금 순서를 사용합니다. 제외 요청은 커밋 직전에 남은 비삭제 소유 Project를 다시 검증합니다. 초기 범위에는 일괄 이전 API를 추가하지 않습니다.
+소유권 변경과 `project_owner_histories` 추가는 같은 트랜잭션에서 처리합니다. 제외 요청은 공통 잠금 순서에 따라 커밋 직전에 남은 비삭제 소유 Project를 다시 검증합니다. 초기 범위에는 일괄 이전 API를 추가하지 않습니다.
+
+보관된 Project의 8.8~8.10 변경 API는 `INVALID_RESOURCE_STATE`를 반환합니다. 8.11 소유권 이전과 참여자·감사 이력 조회는 허용합니다.
 
 ---
 
@@ -1151,7 +1193,7 @@ POST /api/projects/{projectId}/tasks
 | 필드 | 타입 | 필수 | 제약 |
 | --- | --- | --- | --- |
 | taskTypeId | Long | Y | 같은 Workspace의 활성 Task Type |
-| assigneeProjectMemberId | Long | Y | ACTIVE Project Member |
+| assigneeProjectMemberId | Long | Y | ACTIVE EDIT Project Member |
 | startDate | String | N | YYYY-MM-DD |
 | endDate | String | N | YYYY-MM-DD |
 | workerAmount | String | Y | 0 이상 |
@@ -1827,6 +1869,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 ProjectGroup �
 | LAST_OWNER_REQUIRED | 409 | 마지막 Workspace OWNER 변경 불가 |
 | PROJECT_OWNER_CANNOT_BE_REMOVED | 409 | 현재 Project Owner 제거 불가 |
 | PROJECT_OWNERSHIP_TRANSFER_REQUIRED | 409 | 멤버 제외·탈퇴 전 비삭제 Project 소유권 이전 필요 |
+| PROJECT_MEMBER_STATE_CHANGED | 409 | 동시 요청으로 Project Member 또는 Owner 조건 변경, 최신 목록 재조회 필요 |
 | DUPLICATE_YOUTUBE_VIDEO | 409 | Workspace 내 YouTubePublication Video ID 중복 |
 | CURRENT_PUBLICATION_EXISTS | 409 | 같은 VideoContent와 Channel의 CURRENT 게시물 대체 확인 필요 |
 | INVALID_PUBLICATION_REPLACEMENT | 409 | 허용되지 않는 게시물 대체 관계 |
@@ -1970,6 +2013,8 @@ GET /api/workspaces/{workspaceId}/analytics
 - Project 생성에 Channel, 선택적 ProjectGroup, 일정 정보 추가
 - Project Member 추가 대상을 이메일이 아닌 workspaceMemberId로 변경
 - Project Owner 이전 API와 Owner 정합성 검증 추가
+- Project Member 일괄 추가, 재참여 담당 자격 회복과 멤버별 감사 이력 조회 API 추가
+- 보관 Project의 기존 ACTIVE EDIT 참여자 대상 소유권 이전 예외와 공통 동시성 규칙 추가
 - assignment 용어를 task로 통일
 - assignmentId → taskId
 - taskType 문자열 Enum → taskTypeId + taskTypeName

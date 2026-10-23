@@ -99,7 +99,9 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | workspace_invitations | Transaction | 미적용 | 초대자, 발송 / 응답 시각이 자체 업무 데이터이므로 별도 감사 컬럼 불필요 |
 | project_groups | Transaction | 미적용 | 범용 Audit은 두지 않되 프로젝트 그룹 생성자 / 생성 시각은 업무 발생 정보로 보존 |
 | video_projects | Transaction | 미적용 | 범용 Audit은 두지 않되 최초 생성자 / 생성 시각과 보관 / 삭제 라이프사이클 정보는 보존 |
-| project_members | Transaction | 미적용 | 참여 / 제외 시각과 활성 상태로 충분 |
+| project_members | Transaction | 미적용 | 현재 참여 상태를 관리하고 변경 사건은 전용 이력 테이블에 보존 |
+| project_member_histories | Transaction | 미적용 | 참여·재참여·권한 변경·종료 사건과 처리자를 보존 |
+| project_owner_histories | Transaction | 미적용 | Project 소유권 이전 전후와 처리자를 보존 |
 | project_status_histories | Transaction | 미적용 | 변경 전후 상태, 변경자와 변경 시각이 자체 이력 |
 | project_tasks | Transaction | 미적용 | 일정, 상태, 완료 시각이 핵심. 정산 확정 후 금액은 Settlement Item에서 스냅샷 보존 |
 | chat_messages | Transaction | 미적용 | 발신자와 전송 시각 자체가 감사 정보 역할 |
@@ -131,6 +133,8 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | ProjectGroup | project_groups | 여러 Project를 묶는 선택적 상위 업무 단위 |
 | Project | video_projects | 영상 제작 프로젝트 |
 | Project | project_members | Project 참여자 및 EDIT / VIEW 권한 |
+| Project | project_member_histories | Project 참여와 권한 변경 감사 이력 |
+| Project | project_owner_histories | Project 소유권 이전 감사 이력 |
 | Project | project_status_histories | Project 상태 변경 이력 |
 | VideoContent | video_contents | 완성된 논리적 영상 결과물 |
 | VideoContent | project_video_contents | Project와 영상 결과물의 다대다 연결 |
@@ -364,7 +368,7 @@ Workspace에서 관리하는 YouTube 채널입니다.
 - 논리 삭제되지 않은 Project의 `owner_member_id`는 동일 Workspace의 ACTIVE 멤버여야 합니다. 논리 삭제 Project는 당시 소유자를 이력으로 유지하므로 LEFT 또는 REMOVED 멤버를 참조할 수 있습니다.
 - Owner는 `project_members`에도 EDIT 권한 참여자로 등록하는 것을 애플리케이션 규칙으로 둡니다.
 - 현재 Owner에 해당하는 Project Member는 비활성화하거나 VIEW로 낮출 수 없습니다.
-- Owner 변경 시 같은 Workspace의 ACTIVE 멤버를 대상으로 ACTIVE Project Member를 생성·재활성화하고 EDIT 권한을 보장한 뒤 `owner_member_id`를 변경합니다.
+- Owner 변경 대상은 같은 Project의 ACTIVE EDIT Project Member여야 하며, 참여자 생성·재활성화 또는 VIEW의 자동 승격과 소유권 이전을 한 동작으로 처리하지 않습니다.
 - 이전 Owner가 ACTIVE Workspace Member이면 일반 EDIT Project Member로 남습니다. 이후 제작팀에서 제외·탈퇴하면 다른 Project 참여와 함께 비활성화합니다.
 - `created_by_member_id`와 `created_at`은 Owner 변경과 무관하게 최초 생성 정보를 유지합니다.
 - 삭제는 하위 Task, Chat, Expense, Revenue 이력을 보존하기 위해 논리 삭제를 사용합니다.
@@ -452,8 +456,52 @@ Project에 참여하는 Workspace Member와 프로젝트 권한을 관리합니�
 - VIEW는 조회 및 채팅 가능, Project / Task 수정 불가입니다.
 - 현재 Project Owner에 해당하는 Project Member는 제거하거나 비활성화할 수 없으며 VIEW로 권한을 낮출 수도 없습니다. 소유권 이전을 먼저 완료해야 합니다.
 - LEFT 또는 REMOVED 멤버가 Workspace에 재참여해도 기존 Project Member 행을 자동 재활성화하지 않습니다.
+- 참여 종료 Project Member를 다시 추가할 때 `UNIQUE(project_id, workspace_member_id)`에 해당하는 기존 행을 재사용합니다. 새 권한과 `joined_at`을 기록하고 `left_at`을 NULL로 되돌리며 이전 권한은 자동 복구하지 않습니다.
+- EDIT에서 VIEW로 변경하거나 `is_active=false`로 전환해도 기존 `project_tasks.assignee_project_member_id` 참조는 이력으로 유지합니다.
+- ACTIVE EDIT로 재참여하면 여전히 해당 Project Member를 참조하는 미완료 Task의 담당 자격이 자동 회복됩니다. 별도 재지정 상태 컬럼은 두지 않고 Project Member의 현재 활성 상태와 권한으로 계산합니다.
+- Project Member 변경과 Workspace 멤버 제외·탈퇴는 관련 `workspace_members`, `video_projects`, `project_members` 순서로 잠그며 같은 종류의 여러 행은 ID 오름차순으로 잠급니다.
+- 잠금 이후 최신 상태를 다시 검증하고 저장 직전에 현재 `video_projects.owner_member_id`에 해당하는 Project Member가 ACTIVE EDIT인지 확인합니다.
 
-## 6.7. project_status_histories
+## 6.7. project_member_histories
+
+Project Member의 참여와 권한 변경 사건을 append-only로 보존합니다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| project_member_history_id | BIGINT | PK | Project Member 이력 ID |
+| project_member_id | BIGINT | FK → project_members | 대상 Project Member |
+| event_type | VARCHAR(30) | NOT NULL | BASELINE / JOINED / REJOINED / PERMISSION_CHANGED / LEFT |
+| from_permission_level | VARCHAR(10) | NULL | 변경 전 EDIT / VIEW |
+| to_permission_level | VARCHAR(10) | NULL | 변경 후 EDIT / VIEW |
+| from_is_active | BOOLEAN | NULL | 변경 전 참여 활성 상태 |
+| to_is_active | BOOLEAN | NOT NULL | 변경 후 참여 활성 상태 |
+| change_source | VARCHAR(30) | NOT NULL | SYSTEM / PROJECT_MEMBER_MANAGEMENT / WORKSPACE_MEMBERSHIP |
+| changed_by_member_id | BIGINT | FK → workspace_members, NULL | 처리자. SYSTEM 초기화는 NULL |
+| changed_at | DATETIME | NOT NULL | 사건 발생 시각 |
+
+정책:
+
+- 업무 변경과 이력 추가는 같은 트랜잭션에서 처리하며 이력 행은 수정·삭제하지 않습니다.
+- Workspace 제외·탈퇴로 Project Member가 비활성화될 때도 LEFT와 `WORKSPACE_MEMBERSHIP` 발생 경로를 기록합니다.
+- 기존 Project Member에는 BASELINE을 한 번 생성합니다. 기존 `joined_at`, 현재 권한과 활성 상태만 기록하고 알 수 없는 과거 사건은 추정하지 않습니다.
+- 감사 이력 도입 후 재참여할 때 `project_members.joined_at`은 현재 참여 시작 시각으로 갱신하지만 과거 참여 기간과 권한은 이 테이블에서 복원합니다.
+
+## 6.8. project_owner_histories
+
+Project 소유권 이전을 Project Member 권한 이력과 분리하여 append-only로 보존합니다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| project_owner_history_id | BIGINT | PK | Project 소유권 이력 ID |
+| project_id | BIGINT | FK → video_projects | 대상 Project |
+| from_project_member_id | BIGINT | FK → project_members | 이전 Owner |
+| to_project_member_id | BIGINT | FK → project_members | 새 Owner |
+| changed_by_member_id | BIGINT | FK → workspace_members | 처리자 |
+| changed_at | DATETIME | NOT NULL | 이전 시각 |
+
+소유권 변경과 이력 추가는 같은 트랜잭션에서 처리합니다. 기존 데이터에 대해 과거 이전 사건을 추정하지 않으며, 감사 이력 도입 이후 발생한 이전부터 기록합니다.
+
+## 6.9. project_status_histories
 
 Project 상태 변경을 감사 가능한 업무 이력으로 보존합니다.
 
@@ -515,7 +563,8 @@ Project 안에서 실제 수행하는 세부 작업입니다.
 
 정책:
 
-- 담당자는 해당 Project의 ACTIVE `project_members`만 지정할 수 있습니다.
+- 새 담당자는 해당 Project의 ACTIVE EDIT `project_members`만 지정할 수 있습니다.
+- 기존 담당자가 VIEW로 변경되거나 참여 종료되어도 담당자 FK와 Task 상태를 유지합니다. 미완료 Task의 담당자 재지정 필요 여부는 Project Member의 현재 권한·활성 상태로 계산합니다.
 - Task Type과 Project가 동일 Workspace에 속하는지는 서비스 계층에서 검증합니다.
 - `end_date < start_date`는 허용하지 않습니다.
 - Project `due_date` 이후의 종료일은 차단하지 않고 경고합니다.
@@ -913,12 +962,18 @@ erDiagram
     WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : owns
 
     VIDEO_PROJECTS ||--o{ PROJECT_MEMBERS : has
+    PROJECT_MEMBERS ||--o{ PROJECT_MEMBER_HISTORIES : records_member_changes
+    VIDEO_PROJECTS ||--o{ PROJECT_OWNER_HISTORIES : records_owner_changes
+    PROJECT_MEMBERS ||--o{ PROJECT_OWNER_HISTORIES : previous_owner
+    PROJECT_MEMBERS ||--o{ PROJECT_OWNER_HISTORIES : next_owner
     VIDEO_PROJECTS ||--o{ PROJECT_VIDEO_CONTENTS : contributes
     VIDEO_CONTENTS ||--|{ PROJECT_VIDEO_CONTENTS : built_from
     VIDEO_PROJECTS ||--o{ VIDEO_CONTENTS : primarily_attributes
     VIDEO_CONTENTS ||--o{ VIDEO_CONTENT_PRIMARY_PROJECT_HISTORIES : records_primary_changes
     VIDEO_PROJECTS ||--o{ PROJECT_STATUS_HISTORIES : changes
     WORKSPACE_MEMBERS ||--o{ PROJECT_MEMBERS : participates
+    WORKSPACE_MEMBERS o|--o{ PROJECT_MEMBER_HISTORIES : changes_members
+    WORKSPACE_MEMBERS ||--o{ PROJECT_OWNER_HISTORIES : changes_owner
     WORKSPACE_MEMBERS ||--o{ PROJECT_STATUS_HISTORIES : records
     VIDEO_PROJECTS ||--o{ PROJECT_TASKS : contains
     PROJECT_MEMBERS ||--o{ PROJECT_TASKS : assigned
@@ -1110,6 +1165,28 @@ erDiagram
         boolean is_active
     }
 
+    PROJECT_MEMBER_HISTORIES {
+        bigint project_member_history_id PK
+        bigint project_member_id FK
+        varchar event_type
+        varchar from_permission_level
+        varchar to_permission_level
+        boolean from_is_active
+        boolean to_is_active
+        varchar change_source
+        bigint changed_by_member_id FK
+        datetime changed_at
+    }
+
+    PROJECT_OWNER_HISTORIES {
+        bigint project_owner_history_id PK
+        bigint project_id FK
+        bigint from_project_member_id FK
+        bigint to_project_member_id FK
+        bigint changed_by_member_id FK
+        datetime changed_at
+    }
+
     TASK_TYPES {
         bigint task_type_id PK
         bigint workspace_id FK
@@ -1143,6 +1220,10 @@ erDiagram
     WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : archives
     WORKSPACE_MEMBERS ||--o{ VIDEO_PROJECTS : deletes
     VIDEO_PROJECTS ||--o{ PROJECT_MEMBERS : has
+    PROJECT_MEMBERS ||--o{ PROJECT_MEMBER_HISTORIES : records_member_changes
+    VIDEO_PROJECTS ||--o{ PROJECT_OWNER_HISTORIES : records_owner_changes
+    PROJECT_MEMBERS ||--o{ PROJECT_OWNER_HISTORIES : previous_owner
+    PROJECT_MEMBERS ||--o{ PROJECT_OWNER_HISTORIES : next_owner
     VIDEO_PROJECTS ||--o{ PROJECT_VIDEO_CONTENTS : contributes
     VIDEO_CONTENTS ||--|{ PROJECT_VIDEO_CONTENTS : built_from
     VIDEO_PROJECTS ||--o{ VIDEO_CONTENTS : primarily_attributes
@@ -1150,6 +1231,8 @@ erDiagram
     WORKSPACE_MEMBERS ||--o{ VIDEO_CONTENT_PRIMARY_PROJECT_HISTORIES : records
     VIDEO_PROJECTS ||--o{ PROJECT_STATUS_HISTORIES : changes
     WORKSPACE_MEMBERS ||--o{ PROJECT_MEMBERS : participates
+    WORKSPACE_MEMBERS o|--o{ PROJECT_MEMBER_HISTORIES : changes_members
+    WORKSPACE_MEMBERS ||--o{ PROJECT_OWNER_HISTORIES : changes_owner
     WORKSPACE_MEMBERS ||--o{ PROJECT_STATUS_HISTORIES : records
     VIDEO_PROJECTS ||--o{ PROJECT_TASKS : contains
     PROJECT_MEMBERS ||--o{ PROJECT_TASKS : assigned
@@ -1488,6 +1571,8 @@ Project 및 ProjectGroup별 콘텐츠 성과와 예상 플랫폼 수익은 `vide
 - 모든 테이블에 일괄 적용하던 감사 / Soft Delete 컬럼 정책을 데이터 성격에 따라 분리
 - ProjectGroup / Project의 최초 생성자와 생성 시각을 업무 발생 정보로 보존
 - Project Owner와 Project Member의 정합성 및 소유권 이전 순서 명시
+- Project Member 참여·권한 감사 이력과 Project 소유권 이전 이력을 별도 append-only 테이블로 분리
+- Project Member 변경과 Workspace 이탈 경합을 막는 공통 잠금 순서 명시
 - YouTube Video ID 중복 범위를 `youtube_publications`의 Workspace 단위로 제한
 - Expense / Revenue는 물리 삭제 대신 ACTIVE / VOIDED 상태로 관리
 - Settlement 집계 기간의 기준을 Task `completed_at`으로 확정
