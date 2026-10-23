@@ -364,7 +364,7 @@ Workspace에서 관리하는 YouTube 채널입니다.
 - 논리 삭제되지 않은 Project의 `owner_member_id`는 동일 Workspace의 ACTIVE 멤버여야 합니다. 논리 삭제 Project는 당시 소유자를 이력으로 유지하므로 LEFT 또는 REMOVED 멤버를 참조할 수 있습니다.
 - Owner는 `project_members`에도 EDIT 권한 참여자로 등록하는 것을 애플리케이션 규칙으로 둡니다.
 - 현재 Owner에 해당하는 Project Member는 비활성화하거나 VIEW로 낮출 수 없습니다.
-- Owner 변경 시 같은 Workspace의 ACTIVE 멤버를 대상으로 ACTIVE Project Member를 생성·재활성화하고 EDIT 권한을 보장한 뒤 `owner_member_id`를 변경합니다.
+- Owner 변경 대상은 같은 Project의 ACTIVE EDIT Project Member여야 하며, 참여자 생성·재활성화 또는 VIEW의 자동 승격과 소유권 이전을 한 동작으로 처리하지 않습니다.
 - 이전 Owner가 ACTIVE Workspace Member이면 일반 EDIT Project Member로 남습니다. 이후 제작팀에서 제외·탈퇴하면 다른 Project 참여와 함께 비활성화합니다.
 - `created_by_member_id`와 `created_at`은 Owner 변경과 무관하게 최초 생성 정보를 유지합니다.
 - 삭제는 하위 Task, Chat, Expense, Revenue 이력을 보존하기 위해 논리 삭제를 사용합니다.
@@ -452,6 +452,8 @@ Project에 참여하는 Workspace Member와 프로젝트 권한을 관리합니�
 - VIEW는 조회 및 채팅 가능, Project / Task 수정 불가입니다.
 - 현재 Project Owner에 해당하는 Project Member는 제거하거나 비활성화할 수 없으며 VIEW로 권한을 낮출 수도 없습니다. 소유권 이전을 먼저 완료해야 합니다.
 - LEFT 또는 REMOVED 멤버가 Workspace에 재참여해도 기존 Project Member 행을 자동 재활성화하지 않습니다.
+- 참여 종료 Project Member를 다시 추가할 때 `UNIQUE(project_id, workspace_member_id)`에 해당하는 기존 행을 재사용합니다. 새 권한과 `joined_at`을 기록하고 `left_at`을 NULL로 되돌리며 이전 권한은 자동 복구하지 않습니다.
+- EDIT에서 VIEW로 변경하거나 `is_active=false`로 전환해도 기존 `project_tasks.assignee_project_member_id` 참조는 이력으로 유지합니다.
 
 ## 6.7. project_status_histories
 
@@ -515,7 +517,8 @@ Project 안에서 실제 수행하는 세부 작업입니다.
 
 정책:
 
-- 담당자는 해당 Project의 ACTIVE `project_members`만 지정할 수 있습니다.
+- 새 담당자는 해당 Project의 ACTIVE EDIT `project_members`만 지정할 수 있습니다.
+- 기존 담당자가 VIEW로 변경되거나 참여 종료되어도 담당자 FK와 Task 상태를 유지합니다. 미완료 Task의 담당자 재지정 필요 여부는 Project Member의 현재 권한·활성 상태로 계산합니다.
 - Task Type과 Project가 동일 Workspace에 속하는지는 서비스 계층에서 검증합니다.
 - `end_date < start_date`는 허용하지 않습니다.
 - Project `due_date` 이후의 종료일은 차단하지 않고 경고합니다.
