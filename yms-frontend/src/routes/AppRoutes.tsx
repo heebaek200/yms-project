@@ -17,6 +17,7 @@ import NotFoundPage from '../pages/NotFoundPage';
 import ComingSoonPage from '../pages/ComingSoonPage';
 import WorkspaceSettingsPage from '../pages/WorkspaceSettingsPage';
 import ProjectsPage from '../pages/ProjectsPage';
+import ProjectMembersPage from '../pages/ProjectMembersPage';
 import ProjectGroupPage from '../pages/ProjectGroupPage';
 import AppLayout from '../layouts/AppLayout';
 import WorkspaceRouteStatus from '../components/routing/WorkspaceRouteStatus';
@@ -237,6 +238,16 @@ const router = createBrowserRouter(
                 <Route
                     path="/projects/:projectId"
                     element={<ProjectsPage />}
+                />
+
+                <Route
+                    path="/projects/:projectId/videos"
+                    element={<ProjectsPage />}
+                />
+
+                <Route
+                    path="/projects/:projectId/members"
+                    element={<ProjectMembersPage />}
                 />
 
                 {/* SCR-09 메신저 예정 Route */}

@@ -1081,7 +1081,7 @@ DELETE /api/projects/{projectId}
 
 GET /api/projects/{projectId}/members
 
-현재 Project의 활성 참여자를 먼저 반환하고 현재 참여 종료자는 별도 목록으로 구분합니다. 이름, 이메일, 전문 역할, EDIT / VIEW 권한, 참여 상태, 소유자 여부, 현재 참여·종료 시각을 제공합니다. Project 참여자와 Workspace OWNER / ADMIN이 조회할 수 있습니다.
+현재 Project의 활성 참여자를 먼저 반환하고 현재 참여 종료자는 별도 목록으로 구분합니다. 이름, 이메일, 전문 역할, EDIT / VIEW 권한, 참여 상태, 소유자 여부, 현재 Workspace Member 상태(`ACTIVE / LEFT / REMOVED`), 현재 참여·종료 시각을 제공합니다. Project 참여자와 Workspace OWNER / ADMIN이 조회할 수 있습니다. 화면은 현재 참여 종료자라도 Workspace Member가 ACTIVE일 때만 재참여 동작을 제공해야 합니다.
 
 Task 담당자 후보를 조회할 때는 `active=true&permissionLevel=EDIT` 조건을 사용합니다. 이 목록은 #18의 Task 생성·수정 화면에서 재사용하며 VIEW와 참여 종료 사용자는 기존 담당 이력에만 표시합니다.
 

@@ -239,13 +239,32 @@
     right: 0;
     z-index: 110;
 
-    min-width: 160px;
+    min-width: 240px;
     padding: 6px;
 
     background: var(--color-background);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     box-shadow: 0 12px 32px rgb(24 24 27 / 14%);
+}
+
+/* 팝업을 열면 현재 로그인 계정을 즉시 확인하고 이메일을 복사할 수 있게 합니다. */
+.app-user-menu__identity {
+    display: grid;
+    gap: 3px;
+    padding: 8px 12px;
+    min-width: 0;
+}
+
+.app-user-menu__identity strong {
+    font-size: 0.88rem;
+}
+
+.app-user-menu__identity span {
+    color: #737480;
+    font-size: 0.78rem;
+    overflow-wrap: anywhere;
+    user-select: text;
 }
 
 .app-user-menu__item {

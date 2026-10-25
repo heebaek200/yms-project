@@ -1,0 +1,44 @@
+/* 프로젝트 내부 기능은 큰 화면과 모바일에서 같은 위치와 순서를 유지합니다. */
+.project-detail-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin: 1rem 0 1.25rem;
+    padding: 0.35rem;
+    border: 1px solid var(--color-border, #dedfe5);
+    border-radius: 14px;
+    background: rgb(255 255 255 / 35%);
+}
+
+.project-detail-tabs__link {
+    min-width: 0;
+    padding: 0.72rem 0.8rem;
+    border-radius: 10px;
+    color: #62636f;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 160ms ease, color 160ms ease;
+}
+
+.project-detail-tabs__link:hover {
+    background: rgb(239 68 78 / 8%);
+    color: #ef444e;
+}
+
+.project-detail-tabs__link--active {
+    background: rgb(226 226 230 / 82%);
+    color: #ef444e;
+}
+
+@media (max-width: 640px) {
+    .project-detail-tabs {
+        gap: 0.2rem;
+        padding: 0.25rem;
+    }
+
+    .project-detail-tabs__link {
+        padding: 0.7rem 0.2rem;
+        font-size: 0.82rem;
+    }
+}

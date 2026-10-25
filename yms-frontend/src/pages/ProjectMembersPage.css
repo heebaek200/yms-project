@@ -1,0 +1,280 @@
+/* 참여자 관리 화면은 기존 프로젝트 영역의 글래스 표면과 버튼 체계를 그대로 사용합니다. */
+.project-members-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.9rem;
+}
+
+.project-members-header h1 {
+    margin: 0.15rem 0;
+}
+
+.project-members-header p {
+    margin: 0;
+    color: #737480;
+}
+
+.project-members-guide {
+    margin: 1rem 0;
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    background: rgb(255 247 220 / 68%);
+    color: #765b16;
+}
+
+/* 고정 Grid 열은 카드별 액션 수가 달라도 이름·권한·날짜의 세로선을 맞춥니다. */
+.project-member-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.project-member-card {
+    display: grid;
+    grid-template-columns: minmax(170px, 1.35fr) minmax(150px, 1fr) minmax(130px, 0.8fr) minmax(140px, 0.85fr) minmax(240px, auto);
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid #dedfe5;
+    border-radius: 14px;
+    background: rgb(255 255 255 / 42%);
+}
+
+.project-member-card--inactive {
+    background: rgb(240 240 243 / 65%);
+    color: #858690;
+}
+
+.project-member-card--inactive .project-member-card__identity strong {
+    text-decoration: line-through;
+}
+
+.project-member-card__identity,
+.project-member-card__date,
+.project-member-card__access {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.project-member-card__identity span,
+.project-member-card__date span {
+    overflow: hidden;
+    color: #737480;
+    font-size: 0.86rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-member-card__roles,
+.project-member-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.project-member-card__roles span {
+    padding: 0.25rem 0.48rem;
+    border-radius: 999px;
+    background: #f5f5f7;
+    color: #696a74;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.project-member-card__actions {
+    justify-content: flex-end;
+}
+
+.project-member-card__actions .project-button {
+    padding: 0.45rem 0.58rem;
+    font-size: 0.76rem;
+    white-space: nowrap;
+}
+
+/* 제작팀을 떠난 멤버는 Project에서 곧바로 재참여시킬 수 없는 이유를 카드에서 설명합니다. */
+.project-member-card__workspace-state {
+    color: #a04a52;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+/* 소유자와 편집·보기 권한은 의미와 위험도가 즉시 구분되도록 서로 다른 색을 사용합니다. */
+.project-member-badge {
+    width: fit-content;
+    padding: 0.28rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.project-member-badge--owner { background: #fff0c9; color: #8b5a00; }
+.project-member-badge--edit { background: #dcf7e8; color: #15764a; }
+.project-member-badge--view { background: #e9e5ff; color: #5e47b5; }
+
+.project-inactive-members {
+    margin-top: 1rem;
+}
+
+.project-inactive-members__toggle {
+    width: 100%;
+    padding: 0.9rem 1rem;
+    border: 1px solid #dedfe5;
+    border-radius: 12px;
+    background: rgb(255 255 255 / 30%);
+    color: #5f606a;
+    font-weight: 800;
+    text-align: left;
+}
+
+.project-inactive-members__toggle span {
+    float: right;
+}
+
+/* 모달 내부는 선택 후보가 늘어나도 액션을 하단에서 안정적으로 찾도록 구성합니다. */
+.project-member-modal {
+    display: grid;
+    gap: 1rem;
+}
+
+.project-member-permission {
+    display: flex;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid #dedfe5;
+    border-radius: 12px;
+}
+
+.project-member-permission legend {
+    padding: 0 0.25rem;
+    font-weight: 800;
+}
+
+.project-member-candidates {
+    display: grid;
+    gap: 0.55rem;
+    max-height: 42vh;
+    overflow-y: auto;
+}
+
+.project-member-candidates > label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 0.8rem;
+    border: 1px solid #dedfe5;
+    border-radius: 12px;
+}
+
+.project-member-candidates > label > span {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.project-member-candidates small,
+.project-member-candidates em {
+    color: #70717c;
+    font-size: 0.8rem;
+    font-style: normal;
+}
+
+.project-member-candidates em {
+    color: #775cae;
+    font-weight: 700;
+}
+
+.project-member-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.project-member-impact,
+.project-owner-transfer {
+    line-height: 1.55;
+}
+
+.project-member-impact__warning {
+    color: #c23b47;
+    font-weight: 700;
+}
+
+.project-owner-transfer label {
+    display: grid;
+    gap: 0.45rem;
+}
+
+/* 확인용 이메일은 입력 예시가 아니라 복사 가능한 대상 정보로 분리해 표시합니다. */
+.project-owner-transfer__email {
+    width: fit-content;
+    max-width: 100%;
+    padding: 0.55rem 0.7rem;
+    border-radius: 8px;
+    background: rgb(244 245 248 / 85%);
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+.project-owner-transfer input {
+    padding: 0.8rem;
+    border: 1px solid #d7d8df;
+    border-radius: 10px;
+}
+
+.project-member-history {
+    display: grid;
+    gap: 0.75rem;
+    max-height: 50vh;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.project-member-history li {
+    display: grid;
+    gap: 0.2rem;
+    padding-left: 0.8rem;
+    border-left: 3px solid #e95661;
+}
+
+.project-member-history span {
+    color: #777883;
+    font-size: 0.84rem;
+}
+
+@media (max-width: 1100px) {
+    .project-member-card {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .project-member-card__actions {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 640px) {
+    .project-members-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .project-members-header > .project-button {
+        width: 100%;
+    }
+
+    .project-member-card {
+        grid-template-columns: 1fr;
+    }
+
+    .project-member-card__actions {
+        grid-column: auto;
+    }
+
+    .project-member-card__actions .project-button {
+        flex: 1 1 42%;
+    }
+}
