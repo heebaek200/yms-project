@@ -9,10 +9,7 @@ import type {
 } from '../../types/project';
 import type { ApiResponse } from '../types';
 import { findWorkspaceChannel } from '../workspaces/channels';
-import {
-    findActiveWorkspaceMemberByUserId,
-    getWorkspaceMembers
-} from '../workspaces/members';
+import { findActiveWorkspaceMemberByUserId } from '../workspaces/members';
 import { readProjectGroup, readProjectGroups } from '../projectGroups/projectGroupStore';
 import {
     insertProject,
@@ -314,35 +311,4 @@ export function getProjectGroupOptions(workspaceId: number, context: ProjectMuta
         .filter(group => group.workspaceId === workspaceId)
         .filter(group => visibleGroupIds === null || visibleGroupIds.has(group.projectGroupId))
         .map(group => ({ projectGroupId: group.projectGroupId, name: group.name }));
-}
-
-/** 같은 Workspace ACTIVE 멤버에게 소유권을 넘기고 EDIT 참여를 보장합니다. */
-export async function transferProjectOwner(
-    workspaceId: number,
-    projectId: number,
-    newOwnerWorkspaceMemberId: number,
-    context: ProjectMutationContext
-): Promise<ApiResponse<ProjectDetailResponse>> {
-    await waitForMockResponse();
-    const project = readProject(workspaceId, projectId);
-    const actor = findActiveWorkspaceMemberByUserId(workspaceId, context.userId);
-    const canTransfer = project && (
-        context.workspaceRole !== 'MEMBER'
-        || project.ownerWorkspaceMemberId === actor?.workspaceMemberId
-    );
-    const candidates = await getWorkspaceMembers(
-        workspaceId,
-        { status: 'ACTIVE' }
-    );
-    const newOwner = candidates.data.find(
-        member => member.workspaceMemberId === newOwnerWorkspaceMemberId
-    );
-    if (!project || !canTransfer) return { success: false, errorCode: 'PROJECT_OWNER_TRANSFER_FORBIDDEN', message: '프로젝트 소유권을 이전할 권한이 없습니다.', errors: null };
-    if (!newOwner) return { success: false, errorCode: 'PROJECT_OWNER_TARGET_INVALID', message: '같은 제작팀의 활동 중인 멤버를 선택해 주세요.', errors: null };
-
-    const members = project.members.map(member => ({ ...member, isOwner: member.workspaceMemberId === newOwnerWorkspaceMemberId ? true : member.isOwner ? false : member.isOwner, permission: member.workspaceMemberId === newOwnerWorkspaceMemberId ? 'EDIT' as const : member.permission }));
-    if (!members.some(member => member.workspaceMemberId === newOwnerWorkspaceMemberId)) members.push({ workspaceMemberId: newOwner.workspaceMemberId, userId: newOwner.userId, name: newOwner.name, permission: 'EDIT', active: true, isOwner: true });
-    const updated = { ...project, ownerWorkspaceMemberId: newOwner.workspaceMemberId, ownerName: newOwner.name, members: members.map(member => member.workspaceMemberId === newOwnerWorkspaceMemberId ? { ...member, active: true, permission: 'EDIT' as const } : member), updatedAt: new Date().toISOString() };
-    replaceProject(updated);
-    return { success: true, message: `${newOwner.name} 님에게 프로젝트 소유권을 이전했습니다.`, data: toProjectDetailResponse(updated, context.workspaceRole) };
 }

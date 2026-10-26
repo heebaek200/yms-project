@@ -186,6 +186,13 @@ function AppHeader() {
                             className="app-user-menu"
                             role="menu"
                         >
+                            <div className="app-user-menu__identity">
+                                <strong>{user?.name}</strong>
+                                <span>{user?.email}</span>
+                            </div>
+
+                            <div className="app-user-menu__divider" />
+
                             <button
                                 type="button"
                                 className="app-user-menu__item"

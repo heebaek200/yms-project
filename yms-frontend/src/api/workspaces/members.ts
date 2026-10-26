@@ -10,6 +10,7 @@ import {
     countOwnedProjects,
     deactivateProjectMemberships
 } from '../projects/projectStore';
+import { withWorkspaceMutation } from './workspaceMutationQueue';
 
 type StoredWorkspaceMember = Omit<WorkspaceMember, 'ownedProjectCount'>;
 
@@ -94,6 +95,30 @@ let mockMembers: Record<number, StoredWorkspaceMember[]> = {
             leftAt: '2026-09-15T11:00:00+09:00'
         }
     ],
+    2: [
+        {
+            workspaceMemberId: 201,
+            userId: 24621,
+            name: '샘플 크리에이터',
+            email: 'creator@sample.test',
+            professionalRoles: ['CREATOR'],
+            workspaceRole: 'OWNER',
+            status: 'ACTIVE',
+            joinedAt: '2026-01-10T10:00:00+09:00',
+            leftAt: null
+        },
+        {
+            workspaceMemberId: 202,
+            userId: 24601,
+            name: '테스트 사용자',
+            email: 'test@test.com',
+            professionalRoles: ['EDITOR'],
+            workspaceRole: 'MEMBER',
+            status: 'ACTIVE',
+            joinedAt: '2026-08-20T14:00:00+09:00',
+            leftAt: null
+        }
+    ],
     7: [
         {
             workspaceMemberId: 701,
@@ -143,6 +168,11 @@ export function findActiveWorkspaceMemberByUserId(
         item.userId === userId && item.status === 'ACTIVE'
     ));
     return member ? toWorkspaceMember(workspaceId, member) : null;
+}
+
+/** Project Member 후보와 응답 조합에서 최신 Workspace 멤버를 지연 없이 복사해 사용합니다. */
+export function readWorkspaceMembers(workspaceId: number): WorkspaceMember[] {
+    return getMemberStore(workspaceId).map(member => toWorkspaceMember(workspaceId, member));
 }
 
 /**
@@ -330,65 +360,21 @@ export async function removeWorkspaceMember(
     actorUserId: number
 ): Promise<WorkspaceMemberResponse> {
     await new Promise(resolve => setTimeout(resolve, 300));
+    return withWorkspaceMutation(workspaceId, () => {
+        const members = getMemberStore(workspaceId);
+        const actor = members.find(member => member.userId === actorUserId);
+        const target = members.find(member => member.workspaceMemberId === workspaceMemberId);
 
-    const members = getMemberStore(workspaceId);
-    const actor = members.find(member => member.userId === actorUserId);
-    const target = members.find(
-        member => member.workspaceMemberId === workspaceMemberId
-    );
+        // 큐 진입 후 최신 Workspace Member와 Project Owner 상태를 다시 검증합니다.
+        if (!actor || actor.status !== 'ACTIVE' || actor.workspaceRole === 'MEMBER') return { success: false, errorCode: 'WORKSPACE_MEMBER_REMOVE_FORBIDDEN', message: '멤버를 제외할 권한이 없습니다.', errors: null };
+        if (!target || target.status !== 'ACTIVE') return { success: false, errorCode: 'WORKSPACE_MEMBER_NOT_ACTIVE', message: '활동 중인 멤버를 찾을 수 없습니다.', errors: null };
+        if (target.userId === actorUserId) return { success: false, errorCode: 'SELF_REMOVE_NOT_ALLOWED', message: '자기 자신은 제작팀에서 제외할 수 없습니다.', errors: null };
+        if (actor.workspaceRole === 'ADMIN' && target.workspaceRole !== 'MEMBER') return { success: false, errorCode: 'ADMIN_TARGET_FORBIDDEN', message: '관리자는 일반 멤버만 제외할 수 있습니다.', errors: null };
+        if (countOwnedProjects(workspaceId, target.workspaceMemberId) > 0) return { success: false, errorCode: 'PROJECT_OWNERSHIP_TRANSFER_REQUIRED', message: '소유 중인 프로젝트의 소유자를 먼저 변경해 주세요.', errors: null };
 
-    if (!actor || actor.status !== 'ACTIVE' || actor.workspaceRole === 'MEMBER') {
-        return {
-            success: false,
-            errorCode: 'WORKSPACE_MEMBER_REMOVE_FORBIDDEN',
-            message: '멤버를 제외할 권한이 없습니다.',
-            errors: null
-        };
-    }
-
-    if (!target || target.status !== 'ACTIVE') {
-        return {
-            success: false,
-            errorCode: 'WORKSPACE_MEMBER_NOT_ACTIVE',
-            message: '활동 중인 멤버를 찾을 수 없습니다.',
-            errors: null
-        };
-    }
-
-    if (target.userId === actorUserId) {
-        return {
-            success: false,
-            errorCode: 'SELF_REMOVE_NOT_ALLOWED',
-            message: '자기 자신은 제작팀에서 제외할 수 없습니다.',
-            errors: null
-        };
-    }
-
-    if (actor.workspaceRole === 'ADMIN' && target.workspaceRole !== 'MEMBER') {
-        return {
-            success: false,
-            errorCode: 'ADMIN_TARGET_FORBIDDEN',
-            message: '관리자는 일반 멤버만 제외할 수 있습니다.',
-            errors: null
-        };
-    }
-
-    if (countOwnedProjects(workspaceId, target.workspaceMemberId) > 0) {
-        return {
-            success: false,
-            errorCode: 'PROJECT_OWNERSHIP_TRANSFER_REQUIRED',
-            message: '소유 중인 프로젝트의 소유자를 먼저 변경해 주세요.',
-            errors: null
-        };
-    }
-
-    target.status = 'REMOVED';
-    target.leftAt = new Date().toISOString();
-    deactivateProjectMemberships(workspaceId, target.workspaceMemberId);
-
-    return {
-        success: true,
-        message: `${target.name} 님을 제작팀에서 제외했습니다.`,
-        data: toWorkspaceMember(workspaceId, target)
-    };
+        target.status = 'REMOVED';
+        target.leftAt = new Date().toISOString();
+        deactivateProjectMemberships(workspaceId, target.workspaceMemberId, actor.name, actor.workspaceMemberId);
+        return { success: true, message: `${target.name} 님을 제작팀에서 제외했습니다.`, data: toWorkspaceMember(workspaceId, target) };
+    });
 }

@@ -15,6 +15,7 @@ import FeedbackMessage, { type FeedbackMessageType } from '../components/common/
 import FilterResetButton from '../components/common/FilterResetButton';
 import ProjectAreaTabs from '../components/project-groups/ProjectAreaTabs';
 import ProjectGroupModal from '../components/project-groups/ProjectGroupModal';
+import ProjectDetailTabs from '../components/projects/ProjectDetailTabs';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { registerUnsavedChangesGuard } from '../navigation/unsavedChangesGuard';
@@ -79,25 +80,42 @@ function ProjectsPage() {
     const [publicationErrors, setPublicationErrors] = useState<Record<number, string>>({});
     const allowNavigation = useRef(false);
     const formRef = useRef<HTMLFormElement>(null);
+    const latestReadRequestIdRef = useRef(0);
+    const latestChannelRequestIdRef = useRef(0);
+    const activeViewContextRef = useRef('');
+    const activeWorkspaceIdRef = useRef<number | null>(null);
     const isAdmin = currentWorkspace?.myRole !== 'MEMBER';
     const context = useMemo(() => ({ userId: user?.userId ?? 0, userName: user?.name ?? '', workspaceRole: currentWorkspace?.myRole ?? 'MEMBER' as const }), [currentWorkspace?.myRole, user]);
     const groups = currentWorkspace ? getProjectGroupOptions(currentWorkspace.workspaceId, context) : [];
+    const viewContextKey = `${currentWorkspace?.workspaceId ?? 'none'}:${projectId ?? 'list'}:${params.toString()}`;
     const dirty = modalOpen && JSON.stringify(form) !== JSON.stringify(initialForm);
     const blocker = useBlocker(({ currentLocation, nextLocation }) => !allowNavigation.current && dirty && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search));
+
+    // 응답 적용 기준을 Paint 전에 갱신해 이전 제작팀·Route 요청이 새 화면을 덮어쓰지 못하게 합니다.
+    useLayoutEffect(() => {
+        activeViewContextRef.current = viewContextKey;
+        activeWorkspaceIdRef.current = currentWorkspace?.workspaceId ?? null;
+    }, [currentWorkspace?.workspaceId, viewContextKey]);
 
     /** 현재 제작팀의 활성 채널을 필터와 폼에 공급합니다. */
     const loadChannels = useCallback(async () => {
         if (!currentWorkspace) return;
-        const response = await getWorkspaceChannels(currentWorkspace.workspaceId, { workspaceRole: currentWorkspace.myRole }, { activeOnly: true });
+        const workspaceId = currentWorkspace.workspaceId;
+        const requestId = ++latestChannelRequestIdRef.current;
+        const response = await getWorkspaceChannels(workspaceId, { workspaceRole: currentWorkspace.myRole }, { activeOnly: true });
+        if (requestId !== latestChannelRequestIdRef.current || activeWorkspaceIdRef.current !== workspaceId) return;
         setChannels(response.success ? response.data : []);
     }, [currentWorkspace]);
 
     /** query string을 AND 조건으로 전달해 프로젝트 목록을 조회합니다. */
     const loadList = useCallback(async () => {
         if (!currentWorkspace || projectId !== null) return;
+        const requestId = ++latestReadRequestIdRef.current;
+        const requestContextKey = activeViewContextRef.current;
         setDetail(null);
         setLoading(true); setError(null);
         const response = await getWorkspaceProjects(currentWorkspace.workspaceId, { view: params.get('view') === 'archived' ? 'archived' : 'active', status: (params.get('status') as ProjectStatus | 'ALL') ?? 'ALL', channelId: Number(params.get('channelId')) || null, projectGroupId: Number(params.get('projectGroupId')) || null, participation: params.get('participation') === 'MINE' ? 'MINE' : 'ALL', keyword: params.get('keyword') ?? '', page: Number(params.get('page')) || 1 }, context);
+        if (requestId !== latestReadRequestIdRef.current || activeViewContextRef.current !== requestContextKey) return;
         if (response.success) {
             setProjects(response.data.items);
             setTotalPages(response.data.totalPages);
@@ -108,14 +126,17 @@ function ProjectsPage() {
     /** Route ID와 사용자 권한을 적용해 프로젝트 상세를 조회합니다. */
     const loadDetail = useCallback(async () => {
         if (!currentWorkspace || projectId === null) return;
+        const requestId = ++latestReadRequestIdRef.current;
+        const requestContextKey = activeViewContextRef.current;
         setLoading(true); setError(null);
         const response = await getWorkspaceProject(currentWorkspace.workspaceId, projectId, context);
+        if (requestId !== latestReadRequestIdRef.current || activeViewContextRef.current !== requestContextKey) return;
         if (response.success) setDetail(response.data); else { setDetail(null); setError(response.message); }
         setLoading(false);
     }, [context, currentWorkspace, projectId]);
 
     useEffect(() => { void loadChannels(); }, [loadChannels]);
-    useEffect(() => { if (projectId === null) void loadList(); else if (Number.isInteger(projectId)) void loadDetail(); else { setLoading(false); setError('올바르지 않은 프로젝트 주소입니다.'); } }, [loadDetail, loadList, projectId]);
+    useEffect(() => { if (projectId === null) void loadList(); else if (Number.isInteger(projectId)) void loadDetail(); else { latestReadRequestIdRef.current += 1; setLoading(false); setError('올바르지 않은 프로젝트 주소입니다.'); } }, [loadDetail, loadList, projectId]);
     useEffect(() => { setDetail(null); setProjects([]); setFeedback(null); setModalOpen(false); setEditingProject(null); }, [currentWorkspace?.workspaceId]);
     useEffect(() => { setPublicationDrafts({}); setPublicationErrors({}); }, [currentWorkspace?.workspaceId, projectId]);
     useEffect(() => {
@@ -672,13 +693,14 @@ function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, on
     );
 }
 
-/** 기본·작업·참여 정보와 N:M 영상 결과물·게시 이력을 프로젝트 상세에 표시합니다. */
+/** URL 탭에 따라 프로젝트 기본 정보와 영상 결과물을 분리해 표시합니다. */
 function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeRevenue, canEdit, canManage, publicationDrafts, publicationErrors, onPublicationDraft, onEdit, onArchive, onDelete, onAddVideoContent, onChangePrimaryProject, onAddPublication, onPublicationAction }: ProjectDetailViewProps) {
     const location = useLocation();
     if (loading) return <p className="project-state">프로젝트를 불러오는 중...</p>;
     if (!detail || error) return <FeedbackMessage type="error" message={error ?? '프로젝트를 찾을 수 없습니다.'} />;
 
     const back = (location.state as { listSearch?: string } | null)?.listSearch;
+    const videoView = location.pathname.endsWith('/videos');
     const archiveActionAvailable = isArchiveActionAvailable(detail);
     const archiveUnavailableMessage = '업로드 완료 또는 제작 취소 상태에서 보관할 수 있습니다.';
     return (
@@ -689,12 +711,13 @@ function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeR
                 <div><p className="project-group-eyebrow">{detail.videoType === 'LONG' ? 'LONG FORM DEFAULT' : 'SHORTS DEFAULT'}</p><h1>{detail.title}</h1><p>{detail.channelName} · 소유자 {detail.ownerName}</p></div>
                 <div className="project-actions"><span className={`project-status project-status--${detail.status.toLowerCase()}`}>{STATUS_LABEL[detail.status]}</span>{canEdit && <button className="project-button" onClick={onEdit}>수정</button>}{canManage && <span className="project-action-tooltip" title={archiveActionAvailable ? undefined : archiveUnavailableMessage}><button className="project-button" disabled={!archiveActionAvailable} aria-label={archiveActionAvailable ? undefined : `보관: ${archiveUnavailableMessage}`} onClick={onArchive}>{detail.archivedAt ? '복원' : '보관'}</button></span>}{canManage && <button className="project-button project-button--danger" onClick={onDelete}>삭제</button>}</div>
             </header>
-            <div className="project-detail-grid">
+            <ProjectDetailTabs projectId={detail.projectId} />
+            {!videoView && <div className="project-detail-grid">
                 <article><h2>기본 정보</h2><p>{detail.content ?? '등록된 내용이 없습니다.'}</p><dl><div><dt>마감일</dt><dd>{detail.dueDate ?? '미정'}</dd></div><div><dt>업로드 예정일</dt><dd>{detail.plannedUploadDate ?? '미정'}</dd></div><div><dt>프로젝트 그룹</dt><dd>{detail.projectGroupName ?? '없음'}</dd></div></dl></article>
                 <article><h2>작업 요약</h2><strong className="project-big-number">{detail.completedTaskCount}/{detail.taskCount}</strong><p>작업 상세 관리는 다음 이슈에서 연결됩니다.</p></article>
                 <article><h2>참여자</h2><ul>{detail.members.filter(item => item.active).map(item => <li key={item.workspaceMemberId}>{item.name}{item.isOwner ? ' 👑' : ''} <small>{item.permission === 'EDIT' ? '편집' : '보기'}</small></li>)}</ul></article>
-            </div>
-            <section className="project-section project-video-contents">
+            </div>}
+            {videoView && <section className="project-section project-video-contents">
                 <header className="project-section__header"><div><h2>영상 결과물과 YouTube 게시 이력</h2><p>프로젝트는 제작 과정이며, 완성 결과물과 실제 게시물은 별도로 관리합니다.</p></div>{canEdit && <button className="project-button project-button--primary" onClick={onAddVideoContent}>결과물 추가</button>}</header>
                 {detail.videoContents.length === 0 ? <div className="project-state"><strong>아직 영상 결과물이 없습니다.</strong><p>결과물을 추가해 게시 이력과 성과를 연결할 수 있습니다.</p></div> : detail.videoContents.map(content => {
                     const draft = publicationDrafts[content.videoContentId] ?? { youtubeVideo: '', channelId: String(detail.channelId) };
@@ -704,14 +727,14 @@ function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeR
                     return (
                         <article className="project-video-content" key={content.videoContentId}>
                             <header><div><span>{content.videoType === 'LONG' ? '롱폼' : '쇼츠'}</span><h3>{content.title}</h3><p>성과 집계 프로젝트 #{content.primaryProjectId} · 연결 프로젝트 {content.connectedProjectIds.length}개</p></div><div className="project-video-content__actions">{content.primaryProjectId === detail.projectId && <strong className="project-primary-badge" title="이 영상의 성과가 현재 프로젝트와 프로젝트 그룹에 집계됩니다.">성과 집계 대상</strong>}{canEdit && content.connectedProjectIds.length > 1 && <button className="project-button" onClick={() => onChangePrimaryProject(content)}>집계 프로젝트 변경</button>}</div></header>
+                            {canEdit && <div className="project-publication-form"><select aria-label="게시 채널" value={draft.channelId} onChange={event => onPublicationDraft(content.videoContentId, { channelId: event.target.value })}>{channels.map(channel => <option key={channel.channelId} value={channel.channelId}>{channel.name}</option>)}</select><div className="project-publication-field"><input id={`project-youtube-video-${content.videoContentId}`} aria-label="YouTube URL 또는 영상 ID" aria-invalid={Boolean(publicationError)} aria-describedby={publicationError ? publicationErrorId : undefined} value={draft.youtubeVideo} placeholder="YouTube URL 또는 11자리 영상 ID" onChange={event => onPublicationDraft(content.videoContentId, { youtubeVideo: event.target.value })} />{publicationError && <small id={publicationErrorId} role="alert">{publicationError}</small>}</div><button className="project-button project-button--primary" onClick={() => onAddPublication(content)}>등록</button></div>}
                             <div className="project-performance-grid"><PerformanceSummary title="현재 성과" aggregate={content.currentPerformance} canSeeRevenue={canSeeRevenue} /><PerformanceSummary title="누적 게시 성과" aggregate={content.cumulativePerformance} canSeeRevenue={canSeeRevenue} /></div>
                             {byChannel.length > 0 ? <div className="project-publication-timelines">{byChannel.map(publications => <PublicationTimeline key={publications[0].channelId} content={content} publications={publications} canEdit={canEdit} canSeeRevenue={canSeeRevenue} onAction={onPublicationAction} />)}</div> : <p className="project-empty-publication">등록된 YouTube 게시물이 없습니다.</p>}
-                            {canEdit && <div className="project-publication-form"><select aria-label="게시 채널" value={draft.channelId} onChange={event => onPublicationDraft(content.videoContentId, { channelId: event.target.value })}>{channels.map(channel => <option key={channel.channelId} value={channel.channelId}>{channel.name}</option>)}</select><div className="project-publication-field"><input id={`project-youtube-video-${content.videoContentId}`} aria-label="YouTube URL 또는 영상 ID" aria-invalid={Boolean(publicationError)} aria-describedby={publicationError ? publicationErrorId : undefined} value={draft.youtubeVideo} placeholder="YouTube URL 또는 11자리 영상 ID" onChange={event => onPublicationDraft(content.videoContentId, { youtubeVideo: event.target.value })} />{publicationError && <small id={publicationErrorId} role="alert">{publicationError}</small>}</div><button className="project-button project-button--primary" onClick={() => onAddPublication(content)}>게시물 추가</button></div>}
                         </article>
                     );
                 })}
-            </section>
-            <section className="project-section"><h2>프로젝트 상태 변경 이력</h2><ol className="project-history">{[...detail.statusHistory].reverse().map((item, index) => <li key={`${item.changedAt}-${index}`}><strong>{STATUS_LABEL[item.status]}</strong><span>{new Date(item.changedAt).toLocaleString('ko-KR')} · {item.changedByName}</span></li>)}</ol></section>
+            </section>}
+            {!videoView && <section className="project-section"><h2>프로젝트 상태 변경 이력</h2><ol className="project-history">{[...detail.statusHistory].reverse().map((item, index) => <li key={`${item.changedAt}-${index}`}><strong>{STATUS_LABEL[item.status]}</strong><span>{new Date(item.changedAt).toLocaleString('ko-KR')} · {item.changedByName}</span></li>)}</ol></section>}
         </>
     );
 }

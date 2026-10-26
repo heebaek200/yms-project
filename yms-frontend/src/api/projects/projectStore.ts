@@ -1,4 +1,8 @@
-import type { ProjectDetail } from '../../types/project';
+import type {
+    ProjectDetail,
+    ProjectMemberAuditEvent,
+    ProjectMemberPermission
+} from '../../types/project';
 
 let nextProjectId = 33;
 type DeletedProjectFinance = Pick<ProjectDetail, 'projectId' | 'projectGroupId' | 'workerAmount' | 'directExpenseAmount' | 'directRevenueAmount' | 'videoContents'>;
@@ -12,7 +16,7 @@ let projects: ProjectDetail[] = [
         ownerWorkspaceMemberId: 101, ownerName: '테스트 사용자', dueDate: '2026-10-22', plannedUploadDate: '2026-10-25',
         archivedAt: null, updatedAt: '2026-10-19T14:10:00+09:00', taskCount: 4, completedTaskCount: 3, isParticipant: true,
         workerAmount: '1200000.00', directExpenseAmount: '300000.00', directRevenueAmount: '450000.00',
-        members: [{ workspaceMemberId: 101, userId: 24601, name: '테스트 사용자', permission: 'EDIT', active: true, isOwner: true }, { workspaceMemberId: 104, userId: 24604, name: '이편집', permission: 'EDIT', active: true, isOwner: false }],
+        members: [{ workspaceMemberId: 101, userId: 24601, name: '테스트 사용자', permission: 'EDIT', active: true, isOwner: true }, { workspaceMemberId: 104, userId: 24604, name: '이편집', permission: 'EDIT', active: true, isOwner: false }, { workspaceMemberId: 103, userId: 24603, name: '김관리', permission: 'VIEW', active: false, isOwner: false }],
         statusHistory: [{ status: 'PLANNING', changedAt: '2026-09-01T09:00:00+09:00', changedByName: '테스트 사용자' }, { status: 'REVIEW', changedAt: '2026-10-19T14:10:00+09:00', changedByName: '테스트 사용자' }],
         videoContents: [{
             videoContentId: 101, title: '카메라 롱폼 리뷰 완성본', videoType: 'LONG', primaryProjectId: 11, connectedProjectIds: [11], primaryProjectHistory: [{ fromProjectId: null, toProjectId: 11, fromProjectGroupId: null, toProjectGroupId: 1, changedByName: '테스트 사용자', changedAt: '2026-10-01T17:00:00+09:00', reason: '영상 결과물 생성' }],
@@ -26,7 +30,7 @@ let projects: ProjectDetail[] = [
         }]
     },
     {
-        projectId: 12, workspaceId: 1, title: '카메라 Shorts #1', content: '핵심 기능 30초 요약', channelId: 2, channelName: 'YMS Shorts', projectGroupId: 1, projectGroupName: '신제품 카메라 협찬', videoType: 'SHORTS', status: 'UPLOADED', ownerWorkspaceMemberId: 102, ownerName: '윤공동', dueDate: '2026-10-03', plannedUploadDate: '2026-10-05', archivedAt: '2026-10-12T09:00:00+09:00', updatedAt: '2026-10-12T09:00:00+09:00', taskCount: 3, completedTaskCount: 3, isParticipant: false, workerAmount: '350000.00', directExpenseAmount: '100000.00', directRevenueAmount: '150000.00', members: [{ workspaceMemberId: 102, userId: 24602, name: '윤공동', permission: 'EDIT', active: true, isOwner: true }], statusHistory: [{ status: 'UPLOADED', changedAt: '2026-10-05T18:00:00+09:00', changedByName: '윤공동' }], videoContents: []
+        projectId: 12, workspaceId: 1, title: '카메라 Shorts #1', content: '핵심 기능 30초 요약', channelId: 2, channelName: 'YMS Shorts', projectGroupId: 1, projectGroupName: '신제품 카메라 협찬', videoType: 'SHORTS', status: 'UPLOADED', ownerWorkspaceMemberId: 102, ownerName: '윤공동', dueDate: '2026-10-03', plannedUploadDate: '2026-10-05', archivedAt: '2026-10-12T09:00:00+09:00', updatedAt: '2026-10-12T09:00:00+09:00', taskCount: 3, completedTaskCount: 3, isParticipant: false, workerAmount: '350000.00', directExpenseAmount: '100000.00', directRevenueAmount: '150000.00', members: [{ workspaceMemberId: 102, userId: 24602, name: '윤공동', permission: 'EDIT', active: true, isOwner: true }, { workspaceMemberId: 104, userId: 24604, name: '이편집', permission: 'EDIT', active: true, isOwner: false }], statusHistory: [{ status: 'UPLOADED', changedAt: '2026-10-05T18:00:00+09:00', changedByName: '윤공동' }], videoContents: []
     },
     {
         projectId: 13, workspaceId: 1, title: '가을 굿즈 티저', content: null, channelId: 2, channelName: 'YMS Shorts', projectGroupId: 2, projectGroupName: '가을 굿즈 소개', videoType: 'SHORTS', status: 'PLANNING', ownerWorkspaceMemberId: 102, ownerName: '윤공동', dueDate: null, plannedUploadDate: null, archivedAt: null, updatedAt: '2026-10-18T08:00:00+09:00', taskCount: 0, completedTaskCount: 0, isParticipant: false, workerAmount: '0.00', directExpenseAmount: '0.00', directRevenueAmount: '0.00', members: [{ workspaceMemberId: 102, userId: 24602, name: '윤공동', permission: 'EDIT', active: true, isOwner: true }], statusHistory: [{ status: 'PLANNING', changedAt: '2026-10-18T08:00:00+09:00', changedByName: '윤공동' }], videoContents: []
@@ -66,6 +70,165 @@ if (sharedCameraContent) {
     projects = projects.map(project => project.projectId === 12
         ? { ...project, videoContents: [sharedCameraContent] }
         : project);
+}
+
+export type StoredProjectMemberMeta = {
+    projectMemberId: number;
+    projectId: number;
+    workspaceMemberId: number;
+    joinedAt: string;
+    leftAt: string | null;
+    incompleteTaskCount: number;
+};
+
+export type StoredProjectMemberHistory = {
+    historyId: number;
+    projectMemberId: number;
+    eventType: ProjectMemberAuditEvent;
+    fromPermission: ProjectMemberPermission | null;
+    toPermission: ProjectMemberPermission | null;
+    fromActive: boolean | null;
+    toActive: boolean;
+    changeSource: 'SYSTEM' | 'PROJECT_MEMBER_MANAGEMENT' | 'WORKSPACE_MEMBERSHIP';
+    changedByWorkspaceMemberId: number | null;
+    changedByName: string;
+    changedAt: string;
+};
+
+export type StoredProjectOwnerHistory = {
+    historyId: number;
+    projectId: number;
+    fromProjectMemberId: number;
+    toProjectMemberId: number;
+    changedByWorkspaceMemberId: number;
+    changedByName: string;
+    changedAt: string;
+};
+
+const projectMemberMeta = new Map<number, StoredProjectMemberMeta>();
+let projectMemberHistories: StoredProjectMemberHistory[] = [];
+let projectOwnerHistories: StoredProjectOwnerHistory[] = [];
+let nextMemberHistoryId = 1;
+let nextOwnerHistoryId = 1;
+
+/** Project와 Workspace Member 조합으로 Mock에서 재사용할 안정적인 Project Member ID를 만듭니다. */
+export function getProjectMemberId(projectId: number, workspaceMemberId: number): number {
+    return projectId * 100_000 + workspaceMemberId;
+}
+
+/** 감사 기능 도입 전에 존재한 Project 데이터에 SYSTEM BASELINE을 한 번만 준비합니다. */
+function initializeExistingProjectMemberRecords(project: ProjectDetail) {
+    const baselineAt = project.statusHistory[0]?.changedAt ?? project.updatedAt;
+    const incompleteTaskCount = Math.max(0, project.taskCount - project.completedTaskCount);
+    const primaryAssignee = project.members.find(member => !member.isOwner && member.permission === 'EDIT')
+        ?? project.members.find(member => member.permission === 'EDIT');
+
+    project.members.forEach(member => {
+        const projectMemberId = getProjectMemberId(project.projectId, member.workspaceMemberId);
+        if (projectMemberMeta.has(projectMemberId)) return;
+
+        // 담당 Task 저장소가 없는 현재 Mock에서는 미완료 작업을 대표 EDIT 참여자에게 배정해 영향 수를 검증합니다.
+        projectMemberMeta.set(projectMemberId, {
+            projectMemberId,
+            projectId: project.projectId,
+            workspaceMemberId: member.workspaceMemberId,
+            joinedAt: baselineAt,
+            leftAt: member.active ? null : project.updatedAt,
+            incompleteTaskCount: primaryAssignee?.workspaceMemberId === member.workspaceMemberId
+                ? incompleteTaskCount
+                : 0
+        });
+        projectMemberHistories.push({
+            historyId: nextMemberHistoryId++,
+            projectMemberId,
+            eventType: 'BASELINE',
+            fromPermission: null,
+            toPermission: member.permission,
+            fromActive: null,
+            toActive: member.active,
+            changeSource: 'SYSTEM',
+            changedByWorkspaceMemberId: null,
+            changedByName: 'SYSTEM',
+            changedAt: baselineAt
+        });
+    });
+}
+
+projects.forEach(initializeExistingProjectMemberRecords);
+
+/** 새 Project의 최초 참여자를 실제 생성 시점의 JOINED 감사 사건으로 기록합니다. */
+function initializeCreatedProjectMemberRecords(project: ProjectDetail) {
+    const joinedAt = project.statusHistory[0]?.changedAt ?? project.updatedAt;
+    const changedByName = project.statusHistory[0]?.changedByName ?? project.ownerName;
+
+    project.members.forEach(member => {
+        const projectMemberId = getProjectMemberId(project.projectId, member.workspaceMemberId);
+        projectMemberMeta.set(projectMemberId, {
+            projectMemberId,
+            projectId: project.projectId,
+            workspaceMemberId: member.workspaceMemberId,
+            joinedAt,
+            leftAt: member.active ? null : joinedAt,
+            incompleteTaskCount: 0
+        });
+        projectMemberHistories.push({
+            historyId: nextMemberHistoryId++,
+            projectMemberId,
+            eventType: 'JOINED',
+            fromPermission: null,
+            toPermission: member.permission,
+            fromActive: null,
+            toActive: member.active,
+            changeSource: 'SYSTEM',
+            changedByWorkspaceMemberId: project.ownerWorkspaceMemberId,
+            changedByName,
+            changedAt: joinedAt
+        });
+    });
+}
+
+/** Project Member의 현재 참여 기간과 Mock 담당 작업 수를 복사해 반환합니다. */
+export function readProjectMemberMeta(projectId: number, workspaceMemberId: number): StoredProjectMemberMeta | null {
+    const meta = projectMemberMeta.get(getProjectMemberId(projectId, workspaceMemberId));
+    return meta ? { ...meta } : null;
+}
+
+/** 새 참여 또는 재참여의 현재 메타를 저장하고 같은 Project Member ID를 계속 사용합니다. */
+export function saveProjectMemberMeta(meta: StoredProjectMemberMeta) {
+    projectMemberMeta.set(meta.projectMemberId, { ...meta });
+}
+
+/** 참여·권한 변경 사건을 append-only 감사 이력에 기록합니다. */
+export function appendProjectMemberHistory(history: Omit<StoredProjectMemberHistory, 'historyId'>) {
+    projectMemberHistories = [...projectMemberHistories, {
+        ...history,
+        historyId: nextMemberHistoryId++
+    }];
+}
+
+/** 관리 화면의 멤버별 이력 모달에서 사용할 참여·권한 감사 이력을 반환합니다. */
+export function readProjectMemberHistories(projectMemberId: number): StoredProjectMemberHistory[] {
+    return projectMemberHistories
+        .filter(history => history.projectMemberId === projectMemberId)
+        .map(history => ({ ...history }));
+}
+
+/** 소유권 이전 사건을 참여 권한 이력과 분리해 append-only로 기록합니다. */
+export function appendProjectOwnerHistory(history: Omit<StoredProjectOwnerHistory, 'historyId'>) {
+    projectOwnerHistories = [...projectOwnerHistories, {
+        ...history,
+        historyId: nextOwnerHistoryId++
+    }];
+}
+
+/** 선택한 멤버가 이전·신규 Owner였던 소유권 변경 이력을 반환합니다. */
+export function readProjectOwnerHistories(projectId: number, projectMemberId: number): StoredProjectOwnerHistory[] {
+    return projectOwnerHistories
+        .filter(history => history.projectId === projectId && (
+            history.fromProjectMemberId === projectMemberId
+            || history.toProjectMemberId === projectMemberId
+        ))
+        .map(history => ({ ...history }));
 }
 
 /** 공유 결과물의 중첩 게시물·성과·상태 이력까지 복사합니다. */
@@ -111,6 +274,7 @@ export function insertProject(project: Omit<ProjectDetail, 'projectId'>): Projec
     const created = { ...project, projectId: nextProjectId };
     nextProjectId += 1;
     projects = [...projects, cloneProject(created)];
+    initializeCreatedProjectMemberRecords(created);
     return cloneProject(created);
 }
 
@@ -176,6 +340,34 @@ export function countOwnedProjects(workspaceId: number, workspaceMemberId: numbe
 }
 
 /** 제작팀 제외 시 남아 있는 프로젝트 참여를 비활성화합니다. */
-export function deactivateProjectMemberships(workspaceId: number, workspaceMemberId: number) {
-    projects = projects.map(project => project.workspaceId !== workspaceId ? project : ({ ...project, members: project.members.map(member => member.workspaceMemberId === workspaceMemberId ? { ...member, active: false } : member) }));
+export function deactivateProjectMemberships(workspaceId: number, workspaceMemberId: number, changedByName = 'SYSTEM', changedByWorkspaceMemberId: number | null = null) {
+    const changedAt = new Date().toISOString();
+    projects = projects.map(project => {
+        if (project.workspaceId !== workspaceId) return project;
+        const target = project.members.find(member => member.workspaceMemberId === workspaceMemberId && member.active);
+        if (!target) return project;
+
+        // Workspace 이탈도 Project Member의 동일 ID와 담당 이력을 보존한 채 LEFT 사건으로 남깁니다.
+        const projectMemberId = getProjectMemberId(project.projectId, workspaceMemberId);
+        const meta = readProjectMemberMeta(project.projectId, workspaceMemberId);
+        if (meta) saveProjectMemberMeta({ ...meta, leftAt: changedAt });
+        appendProjectMemberHistory({
+            projectMemberId,
+            eventType: 'LEFT',
+            fromPermission: target.permission,
+            toPermission: target.permission,
+            fromActive: true,
+            toActive: false,
+            changeSource: 'WORKSPACE_MEMBERSHIP',
+            changedByWorkspaceMemberId,
+            changedByName,
+            changedAt
+        });
+        return {
+            ...project,
+            members: project.members.map(member => member.workspaceMemberId === workspaceMemberId
+                ? { ...member, active: false }
+                : member)
+        };
+    });
 }

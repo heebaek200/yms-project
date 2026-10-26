@@ -1,4 +1,6 @@
 import type { ProjectStatus } from './projectGroup';
+import type { UserRole } from './auth';
+import type { WorkspaceMemberStatus } from './workspaceSettings';
 
 export type ProjectVideoType = 'LONG' | 'SHORTS';
 export type ProjectRevenueOption = 'DEFAULT' | 'CUSTOM' | 'DISABLED';
@@ -6,6 +8,12 @@ export type YouTubePublicationStatus = 'CURRENT' | 'SUPERSEDED' | 'REMOVED';
 export type YouTubeRemovalReason = 'UNAVAILABLE' | 'INCORRECT';
 export type PerformanceCompleteness = 'COMPLETE' | 'PARTIAL' | 'UNAVAILABLE';
 export type ProjectMemberPermission = 'EDIT' | 'VIEW';
+export type ProjectMemberAuditEvent =
+    | 'BASELINE'
+    | 'JOINED'
+    | 'REJOINED'
+    | 'PERMISSION_CHANGED'
+    | 'LEFT';
 export type ProjectAccessRole =
     | 'PROJECT_OWNER'
     | 'PROJECT_EDITOR'
@@ -20,6 +28,46 @@ export type ProjectMemberSummary = {
     permission: ProjectMemberPermission;
     active: boolean;
     isOwner: boolean;
+};
+
+export type ProjectMemberItem = ProjectMemberSummary & {
+    projectMemberId: number;
+    email: string;
+    professionalRoles: UserRole[];
+    workspaceMemberStatus: WorkspaceMemberStatus;
+    joinedAt: string;
+    leftAt: string | null;
+    incompleteTaskCount: number;
+};
+
+export type ProjectMemberCandidate = {
+    workspaceMemberId: number;
+    projectMemberId: number | null;
+    name: string;
+    email: string;
+    professionalRoles: UserRole[];
+    rejoining: boolean;
+    incompleteTaskCount: number;
+};
+
+export type ProjectMemberHistoryItem = {
+    historyId: number;
+    eventType: ProjectMemberAuditEvent | 'OWNER_ASSIGNED' | 'OWNER_RELEASED';
+    label: string;
+    fromPermission: ProjectMemberPermission | null;
+    toPermission: ProjectMemberPermission | null;
+    changeSource: 'SYSTEM' | 'PROJECT_MEMBER_MANAGEMENT' | 'WORKSPACE_MEMBERSHIP';
+    changedByName: string;
+    changedAt: string;
+};
+
+export type ProjectMemberListData = {
+    projectId: number;
+    projectTitle: string;
+    archived: boolean;
+    canManage: boolean;
+    activeMembers: ProjectMemberItem[];
+    inactiveMembers: ProjectMemberItem[];
 };
 
 export type ProjectStatusHistory = {
