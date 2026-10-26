@@ -249,7 +249,10 @@ Workspace 삭제 시 하위 업무 이력까지 즉시 물리 삭제하지 않�
 - `deleted_at IS NULL`인 Project를 소유한 멤버는 LEFT 또는 REMOVED로 변경할 수 없습니다. 보관 여부와 Project 상태는 이 검사에서 제외 조건이 아닙니다.
 - 멤버를 LEFT 또는 REMOVED로 변경할 때 해당 멤버의 ACTIVE `project_members`를 같은 트랜잭션에서 비활성화하고 `left_at`을 기록합니다.
 - 재참여 시 중복 행을 만들지 않고 기존 멤버 상태를 ACTIVE, Workspace 권한을 MEMBER로 변경하지만 이전 Project 소유권과 `project_members` 상태를 자동 복구하지 않습니다.
-- 자기 자신을 제외하는 제작팀 나가기 기능은 현재 범위에 포함하지 않습니다.
+- 현재 사용자의 제작팀 나가기는 해당 Workspace Member를 LEFT로 변경하며, 관리자가 다른 멤버를 제외하는 REMOVED와 구분합니다.
+- 마지막 ACTIVE OWNER는 LEFT로 변경할 수 없습니다. 비삭제 Project를 소유한 멤버도 LEFT 또는 REMOVED로 변경할 수 없습니다.
+- 제외·탈퇴 영향 화면의 소유 Project, 활성 Project 참여와 미완료 Task 수는 현재 데이터를 집계한 파생 값이며 별도 컬럼으로 저장하지 않습니다.
+- Workspace Member 상태 변경과 대상의 ACTIVE Project Member 비활성화 및 Project Member 이력 추가는 하나의 트랜잭션에서 처리합니다.
 
 ## 5.3. workspace_invitations
 
@@ -1573,6 +1576,7 @@ Project 및 ProjectGroup별 콘텐츠 성과와 예상 플랫폼 수익은 `vide
 - Project Owner와 Project Member의 정합성 및 소유권 이전 순서 명시
 - Project Member 참여·권한 감사 이력과 Project 소유권 이전 이력을 별도 append-only 테이블로 분리
 - Project Member 변경과 Workspace 이탈 경합을 막는 공통 잠금 순서 명시
+- Workspace 본인 탈퇴의 LEFT 전이, 마지막 OWNER·Project 소유권 제약과 영향 집계 기준 추가
 - YouTube Video ID 중복 범위를 `youtube_publications`의 Workspace 단위로 제한
 - Expense / Revenue는 물리 삭제 대신 ACTIVE / VOIDED 상태로 관리
 - Settlement 집계 기간의 기준을 Task `completed_at`으로 확정
