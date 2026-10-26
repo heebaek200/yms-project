@@ -365,6 +365,8 @@ GET /api/workspaces/{workspaceId}/members/{workspaceMemberId}/departure-impact
 
 `ownedProjects`에는 논리 삭제되지 않은 Project만 포함하고 보관 Project도 반환합니다. `transferableMemberCount`는 대상 멤버 자신을 제외한 같은 Project의 ACTIVE EDIT 멤버 수입니다. 참여 종료 수와 미완료 Task 수는 확인 안내용 파생 값이며 별도 저장하지 않습니다.
 
+#18 Task 관리 구현 전 Mock의 `incompleteAssignedTaskCount`는 대상 멤버의 ACTIVE Project Member 메타에 저장된 `incompleteTaskCount`를 합산한 샘플 값입니다. Project의 전체 `taskCount - completedTaskCount`를 #53에서 새로 배분하지 않으며 실제 Task별 담당 관계를 보장하지 않습니다. #18 구현 후에는 `project_tasks.assignee_project_member_id`가 대상 Project Member이고 `status <> 'COMPLETED'`인 행을 집계하도록 교체합니다.
+
 화면은 `isLastActiveOwner`와 `ownedProjects`를 함께 평가하여 차단 사유가 여러 개이면 한 번에 표시합니다. 이 조회 결과는 작업 가능성을 예약하지 않으며 최종 제외·탈퇴 API가 최신 상태를 다시 검증합니다.
 
 ## 4.6. Workspace 멤버 권한 변경
@@ -430,6 +432,8 @@ DELETE /api/workspaces/{workspaceId}/members/me
 탈퇴가 가능하면 Workspace Member를 LEFT로 변경하고 `leftAt`을 기록합니다. 대상 멤버의 ACTIVE Project Member를 같은 트랜잭션에서 비활성화하며 각 Project Member에 LEFT·`WORKSPACE_MEMBERSHIP` 이력을 추가합니다. 재초대 후 수락해도 이전 Project 소유권과 Project Member 상태를 자동 복구하지 않습니다.
 
 응답 성공 후 클라이언트는 탈퇴 대상이 현재 선택한 Workspace이면 해당 탭의 선택을 해제하고 SCR-03에 머뭅니다. 다른 Workspace가 현재 선택되어 있으면 선택 상태를 유지합니다. 같은 Workspace를 사용하는 다른 탭에는 접근 상실을 전파합니다.
+
+영향 응답의 Project 링크가 현재 선택하지 않은 Workspace를 가리키면 클라이언트는 자동 이동하지 않습니다. 사용자가 대상 Workspace 이름이 표시된 전환 동작을 선택한 경우에만 현재 탭의 Workspace를 변경한 뒤 Project Route로 이동합니다. 뒤로가기로 SCR-03에 복귀해도 이전 Workspace를 자동 복원하지 않으며 일반 Workspace 선택과 마찬가지로 다른 탭에는 전환을 전파하지 않습니다.
 
 ## 4.8. 내 Workspace 초대 목록
 

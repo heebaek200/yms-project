@@ -252,6 +252,7 @@ Workspace 삭제 시 하위 업무 이력까지 즉시 물리 삭제하지 않�
 - 현재 사용자의 제작팀 나가기는 해당 Workspace Member를 LEFT로 변경하며, 관리자가 다른 멤버를 제외하는 REMOVED와 구분합니다.
 - 마지막 ACTIVE OWNER는 LEFT로 변경할 수 없습니다. 비삭제 Project를 소유한 멤버도 LEFT 또는 REMOVED로 변경할 수 없습니다.
 - 제외·탈퇴 영향 화면의 소유 Project, 활성 Project 참여와 미완료 Task 수는 현재 데이터를 집계한 파생 값이며 별도 컬럼으로 저장하지 않습니다.
+- #18 이전 Mock에서는 기존 Project Member 메타의 `incompleteTaskCount`를 샘플 영향 수로 사용합니다. 실제 Task 저장소 구현 후에는 `project_tasks.assignee_project_member_id`와 미완료 상태를 기준으로 집계하며 별도 중복 집계 컬럼을 추가하지 않습니다.
 - Workspace Member 상태 변경과 대상의 ACTIVE Project Member 비활성화 및 Project Member 이력 추가는 하나의 트랜잭션에서 처리합니다.
 
 ## 5.3. workspace_invitations
