@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 
 import {
@@ -64,51 +64,111 @@ function ProjectMembersPage() {
     const [historyMember, setHistoryMember] = useState<ProjectMemberItem | null>(null);
     const [histories, setHistories] = useState<ProjectMemberHistoryItem[]>([]);
     const [inactiveOpen, setInactiveOpen] = useState(false);
+    const latestMemberRequestIdRef = useRef(0);
+    const latestCandidateRequestIdRef = useRef(0);
+    const latestHistoryRequestIdRef = useRef(0);
+    const activeViewContextRef = useRef('');
 
     const context = useMemo(() => user && currentWorkspace
         ? createRequestContext(user.userId, user.name, currentWorkspace.myRole)
         : null, [currentWorkspace, user]);
+    const viewContextKey = `${currentWorkspace?.workspaceId ?? 'none'}:${Number.isInteger(projectId) ? projectId : 'invalid'}`;
+
+    // Paint 전에 현재 조회 문맥을 갱신해 이전 제작팀·Project 응답이 새 화면을 덮어쓰지 못하게 합니다.
+    useLayoutEffect(() => {
+        activeViewContextRef.current = viewContextKey;
+    }, [viewContextKey]);
 
     /** 최신 참여자 상태를 다시 조회해 화면과 Mock API의 경쟁 조건 판정을 일치시킵니다. */
-    const refresh = useCallback(async () => {
-        if (!currentWorkspace || !context || !Number.isInteger(projectId)) return;
-        setLoading(true);
+    const refresh = useCallback(async (showLoading = true) => {
+        if (!currentWorkspace || !context || !Number.isInteger(projectId)) return false;
+        const requestId = ++latestMemberRequestIdRef.current;
+        const requestContextKey = activeViewContextRef.current;
+        if (showLoading) setLoading(true);
         const response = await getProjectMembers(currentWorkspace.workspaceId, projectId, context);
+        if (requestId !== latestMemberRequestIdRef.current || activeViewContextRef.current !== requestContextKey) return false;
         if (response.success) {
             setData(response.data);
         } else {
             setData(null);
             setFeedback({ type: 'error', message: response.message });
         }
-        setLoading(false);
+        if (showLoading) setLoading(false);
+        return response.success;
     }, [currentWorkspace, context, projectId]);
 
     useEffect(() => {
         void refresh();
     }, [refresh]);
 
-    /** 참여 후보를 최신 상태로 불러오고 선택값을 초기화한 뒤 추가 모달을 엽니다. */
-    async function openAdd(candidateId?: number) {
-        if (!currentWorkspace || !context) return;
+    useEffect(() => {
+        setData(null);
+        setLoading(true);
+        setSubmitting(false);
         setFeedback(null);
+        setAddOpen(false);
+        setCandidates([]);
+        setSelectedIds([]);
+        setConfirmAction(null);
+        setTransfer(null);
+        setHistoryMember(null);
+        setHistories([]);
+        setInactiveOpen(false);
+    }, [viewContextKey]);
+
+    /** 현재 문맥의 참여 후보를 다시 읽고 필요하면 여전히 유효한 선택만 보존합니다. */
+    async function loadCandidates(candidateId?: number, preserveSelection = false) {
+        if (!currentWorkspace || !context) return false;
+        const requestId = ++latestCandidateRequestIdRef.current;
+        const requestContextKey = activeViewContextRef.current;
         const response = await getProjectMemberCandidates(currentWorkspace.workspaceId, projectId, context);
+        if (requestId !== latestCandidateRequestIdRef.current || activeViewContextRef.current !== requestContextKey) return false;
         if (!response.success) {
             setFeedback({ type: 'error', message: response.message });
-            return;
+            return false;
         }
+
         setCandidates(response.data);
-        setSelectedIds(candidateId && response.data.some(item => item.workspaceMemberId === candidateId) ? [candidateId] : []);
+        const validIds = new Set(response.data.map(item => item.workspaceMemberId));
+        setSelectedIds(current => preserveSelection
+            ? current.filter(id => validIds.has(id))
+            : candidateId && validIds.has(candidateId) ? [candidateId] : []);
+        return true;
+    }
+
+    /** 참여 후보를 최신 상태로 불러오고 선택값을 초기화한 뒤 추가 모달을 엽니다. */
+    async function openAdd(candidateId?: number) {
+        setFeedback(null);
+        if (!await loadCandidates(candidateId)) return;
         setPermission('EDIT');
         setAddOpen(true);
+    }
+
+    /** 동시성 충돌 시 현재 문맥의 목록과 선택 후보를 복구하고 기존 오류 안내를 유지합니다. */
+    async function recoverStateConflict(message: string, refreshCandidateList = false) {
+        const recoveryContextKey = activeViewContextRef.current;
+        await refresh(false);
+        if (activeViewContextRef.current !== recoveryContextKey) return;
+        if (refreshCandidateList) await loadCandidates(undefined, true);
+        if (activeViewContextRef.current !== recoveryContextKey) return;
+        setConfirmAction(null);
+        setTransfer(null);
+        setFeedback({ type: 'error', message });
     }
 
     /** 선택한 후보를 한 권한으로 일괄 추가하며 실패 시 어떤 멤버도 변경하지 않습니다. */
     async function submitAdd() {
         if (!currentWorkspace || !context || selectedIds.length === 0) return;
+        const requestContextKey = activeViewContextRef.current;
         setSubmitting(true);
         const response = await addProjectMembers(currentWorkspace.workspaceId, projectId, { workspaceMemberIds: selectedIds, permissionLevel: permission }, context);
+        if (activeViewContextRef.current !== requestContextKey) return;
         setSubmitting(false);
         if (!response.success) {
+            if (response.errorCode === 'PROJECT_MEMBER_STATE_CHANGED') {
+                await recoverStateConflict(response.message, true);
+                return;
+            }
             setFeedback({ type: 'error', message: response.message });
             return;
         }
@@ -122,10 +182,16 @@ function ProjectMembersPage() {
     /** 즉시 허용되는 승격 또는 확인이 끝난 강등을 최신 상태 검증과 함께 반영합니다. */
     async function changePermission(member: ProjectMemberItem, next: ProjectMemberPermission) {
         if (!currentWorkspace || !context) return;
+        const requestContextKey = activeViewContextRef.current;
         setSubmitting(true);
         const response = await updateProjectMemberPermission(currentWorkspace.workspaceId, projectId, member.projectMemberId, next, context);
+        if (activeViewContextRef.current !== requestContextKey) return;
         setSubmitting(false);
         if (!response.success) {
+            if (response.errorCode === 'PROJECT_MEMBER_STATE_CHANGED') {
+                await recoverStateConflict(response.message);
+                return;
+            }
             setFeedback({ type: 'error', message: response.message });
             return;
         }
@@ -137,10 +203,16 @@ function ProjectMembersPage() {
     /** 참여 종료 전 영향 확인 모달을 거친 대상을 비활성 상태로 전환합니다. */
     async function remove(member: ProjectMemberItem) {
         if (!currentWorkspace || !context) return;
+        const requestContextKey = activeViewContextRef.current;
         setSubmitting(true);
         const response = await removeProjectMember(currentWorkspace.workspaceId, projectId, member.projectMemberId, context);
+        if (activeViewContextRef.current !== requestContextKey) return;
         setSubmitting(false);
         if (!response.success) {
+            if (response.errorCode === 'PROJECT_MEMBER_STATE_CHANGED') {
+                await recoverStateConflict(response.message);
+                return;
+            }
             setFeedback({ type: 'error', message: response.message });
             return;
         }
@@ -152,10 +224,16 @@ function ProjectMembersPage() {
     /** 대상 이메일을 다시 입력한 2단계 확인 후에만 Project 소유권을 이전합니다. */
     async function transferOwnership() {
         if (!currentWorkspace || !context || !transfer || transfer.email !== transfer.member.email) return;
+        const requestContextKey = activeViewContextRef.current;
         setSubmitting(true);
         const response = await transferProjectOwnership(currentWorkspace.workspaceId, projectId, transfer.member.projectMemberId, context);
+        if (activeViewContextRef.current !== requestContextKey) return;
         setSubmitting(false);
         if (!response.success) {
+            if (response.errorCode === 'PROJECT_MEMBER_STATE_CHANGED') {
+                await recoverStateConflict(response.message);
+                return;
+            }
             setFeedback({ type: 'error', message: response.message });
             return;
         }
@@ -167,9 +245,12 @@ function ProjectMembersPage() {
     /** 관리 권한 사용자에게 선택한 참여자의 기준선 이후 변경 이력을 표시합니다. */
     async function openHistory(member: ProjectMemberItem) {
         if (!currentWorkspace || !context) return;
+        const requestId = ++latestHistoryRequestIdRef.current;
+        const requestContextKey = activeViewContextRef.current;
         setHistoryMember(member);
         setHistories([]);
         const response = await getProjectMemberHistories(currentWorkspace.workspaceId, projectId, member.projectMemberId, context);
+        if (requestId !== latestHistoryRequestIdRef.current || activeViewContextRef.current !== requestContextKey) return;
         if (response.success) setHistories(response.data);
         else setFeedback({ type: 'error', message: response.message });
     }
@@ -229,7 +310,7 @@ function ProjectMembersPage() {
             </ProjectGroupModal>}
 
             {confirmAction && <ProjectGroupModal titleId="project-member-confirm-title" title={confirmAction.kind === 'DOWNGRADE' ? '보기 권한으로 변경' : '프로젝트 참여 종료'} description="담당 작업과 프로젝트 접근에 미치는 영향을 확인해 주세요." onRequestClose={() => !submitting && setConfirmAction(null)}>
-                <div className="project-member-modal"><div className="project-member-impact"><strong>{confirmAction.member.name}</strong><p>{confirmAction.kind === 'DOWNGRADE' ? '프로젝트 내용을 더 이상 수정할 수 없습니다.' : '프로젝트 접근이 종료되지만 과거 작업과 참여 이력은 보존됩니다.'}</p>{confirmAction.kind === 'REMOVE' && confirmAction.member.userId === user?.userId && <p className="project-member-impact__warning">본인의 프로젝트 참여만 종료됩니다. 제작팀 관리 권한은 유지됩니다.</p>}{confirmAction.member.incompleteTaskCount > 0 && <p className="project-member-impact__warning">미완료 작업 {confirmAction.member.incompleteTaskCount}건에 담당자 재지정 필요 표시가 생깁니다.</p>}</div><div className="project-member-modal__actions"><button className="project-button" disabled={submitting} onClick={() => setConfirmAction(null)}>취소</button><button className="project-button project-button--danger" disabled={submitting} onClick={() => void (confirmAction.kind === 'DOWNGRADE' ? changePermission(confirmAction.member, 'VIEW') : remove(confirmAction.member))}>확인하고 변경</button></div></div>
+                <div className="project-member-modal"><div className="project-member-impact"><strong>{confirmAction.member.name}</strong><p>{confirmAction.kind === 'DOWNGRADE' ? '프로젝트 내용을 더 이상 수정할 수 없습니다.' : '프로젝트 접근이 종료되지만 과거 작업과 참여 이력은 보존됩니다.'}</p>{confirmAction.kind === 'REMOVE' && confirmAction.member.userId === user?.userId && <div className="project-member-impact__warning"><p>해당 프로젝트의 채팅 참여가 종료됩니다.</p><p>제작팀 소유자·관리자 권한은 유지됩니다.</p></div>}{confirmAction.member.incompleteTaskCount > 0 && <p className="project-member-impact__warning">미완료 작업 {confirmAction.member.incompleteTaskCount}건에 담당자 재지정 필요 표시가 생깁니다.</p>}</div><div className="project-member-modal__actions"><button className="project-button" disabled={submitting} onClick={() => setConfirmAction(null)}>취소</button><button className="project-button project-button--danger" disabled={submitting} onClick={() => void (confirmAction.kind === 'DOWNGRADE' ? changePermission(confirmAction.member, 'VIEW') : remove(confirmAction.member))}>확인하고 변경</button></div></div>
             </ProjectGroupModal>}
 
             {transfer && <ProjectGroupModal titleId="project-owner-transfer-title" title="프로젝트 소유권 이전" description={currentWorkspace?.myRole === 'MEMBER' ? '이전 후 다시 변경하려면 새 소유자 또는 제작팀 관리자의 협조가 필요합니다.' : '이전 후에도 제작팀 관리 권한으로 소유권을 다시 변경할 수 있습니다.'} onRequestClose={() => !submitting && setTransfer(null)}>

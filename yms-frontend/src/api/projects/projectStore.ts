@@ -116,8 +116,8 @@ export function getProjectMemberId(projectId: number, workspaceMemberId: number)
     return projectId * 100_000 + workspaceMemberId;
 }
 
-/** 기존 Project 데이터에 현재 참여 메타와 SYSTEM BASELINE 감사 이력을 한 번만 준비합니다. */
-function ensureProjectMemberRecords(project: ProjectDetail) {
+/** 감사 기능 도입 전에 존재한 Project 데이터에 SYSTEM BASELINE을 한 번만 준비합니다. */
+function initializeExistingProjectMemberRecords(project: ProjectDetail) {
     const baselineAt = project.statusHistory[0]?.changedAt ?? project.updatedAt;
     const incompleteTaskCount = Math.max(0, project.taskCount - project.completedTaskCount);
     const primaryAssignee = project.members.find(member => !member.isOwner && member.permission === 'EDIT')
@@ -154,7 +154,38 @@ function ensureProjectMemberRecords(project: ProjectDetail) {
     });
 }
 
-projects.forEach(ensureProjectMemberRecords);
+projects.forEach(initializeExistingProjectMemberRecords);
+
+/** 새 Project의 최초 참여자를 실제 생성 시점의 JOINED 감사 사건으로 기록합니다. */
+function initializeCreatedProjectMemberRecords(project: ProjectDetail) {
+    const joinedAt = project.statusHistory[0]?.changedAt ?? project.updatedAt;
+    const changedByName = project.statusHistory[0]?.changedByName ?? project.ownerName;
+
+    project.members.forEach(member => {
+        const projectMemberId = getProjectMemberId(project.projectId, member.workspaceMemberId);
+        projectMemberMeta.set(projectMemberId, {
+            projectMemberId,
+            projectId: project.projectId,
+            workspaceMemberId: member.workspaceMemberId,
+            joinedAt,
+            leftAt: member.active ? null : joinedAt,
+            incompleteTaskCount: 0
+        });
+        projectMemberHistories.push({
+            historyId: nextMemberHistoryId++,
+            projectMemberId,
+            eventType: 'JOINED',
+            fromPermission: null,
+            toPermission: member.permission,
+            fromActive: null,
+            toActive: member.active,
+            changeSource: 'SYSTEM',
+            changedByWorkspaceMemberId: project.ownerWorkspaceMemberId,
+            changedByName,
+            changedAt: joinedAt
+        });
+    });
+}
 
 /** Project Member의 현재 참여 기간과 Mock 담당 작업 수를 복사해 반환합니다. */
 export function readProjectMemberMeta(projectId: number, workspaceMemberId: number): StoredProjectMemberMeta | null {
@@ -243,7 +274,7 @@ export function insertProject(project: Omit<ProjectDetail, 'projectId'>): Projec
     const created = { ...project, projectId: nextProjectId };
     nextProjectId += 1;
     projects = [...projects, cloneProject(created)];
-    ensureProjectMemberRecords(created);
+    initializeCreatedProjectMemberRecords(created);
     return cloneProject(created);
 }
 

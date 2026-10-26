@@ -201,6 +201,10 @@
     font-weight: 700;
 }
 
+.project-member-impact__warning p {
+    margin: 0.25rem 0;
+}
+
 .project-owner-transfer label {
     display: grid;
     gap: 0.45rem;

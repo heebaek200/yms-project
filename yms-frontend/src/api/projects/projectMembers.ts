@@ -187,6 +187,10 @@ export async function addProjectMembers(
         const actorWorkspaceMemberId = findActiveWorkspaceMemberByUserId(workspaceId, context.userId)?.workspaceMemberId ?? null;
         let restoredIncompleteTaskCount = 0;
         const members = project.members.map(member => ({ ...member }));
+        const pendingMemberRecords: Array<{
+            meta: Parameters<typeof saveProjectMemberMeta>[0];
+            history: Parameters<typeof appendProjectMemberHistory>[0];
+        }> = [];
         ids.forEach(workspaceMemberId => {
             const workspaceMember = workspaceMembers.find(item => item.workspaceMemberId === workspaceMemberId)!;
             const existingIndex = members.findIndex(member => member.workspaceMemberId === workspaceMemberId);
@@ -199,23 +203,31 @@ export async function addProjectMembers(
 
             const incompleteTaskCount = previousMeta?.incompleteTaskCount ?? 0;
             if (rejoining && request.permissionLevel === 'EDIT') restoredIncompleteTaskCount += incompleteTaskCount;
-            saveProjectMemberMeta({ projectMemberId, projectId, workspaceMemberId, joinedAt: now, leftAt: null, incompleteTaskCount });
-            appendProjectMemberHistory({
-                projectMemberId,
-                eventType: rejoining ? 'REJOINED' : 'JOINED',
-                fromPermission: previousPermission,
-                toPermission: request.permissionLevel,
-                fromActive: rejoining ? false : null,
-                toActive: true,
-                changeSource: 'PROJECT_MEMBER_MANAGEMENT',
-                changedByWorkspaceMemberId: actorWorkspaceMemberId,
-                changedByName: context.userName,
-                changedAt: now
+            pendingMemberRecords.push({
+                meta: { projectMemberId, projectId, workspaceMemberId, joinedAt: now, leftAt: null, incompleteTaskCount },
+                history: {
+                    projectMemberId,
+                    eventType: rejoining ? 'REJOINED' : 'JOINED',
+                    fromPermission: previousPermission,
+                    toPermission: request.permissionLevel,
+                    fromActive: rejoining ? false : null,
+                    toActive: true,
+                    changeSource: 'PROJECT_MEMBER_MANAGEMENT',
+                    changedByWorkspaceMemberId: actorWorkspaceMemberId,
+                    changedByName: context.userName,
+                    changedAt: now
+                }
             });
         });
 
         const updated = { ...project, members, updatedAt: now };
         if (!hasValidOwner(updated)) return { success: false, errorCode: 'PROJECT_MEMBER_STATE_CHANGED', message: '프로젝트 소유자 상태가 변경되었습니다. 다시 시도해 주세요.', errors: null };
+
+        // 모든 검증이 끝난 뒤 메타·감사 이력·Project를 연속 반영해 실패 요청의 흔적을 남기지 않습니다.
+        pendingMemberRecords.forEach(record => {
+            saveProjectMemberMeta(record.meta);
+            appendProjectMemberHistory(record.history);
+        });
         replaceProject(updated);
         return { success: true, message: `${ids.length}명을 프로젝트 참여자로 추가했습니다.`, data: { ...buildMemberList(updated, context), restoredIncompleteTaskCount } };
     });
@@ -267,10 +279,12 @@ export async function removeProjectMember(
         const now = new Date().toISOString();
         const actorWorkspaceMemberId = findActiveWorkspaceMemberByUserId(workspaceId, context.userId)?.workspaceMemberId ?? null;
         const meta = readProjectMemberMeta(projectId, target.workspaceMemberId);
-        if (meta) saveProjectMemberMeta({ ...meta, leftAt: now });
-        appendProjectMemberHistory({ projectMemberId, eventType: 'LEFT', fromPermission: target.permission, toPermission: target.permission, fromActive: true, toActive: false, changeSource: 'PROJECT_MEMBER_MANAGEMENT', changedByWorkspaceMemberId: actorWorkspaceMemberId, changedByName: context.userName, changedAt: now });
         const updated = { ...project, members: project.members.map(member => member === target ? { ...member, active: false } : member), updatedAt: now };
         if (!hasValidOwner(updated)) return { success: false, errorCode: 'PROJECT_MEMBER_STATE_CHANGED', message: '프로젝트 소유자 상태가 변경되었습니다. 다시 시도해 주세요.', errors: null };
+
+        // Owner 불변식까지 확인한 뒤에만 참여 기간과 감사 이력을 확정합니다.
+        if (meta) saveProjectMemberMeta({ ...meta, leftAt: now });
+        appendProjectMemberHistory({ projectMemberId, eventType: 'LEFT', fromPermission: target.permission, toPermission: target.permission, fromActive: true, toActive: false, changeSource: 'PROJECT_MEMBER_MANAGEMENT', changedByWorkspaceMemberId: actorWorkspaceMemberId, changedByName: context.userName, changedAt: now });
         replaceProject(updated);
         return { success: true, message: `${target.name} 님의 프로젝트 참여를 종료했습니다.`, data: buildMemberList(updated, context) };
     });
