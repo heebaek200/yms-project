@@ -10,15 +10,32 @@ import {
     getPendingWorkspaceInvitations,
     rejectWorkspaceInvitation
 } from '../api/workspaces/invitations';
+import {
+    getWorkspaceMemberDepartureImpact,
+    getWorkspaceMembers,
+    leaveWorkspace
+} from '../api/workspaces/members';
 import FeedbackMessage, {
     type FeedbackMessageType
 } from '../components/common/FeedbackMessage';
 import WorkspaceCard from '../components/workspace/WorkspaceCard';
+import WorkspaceDepartureBlocker, {
+    type ProjectDestination
+} from '../components/workspace/WorkspaceDepartureBlocker';
+import WorkspaceDepartureModal from '../components/workspace/WorkspaceDepartureModal';
 import WorkspaceCreateForm from '../components/workspace/WorkspaceCreateForm';
 import WorkspaceInvitationList from '../components/workspace/WorkspaceInvitationList';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../hooks/useWorkspace';
-import type { WorkspaceInvitation } from '../types/workspace';
+import type {
+    WorkspaceInvitation,
+    WorkspaceSummary
+} from '../types/workspace';
+import type {
+    WorkspaceDepartureImpact,
+    WorkspaceOwnedProjectImpact
+} from '../types/workspaceSettings';
+import { broadcastWorkspaceInvalidation } from '../workspace/workspaceSelectionStorage';
 
 import './WorkspaceOnboardingPage.css';
 
@@ -68,6 +85,16 @@ function WorkspaceOnboardingPage() {
         useState<CreateFieldErrors>(EMPTY_CREATE_FIELD_ERRORS);
     const [isCreating, setIsCreating] = useState(false);
     const [feedback, setFeedback] = useState<PageFeedback | null>(null);
+    const [departureWorkspace, setDepartureWorkspace] =
+        useState<WorkspaceSummary | null>(null);
+    const [departureImpact, setDepartureImpact] =
+        useState<WorkspaceDepartureImpact | null>(null);
+    const [departureActorUserId, setDepartureActorUserId] =
+        useState<number | null>(null);
+    const [isDepartureLoading, setIsDepartureLoading] = useState(false);
+    const [leaveConfirmation, setLeaveConfirmation] = useState('');
+    const [departureError, setDepartureError] = useState('');
+    const [isLeaving, setIsLeaving] = useState(false);
 
     /**
      * 현재 사용자에게 도착한 유효한 PENDING 초대를 다시 조회합니다.
@@ -113,6 +140,122 @@ function WorkspaceOnboardingPage() {
         setEnteringWorkspaceId(workspaceId);
         selectWorkspace(workspaceId);
         navigate('/dashboard');
+    };
+
+    /** 제작팀 카드에서 자기 멤버십과 이탈 영향을 조회한 뒤 차단 또는 확인 모달을 엽니다. */
+    const openDepartureModal = async (workspace: WorkspaceSummary) => {
+        if (!user || isDepartureLoading) return;
+
+        setDepartureWorkspace(workspace);
+        setDepartureImpact(null);
+        setDepartureActorUserId(null);
+        setLeaveConfirmation('');
+        setDepartureError('');
+        setIsDepartureLoading(true);
+
+        try {
+            const memberResponse = await getWorkspaceMembers(workspace.workspaceId, {
+                status: 'ACTIVE'
+            });
+            const self = memberResponse.data.find(member => (
+                member.email.toLocaleLowerCase() === user.email.toLocaleLowerCase()
+            ));
+            if (!self) throw new Error('ACTIVE workspace member not found');
+            setDepartureActorUserId(self.userId);
+
+            const impactResponse = await getWorkspaceMemberDepartureImpact(
+                workspace.workspaceId,
+                self.workspaceMemberId,
+                self.userId
+            );
+            if (!impactResponse.success) {
+                setDepartureError(impactResponse.message);
+                return;
+            }
+            setDepartureImpact(impactResponse.data);
+        } catch (error) {
+            console.error(error);
+            setDepartureError('제작팀 나가기 영향을 확인하지 못했습니다.');
+        } finally {
+            setIsDepartureLoading(false);
+        }
+    };
+
+    /** 모달의 임시 입력과 조회 결과를 모두 비우고 제작팀 목록으로 돌아갑니다. */
+    const closeDepartureModal = () => {
+        if (isLeaving) return;
+        setDepartureWorkspace(null);
+        setDepartureImpact(null);
+        setDepartureActorUserId(null);
+        setLeaveConfirmation('');
+        setDepartureError('');
+    };
+
+    /** 차단 Project가 다른 제작팀이면 현재 탭만 전환한 뒤 확정된 해결 화면으로 이동합니다. */
+    const openDepartureProject = (
+        project: WorkspaceOwnedProjectImpact,
+        destination: ProjectDestination
+    ) => {
+        if (!departureWorkspace) return;
+
+        if (currentWorkspace?.workspaceId !== departureWorkspace.workspaceId) {
+            selectWorkspace(departureWorkspace.workspaceId);
+        }
+        closeDepartureModal();
+        navigate(destination === 'MEMBERS'
+            ? `/projects/${project.projectId}/members`
+            : `/projects/${project.projectId}`
+        );
+    };
+
+    /** 제작팀 이름 확인 후 나가기를 요청하고 모든 탭에 권한 무효화를 전파합니다. */
+    const handleWorkspaceLeave = async () => {
+        if (!user || !departureWorkspace || !departureImpact
+            || departureActorUserId === null) return;
+        if (leaveConfirmation.trim() !== departureWorkspace.name) return;
+
+        try {
+            setIsLeaving(true);
+            setDepartureError('');
+            const response = await leaveWorkspace(
+                departureWorkspace.workspaceId,
+                departureActorUserId
+            );
+
+            if (!response.success) {
+                // 사전 조회 이후 경쟁 변경이 생기면 최신 영향을 다시 열어 해결 경로를 제공합니다.
+                if (response.errorCode === 'LAST_OWNER_REQUIRED'
+                    || response.errorCode === 'PROJECT_OWNERSHIP_TRANSFER_REQUIRED') {
+                    const impactResponse = await getWorkspaceMemberDepartureImpact(
+                        departureWorkspace.workspaceId,
+                        departureImpact.workspaceMemberId,
+                        departureActorUserId
+                    );
+                    if (impactResponse.success) setDepartureImpact(impactResponse.data);
+                }
+                setDepartureError(response.message);
+                return;
+            }
+
+            broadcastWorkspaceInvalidation(
+                user.userId,
+                departureWorkspace.workspaceId
+            );
+            setDepartureWorkspace(null);
+            setDepartureImpact(null);
+            setDepartureActorUserId(null);
+            setLeaveConfirmation('');
+            await refreshWorkspaces();
+            setFeedback({
+                type: 'success',
+                message: response.message ?? '제작팀에서 나왔습니다.'
+            });
+        } catch (error) {
+            console.error(error);
+            setDepartureError('제작팀에서 나가지 못했습니다.');
+        } finally {
+            setIsLeaving(false);
+        }
     };
 
     /**
@@ -374,6 +517,9 @@ function WorkspaceOnboardingPage() {
                                         enteringWorkspaceId === workspace.workspaceId
                                     }
                                     onEnter={handleWorkspaceEnter}
+                                    onLeave={workspace => {
+                                        void openDepartureModal(workspace);
+                                    }}
                                 />
                             ))}
                         </div>
@@ -423,6 +569,83 @@ function WorkspaceOnboardingPage() {
                     )}
                 </section>
             </section>
+
+            {departureWorkspace && departureImpact
+                && (departureImpact.isLastActiveOwner
+                    || departureImpact.ownedProjects.length > 0) && (
+                <WorkspaceDepartureBlocker
+                    workspaceName={departureWorkspace.name}
+                    targetName={user?.name ?? '현재 사용자'}
+                    impact={departureImpact}
+                    switchesWorkspace={
+                        currentWorkspace?.workspaceId !== departureWorkspace.workspaceId
+                    }
+                    onOpenProject={openDepartureProject}
+                    onClose={closeDepartureModal}
+                />
+            )}
+
+            {departureWorkspace && (!departureImpact || (
+                !departureImpact.isLastActiveOwner
+                && departureImpact.ownedProjects.length === 0
+            )) && (
+                <WorkspaceDepartureModal
+                    titleId="workspace-leave-title"
+                    title={`${departureWorkspace.name}에서 나갈까요?`}
+                    description="제작팀 접근과 현재 프로젝트 참여가 종료되며 과거 작업 이력은 유지됩니다."
+                    onRequestClose={closeDepartureModal}
+                >
+                    <div className="workspace-departure-modal__body">
+                        {isDepartureLoading ? (
+                            <p role="status">나가기 영향을 확인하고 있습니다...</p>
+                        ) : departureError && !departureImpact ? (
+                            <FeedbackMessage type="error" message={departureError} />
+                        ) : departureImpact && (
+                            <>
+                                {departureError && (
+                                    <FeedbackMessage type="error" message={departureError} />
+                                )}
+                                <div className="workspace-departure-modal__notice">
+                                    <strong>현재 참여 프로젝트 {departureImpact.activeProjectParticipationCount}개</strong>
+                                    <p>미완료 담당 작업 {departureImpact.incompleteAssignedTaskCount}개가 재지정 필요 상태가 됩니다.</p>
+                                </div>
+                                <label className="workspace-departure-modal__field">
+                                    확인을 위해 <strong>{departureWorkspace.name}</strong>을 입력해 주세요.
+                                    <input
+                                        data-autofocus
+                                        value={leaveConfirmation}
+                                        autoComplete="off"
+                                        onChange={event => {
+                                            setLeaveConfirmation(event.target.value);
+                                            setDepartureError('');
+                                        }}
+                                    />
+                                </label>
+                            </>
+                        )}
+                        <div className="workspace-departure-modal__actions">
+                            <button
+                                type="button"
+                                className="workspace-departure-modal__button"
+                                disabled={isLeaving}
+                                onClick={closeDepartureModal}
+                            >
+                                취소
+                            </button>
+                            {departureImpact && (
+                                <button
+                                    type="button"
+                                    className="workspace-departure-modal__button workspace-departure-modal__button--danger"
+                                    disabled={isLeaving || leaveConfirmation.trim() !== departureWorkspace.name}
+                                    onClick={() => void handleWorkspaceLeave()}
+                                >
+                                    {isLeaving ? '나가는 중...' : '제작팀 나가기'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </WorkspaceDepartureModal>
+            )}
         </main>
     );
 }

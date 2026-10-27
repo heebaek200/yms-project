@@ -130,3 +130,10 @@ export function updateMockWorkspaceRole(
             : workspace
     ));
 }
+
+/** 제작팀을 나간 사용자의 ACTIVE 목록 항목을 제거해 재조회 결과에 반영합니다. */
+export function removeMockWorkspaceMembership(workspaceId: number) {
+    mockWorkspaces = mockWorkspaces.filter(
+        workspace => workspace.workspaceId !== workspaceId
+    );
+}

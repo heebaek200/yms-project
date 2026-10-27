@@ -112,6 +112,24 @@
     line-height: 1.5;
 }
 
+/* OWNER 본인의 제외와 자발적 나가기 진입점이 다른 이유를 관리 흐름 안에서 안내합니다. */
+.settings-resource__header .settings-member-self-exit-guide {
+    margin-top: 7px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.settings-member-self-exit-guide a {
+    color: var(--color-primary);
+    font-weight: 700;
+    text-underline-offset: 2px;
+}
+
+.settings-member-self-exit-guide code {
+    font-family: inherit;
+    font-weight: 800;
+}
+
 .settings-button {
     min-height: 38px;
     padding: 8px 13px;

@@ -1,14 +1,19 @@
 import type { AuthUser, UserRole } from '../../types/auth';
 import type { WorkspaceRole } from '../../types/workspace';
 import type {
+    WorkspaceDepartureImpact,
     WorkspaceMember,
     WorkspaceMemberStatus
 } from '../../types/workspaceSettings';
 import type { ApiResponse, ApiSuccessResponse } from '../types';
-import { updateMockWorkspaceRole } from './workspaces';
+import {
+    removeMockWorkspaceMembership,
+    updateMockWorkspaceRole
+} from './workspaces';
 import {
     countOwnedProjects,
-    deactivateProjectMemberships
+    deactivateProjectMemberships,
+    readWorkspaceDepartureProjectImpact
 } from '../projects/projectStore';
 import { withWorkspaceMutation } from './workspaceMutationQueue';
 
@@ -24,6 +29,8 @@ export type WorkspaceMemberListRequest = {
 export type WorkspaceMemberListResponse =
     ApiSuccessResponse<WorkspaceMember[]>;
 export type WorkspaceMemberResponse = ApiResponse<WorkspaceMember>;
+export type WorkspaceDepartureImpactResponse =
+    ApiResponse<WorkspaceDepartureImpact>;
 
 // 권한 경계와 모든 필터를 한 화면에서 검증할 수 있는 제작팀별 Mock 멤버 저장소입니다.
 let mockMembers: Record<number, StoredWorkspaceMember[]> = {
@@ -376,5 +383,122 @@ export async function removeWorkspaceMember(
         target.leftAt = new Date().toISOString();
         deactivateProjectMemberships(workspaceId, target.workspaceMemberId, actor.name, actor.workspaceMemberId);
         return { success: true, message: `${target.name} 님을 제작팀에서 제외했습니다.`, data: toWorkspaceMember(workspaceId, target) };
+    });
+}
+
+/** OWNER·ADMIN의 대상 범위와 자기 조회 규칙을 같은 조건으로 판정합니다. */
+function canInspectDepartureImpact(
+    actor: StoredWorkspaceMember,
+    target: StoredWorkspaceMember
+) {
+    if (actor.userId === target.userId) {
+        return true;
+    }
+
+    if (actor.workspaceRole === 'OWNER') {
+        return true;
+    }
+
+    return actor.workspaceRole === 'ADMIN' && target.workspaceRole === 'MEMBER';
+}
+
+/** 최신 멤버·Project 저장소를 기준으로 제작팀 이탈의 차단 사유와 영향을 계산합니다. */
+function createDepartureImpact(
+    workspaceId: number,
+    target: StoredWorkspaceMember
+): WorkspaceDepartureImpact {
+    const members = getMemberStore(workspaceId);
+    const activeMemberIds = new Set(
+        members
+            .filter(member => member.status === 'ACTIVE')
+            .map(member => member.workspaceMemberId)
+    );
+    const activeOwnerCount = members.filter(member => (
+        member.status === 'ACTIVE' && member.workspaceRole === 'OWNER'
+    )).length;
+    const projectImpact = readWorkspaceDepartureProjectImpact(
+        workspaceId,
+        target.workspaceMemberId,
+        activeMemberIds
+    );
+
+    return {
+        workspaceMemberId: target.workspaceMemberId,
+        isLastActiveOwner: target.workspaceRole === 'OWNER'
+            && activeOwnerCount <= 1,
+        ...projectImpact
+    };
+}
+
+/** 자기 자신 또는 제외 권한이 있는 관리자가 제작팀 이탈 영향을 미리 조회합니다. */
+export async function getWorkspaceMemberDepartureImpact(
+    workspaceId: number,
+    workspaceMemberId: number,
+    actorUserId: number
+): Promise<WorkspaceDepartureImpactResponse> {
+    await new Promise(resolve => setTimeout(resolve, 220));
+
+    const members = getMemberStore(workspaceId);
+    const actor = members.find(member => (
+        member.userId === actorUserId && member.status === 'ACTIVE'
+    ));
+    const target = members.find(member => (
+        member.workspaceMemberId === workspaceMemberId
+        && member.status === 'ACTIVE'
+    ));
+
+    if (!actor || !target || !canInspectDepartureImpact(actor, target)) {
+        return {
+            success: false,
+            errorCode: 'WORKSPACE_DEPARTURE_IMPACT_FORBIDDEN',
+            message: '제작팀 이탈 영향을 확인할 권한이 없습니다.',
+            errors: null
+        };
+    }
+
+    return { success: true, data: createDepartureImpact(workspaceId, target) };
+}
+
+/** 현재 사용자가 제작팀을 나가며 마지막 OWNER와 Project 소유권을 최종 재검증합니다. */
+export async function leaveWorkspace(
+    workspaceId: number,
+    actorUserId: number
+): Promise<WorkspaceMemberResponse> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    return withWorkspaceMutation(workspaceId, () => {
+        const members = getMemberStore(workspaceId);
+        const target = members.find(member => (
+            member.userId === actorUserId && member.status === 'ACTIVE'
+        ));
+
+        if (!target) {
+            return { success: false, errorCode: 'WORKSPACE_MEMBER_NOT_ACTIVE', message: '활동 중인 제작팀 멤버십을 찾을 수 없습니다.', errors: null };
+        }
+
+        const impact = createDepartureImpact(workspaceId, target);
+        if (impact.isLastActiveOwner) {
+            return { success: false, errorCode: 'LAST_OWNER_REQUIRED', message: '마지막 소유자는 제작팀을 나갈 수 없습니다.', errors: null };
+        }
+        if (impact.ownedProjects.length > 0) {
+            return { success: false, errorCode: 'PROJECT_OWNERSHIP_TRANSFER_REQUIRED', message: '소유 중인 프로젝트의 소유자를 먼저 변경해 주세요.', errors: null };
+        }
+
+        // 이탈 이력을 보존하고 연결된 Project 참여도 동일한 멤버 ID로 종료합니다.
+        target.status = 'LEFT';
+        target.leftAt = new Date().toISOString();
+        deactivateProjectMemberships(
+            workspaceId,
+            target.workspaceMemberId,
+            target.name,
+            target.workspaceMemberId
+        );
+        removeMockWorkspaceMembership(workspaceId);
+
+        return {
+            success: true,
+            message: '제작팀에서 나왔습니다.',
+            data: toWorkspaceMember(workspaceId, target)
+        };
     });
 }
