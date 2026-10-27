@@ -493,7 +493,7 @@ export async function leaveWorkspace(
             target.name,
             target.workspaceMemberId
         );
-        removeMockWorkspaceMembership(workspaceId, actorUserId);
+        removeMockWorkspaceMembership(workspaceId);
 
         return {
             success: true,

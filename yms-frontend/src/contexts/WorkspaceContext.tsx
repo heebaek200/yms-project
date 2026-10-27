@@ -7,7 +7,10 @@ import {
     type ReactNode
 } from 'react';
 
-import { getWorkspaces } from '../api/workspaces/workspaces';
+import {
+    getWorkspaces,
+    removeMockWorkspaceMembership
+} from '../api/workspaces/workspaces';
 import { useAuth } from './AuthContext';
 import type { WorkspaceSummary } from '../types/workspace';
 import {
@@ -66,7 +69,7 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         try {
             setIsLoading(true);
 
-            const response = await getWorkspaces(user.userId);
+            const response = await getWorkspaces();
 
             if (requestId !== latestRequestIdRef.current) {
                 return response.data;
@@ -168,6 +171,8 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
                 user.userId,
                 invalidation.workspaceId
             );
+            // 실제 API 전환 전에는 수신 탭의 메모리 Mock도 제거해 이후 재조회에서 복구되지 않게 합니다.
+            removeMockWorkspaceMembership(invalidation.workspaceId);
             workspacesRef.current = workspacesRef.current.filter(
                 workspace => workspace.workspaceId !== invalidation.workspaceId
             );
