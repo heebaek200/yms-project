@@ -1268,7 +1268,8 @@ Query:
 - assigneeProjectMemberId
 - status
 - mineOnly
-- includeDeleted: 기본 false
+- deletedState: ACTIVE / DELETED, 기본 ACTIVE
+- anchorTaskId: 직접 이동할 Task ID
 - page: 기본 0
 - size: 기본 20
 
@@ -1276,7 +1277,19 @@ Query:
 
 응답에는 현재 상태, 담당 자격 이상 사유, 최근 반려 정보, version과 현재 사용자가 수행할 수 있는 액션을 포함합니다. 전체 변경 이력은 9.7의 별도 API로 조회합니다.
 
-`taskId` 직접 이동 대상이 현재 페이지에 없으면 클라이언트가 대상 작업을 포함하는 페이지를 조회할 수 있도록 전체 건수와 페이지 메타데이터를 반환합니다.
+`deletedState=ACTIVE`는 논리 삭제되지 않은 작업만, `deletedState=DELETED`는 논리 삭제된 작업만 반환합니다. 활성 작업과 삭제된 작업을 한 응답에 섞는 ALL 값은 제공하지 않습니다. 두 목록은 필터와 페이지 상태를 독립적으로 관리합니다.
+
+`anchorTaskId`가 있으면 서버는 `page` 대신 현재 `size`와 기본 정렬을 기준으로 대상 작업이 포함된 페이지를 계산해 반환합니다. 일반 필터가 대상 작업을 제외하는 경우 직접 이동을 우선하여 해당 페이지를 반환하고 응답 메타데이터에 `filtersOverridden=true`를 포함합니다. 화면은 작업 필터 Query를 제거하고 필터 초기화 안내를 표시합니다. `anchorTaskId`가 요청한 Project 또는 `deletedState` 범위에 없거나 처리 중 상태가 바뀌면 `anchorMatched=false`를 반환하며 클라이언트는 9.1.1 단건 조회로 최신 상태를 다시 확인합니다.
+
+### 9.1.1. Task 단건 조회와 직접 이동
+
+GET /api/projects/{projectId}/tasks/{taskId}
+
+논리 삭제 여부와 관계없이 현재 Project에서 조회 가능한 Task 한 건을 반환합니다. 금액 필드와 변경 가능 액션은 9장의 공통 권한 규칙에 따라 마스킹합니다.
+
+대시보드·캘린더·알림에서 `taskId`로 진입하면 클라이언트는 먼저 단건 조회로 접근 가능 여부와 삭제 상태를 확인합니다. 활성 작업이면 `deletedState=ACTIVE`, 삭제된 작업이면 `deletedState=DELETED`와 `anchorTaskId`를 사용해 목록을 조회합니다. 삭제된 작업이면 접이식 영역을 자동으로 엽니다.
+
+Task가 존재하지 않거나 요청한 Project에 속하지 않거나 현재 사용자가 조회할 수 없으면 리소스 존재 여부를 구분하지 않고 `TASK_NOT_FOUND`를 반환합니다. 화면은 현재 작업 관리 화면을 유지하고 `요청한 작업을 확인할 수 없습니다.`라고 안내합니다.
 
 ## 9.2. Task 생성
 
@@ -2135,6 +2148,7 @@ DELETE /api/projects/{projectId}/archive
 GET/PATCH/DELETE /api/projects/{projectId}
 Project Member API
 GET    /api/projects/{projectId}/tasks
+GET    /api/projects/{projectId}/tasks/{taskId}
 POST   /api/projects/{projectId}/tasks
 PATCH  /api/projects/{projectId}/tasks/{taskId}
 PATCH  /api/projects/{projectId}/tasks/{taskId}/status
