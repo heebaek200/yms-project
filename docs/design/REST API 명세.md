@@ -750,7 +750,7 @@ Query:
 
 사용자 식별자와 제작팀 권한은 인증 세션 및 제작팀 멤버십에서 결정합니다. OWNER와 ADMIN은 현재 제작팀의 관리 가능 일정을 조회하고 MEMBER는 자신이 참여한 Project와 접근 가능한 Task 일정만 조회합니다. `role=MY_TASK`는 권한 범위를 확장하지 않으며 허용된 일정 중 현재 사용자에게 배정된 Task만 반환합니다. Workspace, 권한, 날짜 범위와 모든 필터를 적용한 뒤 `calendarEvents`와 `todayDeadlines`를 같은 기준으로 생성합니다.
 
-`calendarEvents.workerAmount`는 OWNER와 ADMIN 응답에만 포함합니다. MEMBER는 자신이 참여하거나 담당하는 일정이라도 Schedule 응답에서 작업 금액을 받지 않으며, 본인의 지급 예정 금액은 별도의 개인 정산 API에서 확인합니다.
+`calendarEvents.workerAmount`는 Workspace OWNER·ADMIN과 해당 Project의 Owner·ACTIVE EDIT 참여자 응답에 포함합니다. VIEW 참여자에게는 자신이 담당자인 작업의 금액만 포함하고 다른 작업에서는 필드를 제거합니다. 제작팀 전체 재무 정보와 개인 정산 정보의 기존 접근 권한은 그대로 유지합니다.
 
 응답 예:
 
@@ -1243,7 +1243,42 @@ VIEW 참여자, 참여 종료 사용자나 Project 미참여자를 자동 추가
 
 # 9. Task API
 
-## 9.1. Task 생성
+공통 권한:
+
+- Project 조회 권한자는 작업 목록과 이력을 조회할 수 있습니다.
+- Project Owner, ACTIVE EDIT Project Member와 Workspace OWNER·ADMIN은 작업 생성·수정·상태 변경·논리 삭제·복원 권한을 동일하게 가집니다.
+- VIEW Project Member는 변경할 수 없습니다.
+- 보관 Project에서는 조회 API만 허용합니다. Project의 PLANNING / EDITING / REVIEW / UPLOADED / CANCELLED 상태는 작업 변경을 제한하지 않습니다.
+- CONFIRMED Settlement Item에 포함된 작업은 조회 전용이며 변경 요청에 `TASK_ALREADY_SETTLED`를 반환합니다.
+
+금액 공개:
+
+- Project Owner, ACTIVE EDIT Project Member와 Workspace OWNER·ADMIN 응답에는 모든 작업의 `workerAmount`를 포함합니다.
+- VIEW Project Member에게는 자신이 담당자인 작업의 `workerAmount`만 제공하고 다른 작업에는 필드를 포함하지 않습니다.
+- 작업 이력의 금액 변경 전후 값도 같은 공개 기준을 적용합니다.
+
+## 9.1. Task 목록
+
+GET /api/projects/{projectId}/tasks
+
+Query:
+
+- keyword: 작업 내용, 작업 종류 또는 담당자 이름
+- taskTypeId
+- assigneeProjectMemberId
+- status
+- mineOnly
+- includeDeleted: 기본 false
+- page: 기본 0
+- size: 기본 20
+
+기본 정렬은 REVIEW → PROGRESS → WAITING → COMPLETED 순이며 같은 상태에서는 종료일 오름차순, 종료일이 없으면 생성일 내림차순입니다. 일반 작업과 삭제된 작업은 화면에서 각각 독립된 Query와 페이지 상태를 사용합니다.
+
+응답에는 현재 상태, 담당 자격 이상 사유, 최근 반려 정보, version과 현재 사용자가 수행할 수 있는 액션을 포함합니다. 전체 변경 이력은 9.7의 별도 API로 조회합니다.
+
+`taskId` 직접 이동 대상이 현재 페이지에 없으면 클라이언트가 대상 작업을 포함하는 페이지를 조회할 수 있도록 전체 건수와 페이지 메타데이터를 반환합니다.
+
+## 9.2. Task 생성
 
 POST /api/projects/{projectId}/tasks
 
@@ -1253,6 +1288,7 @@ POST /api/projects/{projectId}/tasks
 | --- | --- | --- | --- |
 | taskTypeId | Long | Y | 같은 Workspace의 활성 Task Type |
 | assigneeProjectMemberId | Long | Y | ACTIVE EDIT Project Member |
+| content | String | N | 앞뒤 공백 제거 후 1~150자, 빈 문자열은 null 처리 |
 | startDate | String | N | YYYY-MM-DD |
 | endDate | String | N | YYYY-MM-DD |
 | workerAmount | String | Y | 0 이상 |
@@ -1263,6 +1299,7 @@ POST /api/projects/{projectId}/tasks
 {
   "taskTypeId": 3,
   "assigneeProjectMemberId": 45,
+  "content": "인트로 구간 자막 수정",
   "startDate": "2026-09-18",
   "endDate": "2026-09-21",
   "workerAmount": "300000.00"
@@ -1271,9 +1308,11 @@ POST /api/projects/{projectId}/tasks
 
 생성 상태는 WAITING입니다.
 
-전문 역할과 Task Type이 일반적인 조합과 다르면 프론트에서 경고할 수 있지만 서버가 강제로 배정을 차단하지는 않습니다.
+전문 역할은 검증하지 않으며 프로필 표시와 담당자 검색·필터에만 사용합니다. 생성 성공 시 `CREATED` 작업 이력을 함께 저장합니다.
 
-## 9.2. Task 수정
+Project dueDate 이후의 endDate는 저장을 허용하되 응답 warning에 정확한 Project 마감일을 제공합니다. 화면은 요청 전 사용자 확인도 수행합니다.
+
+## 9.3. Task 수정
 
 PATCH /api/projects/{projectId}/tasks/{taskId}
 
@@ -1281,17 +1320,24 @@ PATCH /api/projects/{projectId}/tasks/{taskId}
 
 - taskTypeId
 - assigneeProjectMemberId
+- content
 - startDate
 - endDate
 - workerAmount
+- expectedVersion
 
 검증:
 
 - endDate < startDate → 400
 - Project dueDate 이후 → 저장 허용, 응답 warning 제공 가능
-- CONFIRMED Settlement Item에 이미 포함된 Task의 workerAmount 변경은 과거 Settlement 스냅샷에 영향을 주지 않음
+- WAITING / PROGRESS 상태에서만 일반 수정 허용
+- 현재 작업의 비활성 Task Type은 그대로 유지할 수 있지만 다른 Task Type으로 변경할 때는 활성 Task Type만 선택 가능
+- 담당자는 현재 Project의 ACTIVE EDIT Project Member만 지정 가능
+- 실제 값이 변경된 필드만 한 개의 UPDATED 이력으로 기록
+- 담당자 변경 시 기존 담당자와 새 담당자에게 알림. 요청자 자신에게 보내는 자기 알림은 생략
+- version 불일치 → TASK_VERSION_CONFLICT 409
 
-## 9.3. Task 상태 변경
+## 9.4. Task 상태 변경
 
 PATCH /api/projects/{projectId}/tasks/{taskId}/status
 
@@ -1299,7 +1345,9 @@ PATCH /api/projects/{projectId}/tasks/{taskId}/status
 
 ~~~json
 {
-  "status": "REVIEW"
+  "status": "REVIEW",
+  "rejectionReason": null,
+  "expectedVersion": 3
 }
 ~~~
 
@@ -1310,13 +1358,78 @@ PATCH /api/projects/{projectId}/tasks/{taskId}/status
 - REVIEW
 - COMPLETED
 
-검수 반려는 REVIEW → PROGRESS 상태 전이로 처리합니다.
+허용 전이:
+
+- WAITING → PROGRESS
+- PROGRESS → REVIEW
+- REVIEW → COMPLETED
+- REVIEW → PROGRESS: 검수 반려, `rejectionReason` 필수, 최대 500자
+- COMPLETED → REVIEW: 완료 취소 확인 후 실행
+
+담당자인 ACTIVE EDIT 참여자는 자신의 작업을 순서대로 변경할 수 있고 작업 변경 권한자는 Project의 모든 작업 상태를 같은 전이 규칙 안에서 조정할 수 있습니다. 담당자가 Project Owner 또는 상태 조정 권한자이면 자신의 REVIEW 작업도 완료할 수 있습니다. 상태 건너뛰기는 허용하지 않습니다.
+
+담당자가 현재 ACTIVE EDIT가 아니면 재지정 전까지 상태 변경을 차단합니다.
 
 COMPLETED 전환 시 completed_at을 기록합니다.
+
+COMPLETED → REVIEW 전환 시 completed_at을 NULL로 바꿉니다. CONFIRMED Settlement Item이 있으면 완료 취소를 거부합니다.
+
+논리 삭제되지 않은 작업이 하나 이상이고 마지막 미완료 작업을 COMPLETED로 바꾼 경우, Project가 UPLOADED / CANCELLED가 아니면 응답에 선택적 Project 상태 전환 안내를 포함합니다. Task 상태 변경과 Project 상태 변경은 별도 요청이며 자동으로 연동하지 않습니다.
 
 잘못된 상태 전이:
 
 - INVALID_TASK_STATUS_TRANSITION → 409
+- TASK_ASSIGNEE_REASSIGNMENT_REQUIRED → 409
+- TASK_VERSION_CONFLICT → 409
+
+## 9.5. Task 논리 삭제
+
+DELETE /api/projects/{projectId}/tasks/{taskId}
+
+요청은 `expectedVersion`을 전달합니다. Task 상태와 관계없이 논리 삭제할 수 있지만 CONFIRMED Settlement Item에 포함된 작업은 거부합니다.
+
+성공 시 deleted_at / deleted_by_member_id를 기록하고 version을 증가시키며 `DELETED` 이력을 추가합니다. 삭제된 작업은 일반 목록, 일정, 작업 수, 완료 수, 작업자 지급 예정 금액, ProjectGroup 비용, 미완료 작업 수와 검수 요청 집계에서 제외합니다. 영구 삭제 API는 제공하지 않습니다.
+
+## 9.6. Task 복원
+
+POST /api/projects/{projectId}/tasks/{taskId}/restore
+
+요청:
+
+~~~json
+{
+  "expectedVersion": 5
+}
+~~~
+
+기존 상태·작업 종류·담당자·일정·금액을 유지하고 deleted_at / deleted_by_member_id를 NULL로 변경한 뒤 version을 증가시키며 `RESTORED` 이력을 추가합니다.
+
+비활성 Task Type은 기존 값으로 유지합니다. 담당자가 ACTIVE EDIT가 아니어도 복원을 허용하지만 응답에 담당자 재지정 필요 상태를 포함하고 상태 변경은 차단합니다.
+
+## 9.7. Task 변경 이력
+
+GET /api/projects/{projectId}/tasks/{taskId}/histories
+
+이력 이벤트:
+
+- CREATED
+- UPDATED
+- STATUS_CHANGED
+- REJECTED
+- DELETED
+- RESTORED
+
+응답은 이벤트, 이전·이후 상태, 변경 필드의 이전·변경 값, 반려 사유, 처리자와 처리 시각을 제공합니다. 금액 변경 값은 현재 금액 조회 권한에 따라 제거합니다.
+
+## 9.8. Task 알림
+
+- 신규 배정과 담당자 변경 → 새 담당자
+- 담당자 변경 → 기존 담당자에게 해제 알림
+- 검수 요청 → Project Owner
+- 반려와 완료 → 담당자
+- 삭제와 복원 → 현재 담당자
+
+요청자와 알림 대상이 같으면 자기 알림은 생성하지 않습니다. 일반 일정·금액 수정만으로는 알림을 생성하지 않습니다.
 
 ---
 
@@ -1914,6 +2027,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 ProjectGroup �
 | WORKSPACE_INVITATION_NOT_FOUND | 404 | Workspace 초대 없음 |
 | PROJECT_GROUP_NOT_FOUND | 404 | ProjectGroup 없음 |
 | CHANNEL_NOT_FOUND | 404 | Channel 없음 |
+| TASK_NOT_FOUND | 404 | Task 없음 또는 현재 Project에 속하지 않음 |
 
 ## 충돌 / 상태 전이
 
@@ -1936,6 +2050,8 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 ProjectGroup �
 | CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED | 409 | 콘텐츠 성과의 ProjectGroup 귀속 이동 확인 필요 |
 | CHANNEL_IN_USE | 409 | 기존 Project나 업무 데이터에서 사용 중인 Channel 삭제 불가 |
 | INVALID_TASK_STATUS_TRANSITION | 409 | 잘못된 Task 상태 전이 |
+| TASK_ASSIGNEE_REASSIGNMENT_REQUIRED | 409 | 담당자가 ACTIVE EDIT가 아니어서 재지정 필요 |
+| TASK_VERSION_CONFLICT | 409 | 다른 요청이 Task를 먼저 변경하여 최신 내용 재조회 필요 |
 | TASK_ALREADY_SETTLED | 409 | 이미 정산된 Task |
 | TASK_TYPE_IN_USE | 409 | 기존 작업에서 사용 중인 작업 종류 삭제 불가 |
 | DUPLICATE_PROJECT_GROUP_NAME | 409 | Workspace 내 정규화된 ProjectGroup 이름 중복 |
@@ -2018,7 +2134,13 @@ DELETE /api/projects/{projectId}/archive
 ~~~text
 GET/PATCH/DELETE /api/projects/{projectId}
 Project Member API
-Task API
+GET    /api/projects/{projectId}/tasks
+POST   /api/projects/{projectId}/tasks
+PATCH  /api/projects/{projectId}/tasks/{taskId}
+PATCH  /api/projects/{projectId}/tasks/{taskId}/status
+DELETE /api/projects/{projectId}/tasks/{taskId}
+POST   /api/projects/{projectId}/tasks/{taskId}/restore
+GET    /api/projects/{projectId}/tasks/{taskId}/histories
 YouTube API
 Chat REST / WebSocket API
 ~~~

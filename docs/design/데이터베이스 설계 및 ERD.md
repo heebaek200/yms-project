@@ -103,7 +103,8 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | project_member_histories | Transaction | 미적용 | 참여·재참여·권한 변경·종료 사건과 처리자를 보존 |
 | project_owner_histories | Transaction | 미적용 | Project 소유권 이전 전후와 처리자를 보존 |
 | project_status_histories | Transaction | 미적용 | 변경 전후 상태, 변경자와 변경 시각이 자체 이력 |
-| project_tasks | Transaction | 미적용 | 일정, 상태, 완료 시각이 핵심. 정산 확정 후 금액은 Settlement Item에서 스냅샷 보존 |
+| project_tasks | Transaction | 적용 | 일정, 상태, 완료 시각과 논리 삭제·복원이 핵심. 정산 확정 후 금액은 Settlement Item에서 스냅샷 보존 |
+| project_task_histories | History | 미적용 | 작업 생성·수정·상태 변경·반려·삭제·복원 이력 보존 |
 | chat_messages | Transaction | 미적용 | 발신자와 전송 시각 자체가 감사 정보 역할 |
 | chat_room_reads | Transaction | 미적용 | 현재 읽음 위치를 보관하는 상태 데이터 |
 | notifications | Transaction | 미적용 | 생성 시각 / 읽음 시각 자체가 업무 데이터 |
@@ -141,6 +142,7 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | VideoContent | video_content_primary_project_histories | 대표 Project 및 ProjectGroup 귀속 변경 이력 |
 | Task | task_types | Workspace별 확장 가능한 작업 종류 |
 | Task | project_tasks | 실제 세부 작업과 담당자 / 일정 / 지급액 |
+| Task | project_task_histories | 작업 생성·수정·상태·삭제·복원 변경 이력 |
 | Chat | chat_messages | Project 실시간 채팅 메시지 |
 | Chat | chat_room_reads | Project별 사용자 마지막 읽음 위치 |
 | Notification | notifications | 작업, 채팅, 초대, 정산 알림 |
@@ -558,23 +560,59 @@ Project 안에서 실제 수행하는 세부 작업입니다.
 | project_task_id | BIGINT | PK | Task ID |
 | project_id | BIGINT | FK → video_projects | Project |
 | task_type_id | BIGINT | FK → task_types | 작업 종류 |
+| content | VARCHAR(150) | NULL | 사용자 표시용 작업 내용 |
 | assignee_project_member_id | BIGINT | FK → project_members | 담당 Project Member |
 | start_date | DATE | NULL | 작업 시작일 |
 | end_date | DATE | NULL | 작업 종료일 |
 | worker_amount | DECIMAL(15,2) | NOT NULL | 작업자 지급 예정 금액 |
 | status | VARCHAR(20) | NOT NULL | WAITING / PROGRESS / REVIEW / COMPLETED |
 | completed_at | DATETIME | NULL | 완료 시각 |
+| version | BIGINT | NOT NULL | 낙관적 잠금 버전 |
+| created_by_member_id | BIGINT | FK → workspace_members | 생성 사용자 |
+| created_at | DATETIME | NOT NULL | 생성 시각 |
+| updated_by_member_id | BIGINT | FK → workspace_members, NULL | 최종 수정 사용자 |
+| updated_at | DATETIME | NULL | 최종 수정 시각 |
+| deleted_by_member_id | BIGINT | FK → workspace_members, NULL | 논리 삭제 사용자 |
+| deleted_at | DATETIME | NULL | 논리 삭제 시각 |
 
 정책:
 
 - 새 담당자는 해당 Project의 ACTIVE EDIT `project_members`만 지정할 수 있습니다.
+- 전문 역할은 작업 배정 제약이나 작업 종류 적합성 판정에 사용하지 않습니다.
 - 기존 담당자가 VIEW로 변경되거나 참여 종료되어도 담당자 FK와 Task 상태를 유지합니다. 미완료 Task의 담당자 재지정 필요 여부는 Project Member의 현재 권한·활성 상태로 계산합니다.
 - Task Type과 Project가 동일 Workspace에 속하는지는 서비스 계층에서 검증합니다.
 - `end_date < start_date`는 허용하지 않습니다.
 - Project `due_date` 이후의 종료일은 차단하지 않고 경고합니다.
 - REVIEW 반려 시 동일 Task를 PROGRESS로 되돌립니다.
 - `worker_amount`는 Project 제작비와 정산의 원천 금액입니다.
-- CONFIRMED 정산에 포함된 이후 실제 지급 기준 금액은 `settlement_items.amount_snapshot`을 사용합니다.
+- `deleted_at IS NOT NULL`인 작업은 일반 목록, 일정과 현재 집계에서 제외하지만 기존 FK와 이력은 유지하고 복원할 수 있습니다. 영구 삭제 기능은 제공하지 않습니다.
+- 논리 삭제된 작업도 Task Type 사용 이력으로 간주하여 참조 대상 Task Type의 물리 삭제를 제한합니다.
+- CONFIRMED 정산에 포함된 작업은 조회 전용으로 고정하며 수정·상태 변경·완료 취소·논리 삭제를 차단합니다. 실제 지급 기준 금액은 `settlement_items.amount_snapshot`을 사용합니다.
+- 수정·상태 변경·삭제·복원 시 `version`을 비교하고 성공할 때마다 증가시킵니다.
+
+## 7.3. project_task_histories
+
+작업의 업무상 변경을 한 흐름으로 보존합니다.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| project_task_history_id | BIGINT | PK | 작업 이력 ID |
+| project_task_id | BIGINT | FK → project_tasks | 대상 작업 |
+| event_type | VARCHAR(30) | NOT NULL | CREATED / UPDATED / STATUS_CHANGED / REJECTED / DELETED / RESTORED |
+| from_status | VARCHAR(20) | NULL | 변경 전 상태 |
+| to_status | VARCHAR(20) | NULL | 변경 후 상태 |
+| rejection_reason | VARCHAR(500) | NULL | 반려 사유 |
+| changed_fields | JSON | NULL | 일반 수정의 변경 필드와 이전·변경 값 |
+| processed_by_member_id | BIGINT | FK → workspace_members | 처리 사용자 |
+| processed_at | DATETIME | NOT NULL | 처리 시각 |
+
+정책:
+
+- 작업 생성 시 `CREATED` 이력을 함께 기록합니다.
+- 일반 수정은 실제 값이 달라진 필드만 하나의 `UPDATED` 이력으로 기록하고 같은 값의 재저장은 이력을 만들지 않습니다.
+- 검수 반려는 `REJECTED`로 기록하고 REVIEW → PROGRESS 상태와 필수 반려 사유를 함께 보존합니다.
+- 삭제와 복원을 반복하더라도 각 `DELETED` / `RESTORED` 이력을 유지합니다.
+- `changed_fields`의 지급 예정 금액은 API 응답에서 현재 금액 조회 권한이 있는 사용자에게만 제공합니다.
 
 ---
 
@@ -917,7 +955,9 @@ YouTube API에서 마지막으로 성공적으로 동기화한 YouTubePublicatio
 - `youtube_publications(channel_id, published_at)`
 - `youtube_publication_status_histories(publication_id, changed_at)`
 - `project_tasks(project_id, status)`
+- `project_tasks(project_id, deleted_at, status)`
 - `project_tasks(assignee_project_member_id, end_date, status)`
+- `project_task_histories(project_task_id, processed_at)`
 - `chat_messages(project_id, chat_message_id)`
 - `notifications(user_id, read_at, created_at)`
 - `expenses(workspace_id, occurred_on, scope_type)`
@@ -982,6 +1022,8 @@ erDiagram
     VIDEO_PROJECTS ||--o{ PROJECT_TASKS : contains
     PROJECT_MEMBERS ||--o{ PROJECT_TASKS : assigned
     TASK_TYPES ||--o{ PROJECT_TASKS : classifies
+    PROJECT_TASKS ||--o{ PROJECT_TASK_HISTORIES : records_changes
+    WORKSPACE_MEMBERS ||--o{ PROJECT_TASK_HISTORIES : processes
 
     VIDEO_PROJECTS ||--o{ CHAT_MESSAGES : has
     PROJECT_MEMBERS ||--o{ CHAT_MESSAGES : sends
@@ -1203,11 +1245,27 @@ erDiagram
         bigint project_id FK
         bigint task_type_id FK
         bigint assignee_project_member_id FK
+        varchar content
         date start_date
         date end_date
         decimal worker_amount
         varchar status
         datetime completed_at
+        bigint version
+        bigint deleted_by_member_id FK
+        datetime deleted_at
+    }
+
+    PROJECT_TASK_HISTORIES {
+        bigint project_task_history_id PK
+        bigint project_task_id FK
+        varchar event_type
+        varchar from_status
+        varchar to_status
+        varchar rejection_reason
+        json changed_fields
+        bigint processed_by_member_id FK
+        datetime processed_at
     }
 
     WORKSPACES ||--o{ WORKSPACE_MEMBERS : contains
@@ -1241,6 +1299,8 @@ erDiagram
     VIDEO_PROJECTS ||--o{ PROJECT_TASKS : contains
     PROJECT_MEMBERS ||--o{ PROJECT_TASKS : assigned
     TASK_TYPES ||--o{ PROJECT_TASKS : classifies
+    PROJECT_TASKS ||--o{ PROJECT_TASK_HISTORIES : records_changes
+    WORKSPACE_MEMBERS ||--o{ PROJECT_TASK_HISTORIES : processes
 ```
 
 ## 14.3. Chat / Notification

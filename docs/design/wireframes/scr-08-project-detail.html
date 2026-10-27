@@ -18,8 +18,10 @@
         <strong>카메라 리뷰</strong>
         <span class="badge">REVIEW</span>
         <span class="grow"></span>
-        <button class="small-button" type="button">참여자 / 권한</button>
-        <button class="small-button" type="button">YouTube 연결</button>
+        <button class="small-button" type="button">상세 정보</button>
+        <button class="action-button" type="button">작업 관리</button>
+        <button class="small-button" type="button">영상 결과물</button>
+        <button class="small-button" type="button">참여자 관리</button>
     </div>
 
     <div class="main-layout">
@@ -40,31 +42,31 @@
 
             <section class="panel">
                 <div class="row between">
-                    <h2 class="section-title" style="flex:1;">세부 작업</h2>
-                    <button class="small-button" type="button">+ 작업</button>
+                    <div>
+                        <h2 class="section-title">작업 관리</h2>
+                        <p class="help-text">프로젝트의 작업 배정, 일정과 검수 상태를 관리합니다.</p>
+                    </div>
+                    <button class="action-button" type="button">작업 추가</button>
                 </div>
-                <div class="table-wrap">
-                    <table class="table">
-                        <tr><th>작업</th><th>담당</th><th>기간</th><th>지급액</th><th>상태</th><th>액션</th></tr>
-                        <tr><td>가편집</td><td>김편집</td><td>09/15~09/17</td><td>150,000</td><td>COMPLETED</td><td>-</td></tr>
-                        <tr><td>종합 편집</td><td>김편집</td><td>09/18~09/21</td><td>300,000</td><td>REVIEW</td><td><button class="small-button">반려</button></td></tr>
-                        <tr><td>썸네일</td><td>이디자</td><td>09/20~09/21</td><td>100,000</td><td>PROGRESS</td><td>-</td></tr>
-                    </table>
+                <div class="grid-2">
+                    <div class="form-group"><label>검색</label><input type="text" placeholder="작업 내용, 종류 또는 담당자"></div>
+                    <div class="form-group"><label>상태</label><select><option>전체</option><option>검수 요청</option><option>진행 중</option><option>대기</option><option>완료</option></select></div>
+                    <div class="form-group"><label>작업 종류</label><select><option>전체</option><option>종합 편집</option><option>썸네일</option></select></div>
+                    <div class="form-group"><label>담당자</label><select><option>전체</option><option>김편집</option><option>이디자</option></select></div>
                 </div>
-                <p class="help-text">#17에서는 작업 요약 배치만 제공하며 추가·수정·검수 기능은 #18에서 구현합니다.</p>
+                <div class="row"><button class="small-button" type="button">내 작업만</button><button class="small-button" type="button">필터 초기화</button></div>
             </section>
 
             <section class="panel">
-                <h2 class="section-title">YouTube 연결</h2>
-                <p>Video ID: 아직 연결되지 않음</p>
-                <p>수익 방식: 채널 기본 단가 <span class="badge">OWNER / ADMIN만 표시</span></p>
-                <button class="small-button" type="button">영상 연결 / 동기화</button>
+                <div class="row between"><div><span class="badge">검수 요청</span><h3>인트로 구간 자막 수정</h3><p class="help-text">자막 · 김편집 · 09/18~09/21 · 300,000원</p></div><div class="row"><button class="small-button">수정</button><button class="small-button">반려</button><button class="action-button">완료</button><button class="small-button">삭제</button></div></div>
             </section>
 
             <section class="panel">
-                <h2 class="section-title">참여자 요약</h2>
-                <p>소유자 1명 · EDIT 2명 · VIEW 1명</p>
-                <p class="help-text">참여자 추가·제거와 권한 변경은 #47에서 구현합니다.</p>
+                <div class="row between"><div><span class="badge">진행 중</span><h3>썸네일 시안 제작</h3><p class="help-text">썸네일 · 이디자 · 09/20~09/21 · 100,000원</p></div><div class="row"><button class="small-button">수정</button><button class="action-button">검수 요청</button><button class="small-button">삭제</button></div></div>
+            </section>
+
+            <section class="panel">
+                <div class="row between"><strong>삭제된 작업 1개</strong><button class="small-button" type="button">펼치기</button></div>
             </section>
         </div>
 
