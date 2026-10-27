@@ -8,7 +8,7 @@ export type WorkspaceContextValue = {
     isLoading: boolean;
     isInitialized: boolean;
     errorMessage: string | null;
-    selectWorkspace: (workspaceId: number) => void;
+    selectWorkspace: (workspaceId: number) => boolean;
     refreshWorkspaces: () => Promise<WorkspaceSummary[]>;
 };
 

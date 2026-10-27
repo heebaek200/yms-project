@@ -11,6 +11,8 @@ type WorkspaceDepartureBlockerProps = {
     targetName: string;
     impact: WorkspaceDepartureImpact;
     switchesWorkspace: boolean;
+    errorMessage?: string;
+    isNavigating?: boolean;
     onOpenProject: (
         project: WorkspaceOwnedProjectImpact,
         destination: ProjectDestination
@@ -32,6 +34,8 @@ function WorkspaceDepartureBlocker({
     targetName,
     impact,
     switchesWorkspace,
+    errorMessage = '',
+    isNavigating = false,
     onOpenProject,
     onClose
 }: WorkspaceDepartureBlockerProps) {
@@ -43,6 +47,11 @@ function WorkspaceDepartureBlocker({
             onRequestClose={onClose}
         >
             <div className="workspace-departure-modal__body">
+                {errorMessage && (
+                    <p className="workspace-departure-modal__error" role="alert">
+                        {errorMessage}
+                    </p>
+                )}
                 {impact.isLastActiveOwner && (
                     <div className="workspace-departure-modal__notice">
                         <strong>마지막 소유자입니다.</strong>
@@ -78,13 +87,21 @@ function WorkspaceDepartureBlocker({
                                                 {STATUS_LABELS[project.status]}
                                                 {' · 이전 후보 '}{project.transferableMemberCount}명
                                             </p>
+                                            {destination === 'DETAIL' && (
+                                                <p className="workspace-departure-modal__project-guide">
+                                                    보관을 해제한 뒤 EDIT 참여자를 확보하고 소유권을 이전해 주세요.
+                                                </p>
+                                            )}
                                         </div>
                                         <button
                                             type="button"
                                             className="workspace-departure-modal__button"
+                                            disabled={isNavigating}
                                             onClick={() => onOpenProject(project, destination)}
                                         >
-                                            {switchesWorkspace
+                                            {isNavigating
+                                                ? '접근 확인 중...'
+                                                : switchesWorkspace
                                                 ? `${workspaceName}으로 전환하고 ${actionLabel}`
                                                 : actionLabel
                                             }
@@ -100,6 +117,7 @@ function WorkspaceDepartureBlocker({
                     <button
                         type="button"
                         className="workspace-departure-modal__button"
+                        disabled={isNavigating}
                         onClick={onClose}
                     >
                         닫기

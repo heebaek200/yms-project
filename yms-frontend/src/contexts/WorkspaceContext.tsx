@@ -66,7 +66,7 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         try {
             setIsLoading(true);
 
-            const response = await getWorkspaces();
+            const response = await getWorkspaces(user.userId);
 
             if (requestId !== latestRequestIdRef.current) {
                 return response.data;
@@ -206,11 +206,12 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         if (!user || !workspacesRef.current.some(
             workspace => workspace.workspaceId === workspaceId
         )) {
-            return;
+            return false;
         }
 
         setCurrentWorkspaceId(workspaceId);
         saveWorkspaceSelection(user.userId, workspaceId);
+        return true;
     };
 
     // Header와 Workspace 하위 화면이 동일한 현재 Workspace 상태를 공유합니다.

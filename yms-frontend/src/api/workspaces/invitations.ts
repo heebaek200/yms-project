@@ -169,7 +169,7 @@ export async function acceptWorkspaceInvitation(
     const workspace = toWorkspaceSummary(result);
     result.status = 'ACCEPTED';
     result.respondedAt = new Date().toISOString();
-    addMockWorkspaceMembership(workspace);
+    addMockWorkspaceMembership(workspace, user.userId);
 
     return {
         success: true,

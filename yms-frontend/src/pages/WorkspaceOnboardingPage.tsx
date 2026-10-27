@@ -95,6 +95,8 @@ function WorkspaceOnboardingPage() {
     const [leaveConfirmation, setLeaveConfirmation] = useState('');
     const [departureError, setDepartureError] = useState('');
     const [isLeaving, setIsLeaving] = useState(false);
+    const [isOpeningDepartureProject, setIsOpeningDepartureProject] =
+        useState(false);
 
     /**
      * 현재 사용자에게 도착한 유효한 PENDING 초대를 다시 조회합니다.
@@ -183,7 +185,7 @@ function WorkspaceOnboardingPage() {
 
     /** 모달의 임시 입력과 조회 결과를 모두 비우고 제작팀 목록으로 돌아갑니다. */
     const closeDepartureModal = () => {
-        if (isLeaving) return;
+        if (isLeaving || isOpeningDepartureProject) return;
         setDepartureWorkspace(null);
         setDepartureImpact(null);
         setDepartureActorUserId(null);
@@ -192,27 +194,50 @@ function WorkspaceOnboardingPage() {
     };
 
     /** 차단 Project가 다른 제작팀이면 현재 탭만 전환한 뒤 확정된 해결 화면으로 이동합니다. */
-    const openDepartureProject = (
+    const openDepartureProject = async (
         project: WorkspaceOwnedProjectImpact,
         destination: ProjectDestination
     ) => {
         if (!departureWorkspace) return;
 
-        if (currentWorkspace?.workspaceId !== departureWorkspace.workspaceId) {
-            selectWorkspace(departureWorkspace.workspaceId);
+        try {
+            setIsOpeningDepartureProject(true);
+            setDepartureError('');
+            const latestWorkspaces = await refreshWorkspaces();
+            const canAccessTarget = latestWorkspaces.some(workspace => (
+                workspace.workspaceId === departureWorkspace.workspaceId
+            ));
+
+            if (!canAccessTarget
+                || !selectWorkspace(departureWorkspace.workspaceId)) {
+                setDepartureError(
+                    `${departureWorkspace.name} 제작팀에 더 이상 접근할 수 없습니다.`
+                );
+                return;
+            }
+
+            // 최신 접근 권한과 현재 탭의 선택 갱신이 모두 성공한 뒤에만 Project Route로 이동합니다.
+            setDepartureWorkspace(null);
+            setDepartureImpact(null);
+            setDepartureActorUserId(null);
+            setLeaveConfirmation('');
+            navigate(destination === 'MEMBERS'
+                ? `/projects/${project.projectId}/members`
+                : `/projects/${project.projectId}`
+            );
+        } catch (error) {
+            console.error(error);
+            setDepartureError('제작팀 접근 권한을 확인하지 못했습니다.');
+        } finally {
+            setIsOpeningDepartureProject(false);
         }
-        closeDepartureModal();
-        navigate(destination === 'MEMBERS'
-            ? `/projects/${project.projectId}/members`
-            : `/projects/${project.projectId}`
-        );
     };
 
     /** 제작팀 이름 확인 후 나가기를 요청하고 모든 탭에 권한 무효화를 전파합니다. */
     const handleWorkspaceLeave = async () => {
         if (!user || !departureWorkspace || !departureImpact
             || departureActorUserId === null) return;
-        if (leaveConfirmation.trim() !== departureWorkspace.name) return;
+        if (leaveConfirmation !== departureWorkspace.name) return;
 
         try {
             setIsLeaving(true);
@@ -581,6 +606,8 @@ function WorkspaceOnboardingPage() {
                         currentWorkspace?.workspaceId !== departureWorkspace.workspaceId
                     }
                     onOpenProject={openDepartureProject}
+                    errorMessage={departureError}
+                    isNavigating={isOpeningDepartureProject}
                     onClose={closeDepartureModal}
                 />
             )}
@@ -636,7 +663,7 @@ function WorkspaceOnboardingPage() {
                                 <button
                                     type="button"
                                     className="workspace-departure-modal__button workspace-departure-modal__button--danger"
-                                    disabled={isLeaving || leaveConfirmation.trim() !== departureWorkspace.name}
+                                    disabled={isLeaving || leaveConfirmation !== departureWorkspace.name}
                                     onClick={() => void handleWorkspaceLeave()}
                                 >
                                     {isLeaving ? '나가는 중...' : '제작팀 나가기'}

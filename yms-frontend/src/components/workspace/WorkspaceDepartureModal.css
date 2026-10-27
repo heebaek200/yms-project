@@ -80,6 +80,23 @@
     line-height: 1.5;
 }
 
+.workspace-departure-modal__error {
+    margin: 0;
+    padding: 11px 13px;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    color: #b91c1c;
+    background: #fef2f2;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.workspace-departure-modal__project .workspace-departure-modal__project-guide {
+    color: #9f1239;
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .workspace-departure-modal__projects {
     display: grid;
     gap: 10px;
