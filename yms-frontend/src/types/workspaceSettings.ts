@@ -4,6 +4,7 @@ import type {
     WorkspaceRole
 } from './workspace';
 import type { UserRole } from './auth';
+import type { ProjectStatus } from './projectGroup';
 
 // YouTube 연결 여부와 실패 상태를 Channel 정보와 함께 표시합니다.
 export type ChannelIntegrationStatus =
@@ -51,6 +52,24 @@ export type WorkspaceMember = {
     joinedAt: string;
     leftAt: string | null;
     ownedProjectCount: number;
+};
+
+// 제작팀 이탈 전에 소유권 이전이 필요한 Project와 이동 경로를 판단할 정보입니다.
+export type WorkspaceOwnedProjectImpact = {
+    projectId: number;
+    title: string;
+    status: ProjectStatus;
+    archived: boolean;
+    transferableMemberCount: number;
+};
+
+// 제작팀 나가기·멤버 제외 전에 차단 사유와 참여 영향을 한 번에 확인합니다.
+export type WorkspaceDepartureImpact = {
+    workspaceMemberId: number;
+    isLastActiveOwner: boolean;
+    ownedProjects: WorkspaceOwnedProjectImpact[];
+    activeProjectParticipationCount: number;
+    incompleteAssignedTaskCount: number;
 };
 
 // 제작팀이 발송한 초대 내역입니다. EXPIRED는 PENDING과 만료 시각으로 계산합니다.

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 
 import {
     cancelWorkspaceMemberInvitation,
@@ -7,6 +8,7 @@ import {
     isWorkspaceInvitationExpired
 } from '../../api/workspaces/memberInvitations';
 import {
+    getWorkspaceMemberDepartureImpact,
     getWorkspaceMembers,
     removeWorkspaceMember,
     updateWorkspaceMemberRole
@@ -20,6 +22,7 @@ import {
 import type { UserRole } from '../../types/auth';
 import type { WorkspaceRole } from '../../types/workspace';
 import type {
+    WorkspaceDepartureImpact,
     WorkspaceInvitationStatusFilter,
     WorkspaceMember,
     WorkspaceMemberStatus,
@@ -28,6 +31,7 @@ import type {
 import FeedbackMessage, {
     type FeedbackMessageType
 } from '../common/FeedbackMessage';
+import WorkspaceDepartureBlocker from '../workspace/WorkspaceDepartureBlocker';
 import SettingsModal from './SettingsModal';
 
 type MemberManagementProps = {
@@ -90,6 +94,7 @@ function MemberManagement({
     workspaceId,
     onDirtyChange
 }: MemberManagementProps) {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const { currentWorkspace, refreshWorkspaces } = useWorkspace();
     const [members, setMembers] = useState<WorkspaceMember[]>([]);
@@ -123,6 +128,12 @@ function MemberManagement({
     const [ownerConfirmationEmail, setOwnerConfirmationEmail] = useState('');
     const [removingMember, setRemovingMember] =
         useState<WorkspaceMember | null>(null);
+    const [departureMember, setDepartureMember] =
+        useState<WorkspaceMember | null>(null);
+    const [departureImpact, setDepartureImpact] =
+        useState<WorkspaceDepartureImpact | null>(null);
+    const [checkingDepartureMemberId, setCheckingDepartureMemberId] =
+        useState<number | null>(null);
     const [ownerRemovalEmail, setOwnerRemovalEmail] = useState('');
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
@@ -396,19 +407,43 @@ function MemberManagement({
         void saveRoleChange();
     };
 
-    /** 소유 프로젝트가 있는 멤버는 고위험 제외 확인 모달을 열기 전에 차단합니다. */
-    const openRemoveMemberModal = (member: WorkspaceMember) => {
-        if (member.ownedProjectCount > 0) {
+    /** 멤버 제외 전에 최신 이탈 영향을 조회해 차단 또는 확인 모달을 선택합니다. */
+    const openRemoveMemberModal = async (member: WorkspaceMember) => {
+        if (!user || checkingDepartureMemberId !== null) return;
+
+        try {
+            setCheckingDepartureMemberId(member.workspaceMemberId);
+            setMemberFeedback(null);
+            setModalError(null);
+            const response = await getWorkspaceMemberDepartureImpact(
+                workspaceId,
+                member.workspaceMemberId,
+                user.userId
+            );
+
+            if (!response.success) {
+                setMemberFeedback({ type: 'error', message: response.message });
+                return;
+            }
+
+            if (response.data.isLastActiveOwner
+                || response.data.ownedProjects.length > 0) {
+                setDepartureMember(member);
+                setDepartureImpact(response.data);
+                return;
+            }
+
+            setRemovingMember(member);
+            setOwnerRemovalEmail('');
+        } catch (error) {
+            console.error(error);
             setMemberFeedback({
                 type: 'error',
-                message: `소유 중인 프로젝트 ${member.ownedProjectCount}개의 소유자를 먼저 변경해 주세요.`
+                message: '멤버 제외 영향을 확인하지 못했습니다.'
             });
-            return;
+        } finally {
+            setCheckingDepartureMemberId(null);
         }
-
-        setRemovingMember(member);
-        setOwnerRemovalEmail('');
-        setModalError(null);
     };
 
     /** 확인 모달에서 선택한 멤버를 제외하고 현재 필터 목록을 다시 조회합니다. */
@@ -432,6 +467,21 @@ function MemberManagement({
             );
 
             if (!response.success) {
+                if (response.errorCode === 'LAST_OWNER_REQUIRED'
+                    || response.errorCode === 'PROJECT_OWNERSHIP_TRANSFER_REQUIRED') {
+                    const impactResponse = await getWorkspaceMemberDepartureImpact(
+                        workspaceId,
+                        removingMember.workspaceMemberId,
+                        user.userId
+                    );
+                    if (impactResponse.success) {
+                        // 경쟁 변경으로 생긴 차단 조건은 오래된 확인 화면 대신 해결 경로로 보여줍니다.
+                        setDepartureMember(removingMember);
+                        setDepartureImpact(impactResponse.data);
+                        setRemovingMember(null);
+                        setOwnerRemovalEmail('');
+                    }
+                }
                 setModalError(response.message);
                 return;
             }
@@ -555,6 +605,13 @@ function MemberManagement({
                     <div>
                         <h2 id="member-management-title">멤버 관리</h2>
                         <p>전문 역할과 제작팀 권한, 참여 상태를 확인하고 관리합니다.</p>
+                        {actorRole === 'OWNER' && (
+                            <p className="settings-member-self-exit-guide">
+                                본인은 멤버 목록에서 제외할 수 없습니다. 제작팀을 나가려면{' '}
+                                <Link to="/workspaces">제작팀 목록</Link>에서 해당 제작팀의{' '}
+                                <code>⋯</code> 메뉴를 이용해 주세요.
+                            </p>
+                        )}
                     </div>
 
                     <button
@@ -674,6 +731,8 @@ function MemberManagement({
                                 <div className="settings-member-card__date">
                                     <span>참여일</span>
                                     <strong>{formatDate(member.joinedAt)}</strong>
+                                    <span>소유 프로젝트</span>
+                                    <strong>{member.ownedProjectCount}개</strong>
                                 </div>
                                 <div className="settings-member-card__actions">
                                     {actorRole === 'OWNER' && member.status === 'ACTIVE' && (
@@ -685,9 +744,13 @@ function MemberManagement({
                                         <button
                                             type="button"
                                             className="settings-button settings-button--danger"
-                                            onClick={() => openRemoveMemberModal(member)}
+                                            disabled={checkingDepartureMemberId !== null}
+                                            onClick={() => void openRemoveMemberModal(member)}
                                         >
-                                            제작팀에서 제외
+                                            {checkingDepartureMemberId === member.workspaceMemberId
+                                                ? '확인 중...'
+                                                : '제작팀에서 제외'
+                                            }
                                         </button>
                                     )}
                                 </div>
@@ -947,6 +1010,28 @@ function MemberManagement({
                         </div>
                     </form>
                 </SettingsModal>
+            )}
+
+            {departureMember && departureImpact && (
+                <WorkspaceDepartureBlocker
+                    workspaceName={currentWorkspace?.name ?? '현재 제작팀'}
+                    targetName={departureMember.name}
+                    impact={departureImpact}
+                    switchesWorkspace={false}
+                    onOpenProject={(project, destination) => {
+                        setDepartureMember(null);
+                        setDepartureImpact(null);
+                        navigate(destination === 'MEMBERS'
+                            ? `/projects/${project.projectId}/members`
+                            : `/projects/${project.projectId}`
+                        );
+                    }}
+                    onClose={() => {
+                        setDepartureMember(null);
+                        setDepartureImpact(null);
+                        setModalError(null);
+                    }}
+                />
             )}
 
             {removingMember && (

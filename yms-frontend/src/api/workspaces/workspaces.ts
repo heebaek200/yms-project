@@ -15,7 +15,8 @@ export type CreateWorkspaceRequest = {
 
 export type CreateWorkspaceResponse = ApiResponse<WorkspaceSummary>;
 
-// 실제 API 연동 전까지 생성과 초대 수락 결과가 목록 조회에 유지되는 Mock 저장소입니다.
+// 실제 API 연동 전까지 생성·초대·탈퇴 결과를 현재 탭 생명주기 동안 유지합니다.
+// 페이지 새로고침 시 Member·Project Mock과 ID 발급값을 포함한 전체 초기 상태가 함께 복구됩니다.
 let mockWorkspaces: WorkspaceSummary[] = [
     {
         workspaceId: 1,
@@ -129,4 +130,11 @@ export function updateMockWorkspaceRole(
             ? { ...workspace, myRole: workspaceRole }
             : workspace
     ));
+}
+
+/** 현재 탭 또는 무효화 이벤트를 받은 다른 탭의 ACTIVE 목록에서 제작팀을 제거합니다. */
+export function removeMockWorkspaceMembership(workspaceId: number) {
+    mockWorkspaces = mockWorkspaces.filter(
+        workspace => workspace.workspaceId !== workspaceId
+    );
 }

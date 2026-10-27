@@ -144,6 +144,64 @@
     font-size: 17px;
 }
 
+.workspace-card__heading-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.workspace-card__menu {
+    position: relative;
+}
+
+.workspace-card__menu summary {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    list-style: none;
+}
+
+.workspace-card__menu summary::-webkit-details-marker {
+    display: none;
+}
+
+.workspace-card__menu summary:hover {
+    background: rgb(15 23 42 / 0.06);
+}
+
+.workspace-card__menu-popover {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 5px);
+    right: 0;
+    width: max-content;
+    min-width: 150px;
+    padding: 5px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-background);
+    box-shadow: 0 12px 30px rgb(15 23 42 / 0.14);
+}
+
+.workspace-card__menu-popover button {
+    width: 100%;
+    padding: 9px 11px;
+    border: 0;
+    border-radius: 7px;
+    color: #c62828;
+    text-align: left;
+    background: transparent;
+    cursor: pointer;
+}
+
+.workspace-card__menu-popover button:hover {
+    background: rgb(211 47 47 / 0.07);
+}
+
 .workspace-card__current-badge {
     flex-shrink: 0;
     padding: 4px 8px;

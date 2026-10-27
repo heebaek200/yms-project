@@ -334,6 +334,41 @@ Query:
 - leftAt
 - ownedProjectCount: 논리 삭제되지 않은 소유 Project 수, 보관 Project 포함
 
+## 4.5.1. Workspace 멤버 제외·탈퇴 영향 조회
+
+GET /api/workspaces/{workspaceId}/members/{workspaceMemberId}/departure-impact
+
+제작팀 멤버 제외 또는 본인 탈퇴 확인 화면에서 필요한 차단 사유와 영향을 지연 조회합니다. 대상 본인 또는 해당 멤버를 제외할 수 있는 Workspace OWNER·ADMIN만 호출할 수 있습니다.
+
+응답 예:
+
+~~~json
+{
+  "success": true,
+  "data": {
+    "workspaceMemberId": 104,
+    "isLastActiveOwner": false,
+    "ownedProjects": [
+      {
+        "projectId": 14,
+        "title": "10월 편집 비하인드",
+        "status": "EDITING",
+        "archived": false,
+        "transferableMemberCount": 1
+      }
+    ],
+    "activeProjectParticipationCount": 3,
+    "incompleteAssignedTaskCount": 5
+  }
+}
+~~~
+
+`ownedProjects`에는 논리 삭제되지 않은 Project만 포함하고 보관 Project도 반환합니다. `transferableMemberCount`는 대상 멤버 자신을 제외한 같은 Project의 ACTIVE EDIT 멤버 수입니다. 참여 종료 수와 미완료 Task 수는 확인 안내용 파생 값이며 별도 저장하지 않습니다.
+
+#18 Task 관리 구현 전 Mock의 `incompleteAssignedTaskCount`는 대상 멤버의 ACTIVE Project Member 메타에 저장된 `incompleteTaskCount`를 합산한 샘플 값입니다. Project의 전체 `taskCount - completedTaskCount`를 #53에서 새로 배분하지 않으며 실제 Task별 담당 관계를 보장하지 않습니다. #18 구현 후에는 `project_tasks.assignee_project_member_id`가 대상 Project Member이고 `status <> 'COMPLETED'`인 행을 집계하도록 교체합니다.
+
+화면은 `isLastActiveOwner`와 `ownedProjects`를 함께 평가하여 차단 사유가 여러 개이면 한 번에 표시합니다. 이 조회 결과는 작업 가능성을 예약하지 않으며 최종 제외·탈퇴 API가 최신 상태를 다시 검증합니다.
+
 ## 4.6. Workspace 멤버 권한 변경
 
 PATCH /api/workspaces/{workspaceId}/members/{workspaceMemberId}
@@ -370,11 +405,35 @@ DELETE /api/workspaces/{workspaceId}/members/{workspaceMemberId}
 - ADMIN: 일반 MEMBER만 제외할 수 있음
 - MEMBER: 제외 API 사용 불가
 
-LEFT 또는 REMOVED 멤버에는 제외 요청을 보내지 않습니다. 자기 자신을 제외하는 제작팀 나가기는 별도 기능으로 두고 이 API의 현재 범위에 포함하지 않습니다.
+LEFT 또는 REMOVED 멤버에는 제외 요청을 보내지 않습니다. 자기 자신이 제작팀을 나가는 동작은 4.7.1의 전용 API를 사용합니다.
 
 대상 멤버가 논리 삭제되지 않은 Project를 하나라도 소유하면 `409 PROJECT_OWNERSHIP_TRANSFER_REQUIRED`를 반환합니다. 보관 Project도 포함하고 논리 삭제 Project는 제외합니다. 화면의 `ownedProjectCount`는 위험 확인 전 사전 안내에 사용하지만 최종 판단은 이 요청의 서버 검증을 기준으로 합니다.
 
 제외가 가능하면 Workspace Member를 REMOVED로 변경하면서 대상 멤버의 ACTIVE Project Member를 같은 트랜잭션에서 비활성화하고 참여 종료 시각을 기록합니다. 대상 Workspace Member와 소유 Project를 잠근 상태에서 재검증하여 소유권 이전 요청과의 경합을 차단합니다.
+
+## 4.7.1. 현재 사용자 Workspace 탈퇴
+
+DELETE /api/workspaces/{workspaceId}/members/me
+
+현재 인증 사용자의 ACTIVE Workspace Member를 LEFT로 변경합니다. 화면의 제작팀 이름 재입력은 오조작을 줄이는 확인 절차이며, API는 인증 사용자와 Workspace Member의 일치 여부를 기준으로 대상을 결정합니다.
+
+최종 처리 전에 다음 조건을 같은 트랜잭션에서 다시 검증합니다.
+
+- 현재 사용자가 해당 Workspace의 ACTIVE 멤버인지
+- 마지막 ACTIVE OWNER가 아닌지
+- 논리 삭제되지 않은 소유 Project가 없는지
+
+주요 오류:
+
+- LAST_OWNER_REQUIRED → 409
+- PROJECT_OWNERSHIP_TRANSFER_REQUIRED → 409
+- WORKSPACE_MEMBER_NOT_FOUND → 404
+
+탈퇴가 가능하면 Workspace Member를 LEFT로 변경하고 `leftAt`을 기록합니다. 대상 멤버의 ACTIVE Project Member를 같은 트랜잭션에서 비활성화하며 각 Project Member에 LEFT·`WORKSPACE_MEMBERSHIP` 이력을 추가합니다. 재초대 후 수락해도 이전 Project 소유권과 Project Member 상태를 자동 복구하지 않습니다.
+
+응답 성공 후 클라이언트는 탈퇴 대상이 현재 선택한 Workspace이면 해당 탭의 선택을 해제하고 SCR-03에 머뭅니다. 다른 Workspace가 현재 선택되어 있으면 선택 상태를 유지합니다. 같은 Workspace를 사용하는 다른 탭에는 접근 상실을 전파합니다.
+
+영향 응답의 Project 링크가 현재 선택하지 않은 Workspace를 가리키면 클라이언트는 자동 이동하지 않습니다. 사용자가 대상 Workspace 이름이 표시된 전환 동작을 선택한 경우에만 현재 탭의 Workspace를 변경한 뒤 Project Route로 이동합니다. 뒤로가기로 SCR-03에 복귀해도 이전 Workspace를 자동 복원하지 않으며 일반 Workspace 선택과 마찬가지로 다른 탭에는 전환을 전파하지 않습니다.
 
 ## 4.8. 내 Workspace 초대 목록
 
@@ -2007,6 +2066,7 @@ GET /api/workspaces/{workspaceId}/analytics
 - 인증 관련 profile-setup Endpoint를 users/me/profile로 재구성
 - Workspace를 모든 업무 데이터의 API 경계로 추가
 - Workspace Member / Invitation API 신규 추가
+- Workspace 멤버 제외·탈퇴 영향 조회와 현재 사용자 탈퇴 API 추가
 - Channel API 신규 추가
 - 고정 Task Enum 대신 Workspace Task Type API 도입
 - ProjectGroup API 신규 추가

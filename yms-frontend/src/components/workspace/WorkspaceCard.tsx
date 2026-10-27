@@ -5,6 +5,7 @@ type WorkspaceCardProps = {
     isCurrent: boolean;
     isEntering: boolean;
     onEnter: (workspaceId: number) => void;
+    onLeave: (workspace: WorkspaceSummary) => void;
 };
 
 const WORKSPACE_ROLE_LABELS: Record<WorkspaceRole, string> = {
@@ -22,7 +23,8 @@ function WorkspaceCard({
     workspace,
     isCurrent,
     isEntering,
-    onEnter
+    onEnter,
+    onLeave
 }: WorkspaceCardProps) {
     return (
         <article className={`workspace-card ${isCurrent
@@ -31,11 +33,30 @@ function WorkspaceCard({
         }`}>
             <div className="workspace-card__heading">
                 <h3>{workspace.name}</h3>
-                {isCurrent && (
-                    <span className="workspace-card__current-badge">
-                        현재 선택
-                    </span>
-                )}
+                <div className="workspace-card__heading-actions">
+                    {isCurrent && (
+                        <span className="workspace-card__current-badge">
+                            현재 선택
+                        </span>
+                    )}
+                    <details className="workspace-card__menu">
+                        <summary aria-label={`${workspace.name} 메뉴 열기`}>⋯</summary>
+                        <div className="workspace-card__menu-popover">
+                            <button
+                                type="button"
+                                aria-label={`${workspace.name} 제작팀 나가기`}
+                                onClick={event => {
+                                    // 실행 전에 네이티브 메뉴를 닫아 모달 복원 포커스를 안정적으로 유지합니다.
+                                    event.currentTarget.closest('details')
+                                        ?.removeAttribute('open');
+                                    onLeave(workspace);
+                                }}
+                            >
+                                제작팀 나가기
+                            </button>
+                        </div>
+                    </details>
+                </div>
             </div>
 
             <dl className="workspace-card__details">

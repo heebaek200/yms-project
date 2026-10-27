@@ -339,6 +339,45 @@ export function countOwnedProjects(workspaceId: number, workspaceMemberId: numbe
     return projects.filter(project => project.workspaceId === workspaceId && project.ownerWorkspaceMemberId === workspaceMemberId).length;
 }
 
+/** 제작팀 이탈 영향 조회에 필요한 소유 Project와 현재 참여·미완료 담당 수를 계산합니다. */
+export function readWorkspaceDepartureProjectImpact(
+    workspaceId: number,
+    workspaceMemberId: number,
+    activeWorkspaceMemberIds: ReadonlySet<number>
+) {
+    const workspaceProjects = projects.filter(project => project.workspaceId === workspaceId);
+    const ownedProjects = workspaceProjects
+        .filter(project => project.ownerWorkspaceMemberId === workspaceMemberId)
+        .map(project => ({
+            projectId: project.projectId,
+            title: project.title,
+            status: project.status,
+            archived: project.archivedAt !== null,
+            // 현재 제작팀에 남아 있는 ACTIVE EDIT 참여자만 소유권 이전 후보로 계산합니다.
+            transferableMemberCount: project.members.filter(member => (
+                member.workspaceMemberId !== workspaceMemberId
+                && member.active
+                && member.permission === 'EDIT'
+                && activeWorkspaceMemberIds.has(member.workspaceMemberId)
+            )).length
+        }));
+    const activeParticipations = workspaceProjects.filter(project => (
+        project.members.some(member => (
+            member.workspaceMemberId === workspaceMemberId && member.active
+        ))
+    ));
+
+    return {
+        ownedProjects,
+        activeProjectParticipationCount: activeParticipations.length,
+        // Task API가 구현되기 전에는 Project Member Mock 메타의 기존 담당 수를 합산합니다.
+        incompleteAssignedTaskCount: activeParticipations.reduce((total, project) => (
+            total + (readProjectMemberMeta(project.projectId, workspaceMemberId)
+                ?.incompleteTaskCount ?? 0)
+        ), 0)
+    };
+}
+
 /** 제작팀 제외 시 남아 있는 프로젝트 참여를 비활성화합니다. */
 export function deactivateProjectMemberships(workspaceId: number, workspaceMemberId: number, changedByName = 'SYSTEM', changedByWorkspaceMemberId: number | null = null) {
     const changedAt = new Date().toISOString();

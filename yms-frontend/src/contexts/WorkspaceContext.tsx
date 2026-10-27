@@ -7,7 +7,10 @@ import {
     type ReactNode
 } from 'react';
 
-import { getWorkspaces } from '../api/workspaces/workspaces';
+import {
+    getWorkspaces,
+    removeMockWorkspaceMembership
+} from '../api/workspaces/workspaces';
 import { useAuth } from './AuthContext';
 import type { WorkspaceSummary } from '../types/workspace';
 import {
@@ -168,6 +171,8 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
                 user.userId,
                 invalidation.workspaceId
             );
+            // 실제 API 전환 전에는 수신 탭의 메모리 Mock도 제거해 이후 재조회에서 복구되지 않게 합니다.
+            removeMockWorkspaceMembership(invalidation.workspaceId);
             workspacesRef.current = workspacesRef.current.filter(
                 workspace => workspace.workspaceId !== invalidation.workspaceId
             );
@@ -206,11 +211,12 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         if (!user || !workspacesRef.current.some(
             workspace => workspace.workspaceId === workspaceId
         )) {
-            return;
+            return false;
         }
 
         setCurrentWorkspaceId(workspaceId);
         saveWorkspaceSelection(user.userId, workspaceId);
+        return true;
     };
 
     // Header와 Workspace 하위 화면이 동일한 현재 Workspace 상태를 공유합니다.
