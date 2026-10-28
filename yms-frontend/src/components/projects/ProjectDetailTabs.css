@@ -1,7 +1,8 @@
 /* 프로젝트 내부 기능은 큰 화면과 모바일에서 같은 위치와 순서를 유지합니다. */
 .project-detail-tabs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* 네 기능의 위치를 화면 크기와 관계없이 한 행의 같은 순서로 유지합니다. */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.45rem;
     margin: 1rem 0 1.25rem;
     padding: 0.35rem;

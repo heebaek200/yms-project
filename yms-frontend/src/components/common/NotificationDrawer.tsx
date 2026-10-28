@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 
 import type { NotificationItem } from '../../api/notifications/notifications';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -19,6 +20,7 @@ type NotificationFilter = 'ALL' | 'UNREAD';
  * 관련 상세 라우트가 추가되면 항목 선택 처리에 대상별 이동만 연결하면 됩니다.
  */
 function NotificationDrawer({ onClose }: NotificationDrawerProps) {
+    const navigate = useNavigate();
     const {
         notifications,
         unreadCount,
@@ -61,15 +63,17 @@ function NotificationDrawer({ onClose }: NotificationDrawerProps) {
 
     /**
      * 선택한 미확인 알림을 읽음 상태로 변경합니다.
-     * 현재 저장소에는 대상 상세 라우트가 없어 읽음 처리까지만 수행합니다.
-     * 향후 projectId 등의 대상 ID를 사용한 navigate 호출을 이 지점에 연결합니다.
+     * 작업 알림은 Project 작업 탭의 해당 작업으로 이동하고 Drawer를 닫습니다.
      */
     const handleNotificationSelect = async (notification: NotificationItem) => {
         if (!notification.read) {
             await readNotification(notification.notificationId);
         }
 
-        // TODO: 프로젝트·메신저·초대·정산 라우트 구현 후 대상별 화면 이동을 연결합니다.
+        if (notification.notificationType === 'TASK_UPDATE' && notification.projectId && notification.taskId) {
+            navigate(`/projects/${notification.projectId}/tasks?taskId=${notification.taskId}`);
+            onClose();
+        }
     };
 
     return (

@@ -231,6 +231,38 @@ export async function updateWorkspaceProject(workspaceId: number, projectId: num
     return { success: true, message: '프로젝트를 저장했습니다.', data: toProjectDetailResponse(updated, context.workspaceRole) };
 }
 
+/** 다른 기본 정보를 덮어쓰지 않고 Project 상태와 상태 변경 이력만 갱신합니다. */
+export async function updateWorkspaceProjectStatus(
+    workspaceId: number,
+    projectId: number,
+    status: ProjectStatus,
+    context: ProjectMutationContext
+): Promise<ApiResponse<ProjectDetailResponse>> {
+    await waitForMockResponse();
+    const project = readProject(workspaceId, projectId);
+    if (!project || !canEditProject(project, context)) {
+        return { success: false, errorCode: 'PROJECT_EDIT_FORBIDDEN', message: '프로젝트 상태를 변경할 권한이 없습니다.', errors: null };
+    }
+    if (!EDITABLE_STATUSES.includes(status)) {
+        return { success: false, errorCode: 'INVALID_INPUT_VALUE', message: '올바른 프로젝트 상태를 선택해 주세요.', errors: [{ field: 'status', value: status, reason: '올바른 프로젝트 상태를 선택해 주세요.' }] };
+    }
+    if (status === project.status) {
+        return { success: true, message: '프로젝트 상태가 이미 선택한 값입니다.', data: toProjectDetailResponse(project, context.workspaceRole) };
+    }
+
+    const now = new Date().toISOString();
+    const updated: ProjectDetail = {
+        ...project,
+        status,
+        // 보관된 Project를 다시 제작 단계로 돌리면 기존 정책에 따라 활성 목록으로 복원합니다.
+        archivedAt: project.archivedAt && ACTIVE_STATUSES.includes(status) ? null : project.archivedAt,
+        updatedAt: now,
+        statusHistory: [...project.statusHistory, { status, changedAt: now, changedByName: context.userName }]
+    };
+    replaceProject(updated);
+    return { success: true, message: '프로젝트 상태를 변경했습니다.', data: toProjectDetailResponse(updated, context.workspaceRole) };
+}
+
 /** 완료·취소 프로젝트를 보관하거나 다시 활성 목록으로 복원합니다. */
 export async function setWorkspaceProjectArchived(workspaceId: number, projectId: number, archived: boolean, context: ProjectMutationContext): Promise<ApiResponse<ProjectDetailResponse>> {
     await waitForMockResponse();

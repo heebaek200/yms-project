@@ -51,23 +51,21 @@ function DashboardSchedule({
         );
 
     /**
-     * 캘린더에서 선택된 일정이 속한 프로젝트 상세로 이동합니다.
-     * Task 상세 UI가 없는 동안에는 임시 Route를 만들지 않고 Project까지만 연결합니다.
+     * 캘린더에서 선택된 일정의 작업 탭으로 이동하고 해당 작업을 anchor로 전달합니다.
      */
     const handleEventClick = (
         event: SchedulerEventClickData
     ) => {
-        navigate(`/projects/${event.projectId}`);
+        navigate(`/projects/${event.projectId}/tasks?taskId=${event.taskId}`);
     };
 
     /**
-     * 오늘 마감 항목도 Calendar와 동일한 Project 상세 이동 규칙을 사용합니다.
-     * 전달받은 taskId는 향후 Task 상세 기능이 추가될 때 사용할 수 있도록 응답에는 유지합니다.
+     * 오늘 마감 항목도 Calendar와 동일하게 선택 작업이 보이는 목록 위치로 이동합니다.
      */
     const handleDeadlineClick = (
         deadline: TodayDeadline
     ) => {
-        navigate(`/projects/${deadline.projectId}`);
+        navigate(`/projects/${deadline.projectId}/tasks?taskId=${deadline.taskId}`);
     };
 
     /**

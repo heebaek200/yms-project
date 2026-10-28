@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { getWorkspaceChannels } from '../api/workspaces/channels';
-import { createWorkspaceProject, deleteWorkspaceProject, getProjectGroupOptions, getWorkspaceProject, getWorkspaceProjects, setWorkspaceProjectArchived, updateWorkspaceProject, type SaveProjectRequest } from '../api/projects/projects';
+import { createWorkspaceProject, deleteWorkspaceProject, getProjectGroupOptions, getWorkspaceProject, getWorkspaceProjects, setWorkspaceProjectArchived, updateWorkspaceProject, updateWorkspaceProjectStatus, type SaveProjectRequest } from '../api/projects/projects';
 import {
     changeVideoContentPrimaryProject,
     createProjectVideoContent,
@@ -13,15 +13,17 @@ import {
 import CompositionSafeSearchInput from '../components/common/CompositionSafeSearchInput';
 import FeedbackMessage, { type FeedbackMessageType } from '../components/common/FeedbackMessage';
 import FilterResetButton from '../components/common/FilterResetButton';
+import ResourceNavigationLink from '../components/common/ResourceNavigationLink';
 import ProjectAreaTabs from '../components/project-groups/ProjectAreaTabs';
 import ProjectGroupModal from '../components/project-groups/ProjectGroupModal';
-import ProjectDetailTabs from '../components/projects/ProjectDetailTabs';
+import ProjectDetailHeader from '../components/projects/ProjectDetailHeader';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { registerUnsavedChangesGuard } from '../navigation/unsavedChangesGuard';
 import type { ProjectAccessRole, ProjectDetailResponse, ProjectListItemResponse, ProjectVideoType, VideoContentResponse, YouTubePublicationResponse, YouTubeRemovalReason } from '../types/project';
 import type { ProjectStatus } from '../types/projectGroup';
 import type { WorkspaceChannelListItem } from '../types/workspaceSettings';
+import { PROJECT_STATUS_LABELS } from '../projectStatuses';
 import { formatMoney } from '../utils/decimal';
 import './ProjectGroupPage.css';
 import './ProjectsPage.css';
@@ -31,7 +33,7 @@ type FormValues = { title: string; content: string; channelId: string; projectGr
 type Feedback = { type: FeedbackMessageType; message: string };
 type Errors = Partial<Record<keyof FormValues, string>>;
 type PublicationDraft = { youtubeVideo: string; channelId: string };
-const STATUS_LABEL: Record<ProjectStatus, string> = { PLANNING: '준비 중', EDITING: '편집 중', REVIEW: '검수 중', UPLOADED: '업로드 완료', CANCELLED: '취소' };
+const STATUS_LABEL = PROJECT_STATUS_LABELS;
 const EMPTY_FORM: FormValues = { title: '', content: '', channelId: '', projectGroupId: '', videoType: '', status: 'PLANNING', dueDate: '', plannedUploadDate: '' };
 
 /** 새 프로젝트에서 선택 가능한 채널이 하나뿐이면 해당 채널을 초기값으로 사용합니다. */
@@ -303,6 +305,23 @@ function ProjectsPage() {
         if (response.success) navigate('/projects', { replace: true }); else setFeedback({ type: 'error', message: response.message });
     };
 
+    /** 상세 정보의 인라인 선택값만 PATCH해 다른 프로젝트 기본 정보를 덮어쓰지 않습니다. */
+    const changeProjectStatus = async (status: ProjectStatus) => {
+        if (!currentWorkspace || !detail || status === detail.status) return false;
+        setSubmitting(true);
+        setFeedback(null);
+        const response = await updateWorkspaceProjectStatus(
+            currentWorkspace.workspaceId,
+            detail.projectId,
+            status,
+            context
+        );
+        setSubmitting(false);
+        if (response.success) setDetail(response.data);
+        setFeedback({ type: response.success ? 'success' : 'error', message: response.message ?? '' });
+        return response.success;
+    };
+
     /** Project 기본값으로 결과물을 즉시 만들고 게시물 등록 단계로 이어갑니다. */
     const addVideoContent = async () => {
         if (!currentWorkspace || !detail) return;
@@ -430,7 +449,7 @@ function ProjectsPage() {
     const activeMember = detail?.members.find(member => member.userId === user?.userId && member.active);
     const canEdit = isAdmin || activeMember?.permission === 'EDIT';
     const canManage = isAdmin || activeMember?.isOwner === true;
-    return <section className="project-area-page"><ProjectAreaTabs />{projectId === null ? <ProjectList projects={projects} channels={channels} groups={groups} loading={loading} error={error} params={params} totalPages={totalPages} onFilter={setFilter} onResetFilters={() => setParams(new URLSearchParams(), { replace: true })} onCreate={requestCreateForm} /> : <ProjectDetailView detail={detail} channels={channels} loading={loading} error={error} feedback={feedback} canSeeRevenue={isAdmin} canEdit={canEdit} canManage={canManage} publicationDrafts={publicationDrafts} publicationErrors={publicationErrors} onPublicationDraft={changePublicationDraft} onEdit={() => detail && openForm(detail)} onArchive={() => void archive()} onDelete={() => void remove()} onAddVideoContent={() => void addVideoContent()} onChangePrimaryProject={content => void changePrimaryProject(content)} onAddPublication={content => void addPublication(content)} onPublicationAction={(content, publication, action) => void mutatePublication(content, publication, action)} />}{modalOpen && <ProjectGroupModal titleId="project-form-title" title={editingProject ? '프로젝트 수정' : '새 프로젝트'} description="영상 제작 과정의 기본 정보와 시작 상태를 설정합니다." onRequestClose={closeForm}><ProjectForm formRef={formRef} values={form} errors={errors} channels={channels} groups={groups} edit={editingProject !== null} admin={isAdmin} submitting={submitting} onChange={change} onSubmit={submit} onCancel={closeForm} /></ProjectGroupModal>}</section>;
+    return <section className="project-area-page">{projectId === null ? <><ProjectAreaTabs /><ProjectList projects={projects} channels={channels} groups={groups} loading={loading} error={error} params={params} totalPages={totalPages} onFilter={setFilter} onResetFilters={() => setParams(new URLSearchParams(), { replace: true })} onCreate={requestCreateForm} /></> : <ProjectDetailView detail={detail} channels={channels} loading={loading} error={error} feedback={feedback} canSeeRevenue={isAdmin} canEdit={canEdit} canManage={canManage} statusSubmitting={submitting} publicationDrafts={publicationDrafts} publicationErrors={publicationErrors} onPublicationDraft={changePublicationDraft} onStatusChange={changeProjectStatus} onEdit={() => detail && openForm(detail)} onArchive={() => void archive()} onDelete={() => void remove()} onAddVideoContent={() => void addVideoContent()} onChangePrimaryProject={content => void changePrimaryProject(content)} onAddPublication={content => void addPublication(content)} onPublicationAction={(content, publication, action) => void mutatePublication(content, publication, action)} />}{modalOpen && <ProjectGroupModal titleId="project-form-title" title={editingProject ? '프로젝트 수정' : '새 프로젝트'} description={editingProject ? '프로젝트 기본 정보와 일정을 수정합니다.' : '영상 제작 과정의 기본 정보와 시작 상태를 설정합니다.'} onRequestClose={closeForm}><ProjectForm formRef={formRef} values={form} errors={errors} channels={channels} groups={groups} edit={editingProject !== null} admin={isAdmin} submitting={submitting} onChange={change} onSubmit={submit} onCancel={closeForm} /></ProjectGroupModal>}</section>;
 }
 
 type ProjectAccessGuide = {
@@ -633,9 +652,11 @@ type ProjectDetailViewProps = {
     canSeeRevenue: boolean;
     canEdit: boolean;
     canManage: boolean;
+    statusSubmitting: boolean;
     publicationDrafts: Record<number, PublicationDraft>;
     publicationErrors: Record<number, string>;
     onPublicationDraft: (videoContentId: number, patch: Partial<PublicationDraft>) => void;
+    onStatusChange: (status: ProjectStatus) => Promise<boolean>;
     onEdit: () => void;
     onArchive: () => void;
     onDelete: () => void;
@@ -644,6 +665,16 @@ type ProjectDetailViewProps = {
     onAddPublication: (content: VideoContentResponse) => void;
     onPublicationAction: (content: VideoContentResponse, publication: YouTubePublicationResponse, action: 'sync' | 'unavailable' | 'incorrect' | 'restore') => void;
 };
+
+/** 선택한 Project 상태에 따라 실제 동작에서 주의할 점을 짧게 안내합니다. */
+function getProjectStatusGuidance(status: ProjectStatus, archived: boolean): string {
+    if (archived && (status === 'PLANNING' || status === 'EDITING' || status === 'REVIEW')) {
+        return '이 상태로 변경하면 프로젝트 보관이 자동으로 해제됩니다.';
+    }
+    if (status === 'UPLOADED') return '영상 결과물이나 YouTube 게시물을 자동으로 만들지는 않습니다.';
+    if (status === 'CANCELLED') return '제작 취소로 표시되며 나중에 다른 상태로 변경해 다시 진행할 수 있습니다.';
+    return '프로젝트의 현재 제작 진행 단계를 표시합니다.';
+}
 
 /** 현재·누적 집계값과 데이터 완전성을 한 카드에서 구분해 표시합니다. */
 function PerformanceSummary({ title, aggregate, canSeeRevenue }: { title: string; aggregate: VideoContentResponse['currentPerformance']; canSeeRevenue: boolean }) {
@@ -694,8 +725,15 @@ function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, on
 }
 
 /** URL 탭에 따라 프로젝트 기본 정보와 영상 결과물을 분리해 표시합니다. */
-function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeRevenue, canEdit, canManage, publicationDrafts, publicationErrors, onPublicationDraft, onEdit, onArchive, onDelete, onAddVideoContent, onChangePrimaryProject, onAddPublication, onPublicationAction }: ProjectDetailViewProps) {
+function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeRevenue, canEdit, canManage, statusSubmitting, publicationDrafts, publicationErrors, onPublicationDraft, onStatusChange, onEdit, onArchive, onDelete, onAddVideoContent, onChangePrimaryProject, onAddPublication, onPublicationAction }: ProjectDetailViewProps) {
     const location = useLocation();
+    const [selectedStatus, setSelectedStatus] = useState<ProjectStatus>(detail?.status ?? 'PLANNING');
+
+    /** 저장 응답이나 다른 Project 조회로 상세가 바뀌면 인라인 선택값도 서버 상태에 맞춥니다. */
+    useEffect(() => {
+        if (detail) setSelectedStatus(detail.status);
+    }, [detail]);
+
     if (loading) return <p className="project-state">프로젝트를 불러오는 중...</p>;
     if (!detail || error) return <FeedbackMessage type="error" message={error ?? '프로젝트를 찾을 수 없습니다.'} />;
 
@@ -703,18 +741,32 @@ function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeR
     const videoView = location.pathname.endsWith('/videos');
     const archiveActionAvailable = isArchiveActionAvailable(detail);
     const archiveUnavailableMessage = '업로드 완료 또는 제작 취소 상태에서 보관할 수 있습니다.';
+    const submitStatusChange = async () => {
+        const changed = await onStatusChange(selectedStatus);
+        if (!changed) setSelectedStatus(detail.status);
+    };
     return (
         <>
-            <div className="project-detail-nav"><Link to={`/projects${back ? `?${back}` : ''}`}>← 프로젝트 목록</Link></div>
+            <ProjectDetailHeader projectId={detail.projectId} title={detail.title} channelName={detail.channelName} ownerName={detail.ownerName} status={detail.status} listSearch={back} />
             {feedback && <FeedbackMessage type={feedback.type} message={feedback.message} />}
-            <header className="project-detail-header">
-                <div><p className="project-group-eyebrow">{detail.videoType === 'LONG' ? 'LONG FORM DEFAULT' : 'SHORTS DEFAULT'}</p><h1>{detail.title}</h1><p>{detail.channelName} · 소유자 {detail.ownerName}</p></div>
-                <div className="project-actions"><span className={`project-status project-status--${detail.status.toLowerCase()}`}>{STATUS_LABEL[detail.status]}</span>{canEdit && <button className="project-button" onClick={onEdit}>수정</button>}{canManage && <span className="project-action-tooltip" title={archiveActionAvailable ? undefined : archiveUnavailableMessage}><button className="project-button" disabled={!archiveActionAvailable} aria-label={archiveActionAvailable ? undefined : `보관: ${archiveUnavailableMessage}`} onClick={onArchive}>{detail.archivedAt ? '복원' : '보관'}</button></span>}{canManage && <button className="project-button project-button--danger" onClick={onDelete}>삭제</button>}</div>
-            </header>
-            <ProjectDetailTabs projectId={detail.projectId} />
+            {!videoView && (canEdit || canManage) && <div className="project-detail-management-actions">{canEdit && <button className="project-button" onClick={onEdit}>기본 정보 수정</button>}{canManage && <span className="project-action-tooltip" title={archiveActionAvailable ? undefined : archiveUnavailableMessage}><button className="project-button" disabled={!archiveActionAvailable} aria-label={archiveActionAvailable ? undefined : `보관: ${archiveUnavailableMessage}`} onClick={onArchive}>{detail.archivedAt ? '복원' : '보관'}</button></span>}{canManage && <button className="project-button project-button--danger" onClick={onDelete}>삭제</button>}</div>}
+            {!videoView && canEdit && <section className="project-status-editor" aria-labelledby="project-status-editor-title">
+                <div>
+                    <h2 id="project-status-editor-title">프로젝트 상태</h2>
+                    <p>{getProjectStatusGuidance(selectedStatus, detail.archivedAt !== null)}</p>
+                </div>
+                <fieldset disabled={statusSubmitting}>
+                    <legend className="sr-only">변경할 프로젝트 상태</legend>
+                    {Object.entries(STATUS_LABEL).map(([status, label]) => <label key={status} className={status === 'CANCELLED' ? 'project-status-editor__option project-status-editor__option--danger' : 'project-status-editor__option'}>
+                        <input type="radio" name="project-detail-status" value={status} checked={selectedStatus === status} onChange={() => setSelectedStatus(status as ProjectStatus)} />
+                        <span>{status === 'CANCELLED' ? '제작 취소' : label}</span>
+                    </label>)}
+                </fieldset>
+                <button type="button" className="project-button project-button--primary" disabled={statusSubmitting || selectedStatus === detail.status} onClick={() => void submitStatusChange()}>{statusSubmitting ? '변경 중…' : '상태 변경'}</button>
+            </section>}
             {!videoView && <div className="project-detail-grid">
                 <article><h2>기본 정보</h2><p>{detail.content ?? '등록된 내용이 없습니다.'}</p><dl><div><dt>마감일</dt><dd>{detail.dueDate ?? '미정'}</dd></div><div><dt>업로드 예정일</dt><dd>{detail.plannedUploadDate ?? '미정'}</dd></div><div><dt>프로젝트 그룹</dt><dd>{detail.projectGroupName ?? '없음'}</dd></div></dl></article>
-                <article><h2>작업 요약</h2><strong className="project-big-number">{detail.completedTaskCount}/{detail.taskCount}</strong><p>작업 상세 관리는 다음 이슈에서 연결됩니다.</p></article>
+                <article><h2>작업 요약</h2><strong className="project-big-number">{detail.completedTaskCount}/{detail.taskCount}</strong><p>완료 / 전체 작업</p><ResourceNavigationLink to={`/projects/${detail.projectId}/tasks`} state={back ? { listSearch: back } : undefined} label="작업 관리로 이동" variant="detail" /></article>
                 <article><h2>참여자</h2><ul>{detail.members.filter(item => item.active).map(item => <li key={item.workspaceMemberId}>{item.name}{item.isOwner ? ' 👑' : ''} <small>{item.permission === 'EDIT' ? '편집' : '보기'}</small></li>)}</ul></article>
             </div>}
             {videoView && <section className="project-section project-video-contents">
@@ -784,7 +836,7 @@ function ProjectChoiceField({ name, legend, value, options, error, onChange }: {
 /** 생성과 수정에서 동일한 순서와 모바일 조작감을 공유하는 폼입니다. */
 function ProjectForm({ formRef, values, errors, channels, groups, edit, admin, submitting, onChange, onSubmit, onCancel }: { formRef: React.RefObject<HTMLFormElement | null>; values: FormValues; errors: Errors; channels: WorkspaceChannelListItem[]; groups: ReturnType<typeof getProjectGroupOptions>; edit: boolean; admin: boolean; submitting: boolean; onChange: (field: keyof FormValues, value: string) => void; onSubmit: (event: React.SubmitEvent<HTMLFormElement>) => void; onCancel: () => void }) {
     const statusOptions = Object.entries(STATUS_LABEL)
-        .filter(([status]) => edit || status === 'PLANNING' || status === 'EDITING')
+        .filter(([status]) => status === 'PLANNING' || status === 'EDITING')
         .map(([status, label]) => ({
             value: status,
             label: status === 'CANCELLED' ? '제작 취소' : label,
@@ -825,14 +877,14 @@ function ProjectForm({ formRef, values, errors, channels, groups, edit, admin, s
                 onChange={value => onChange('videoType', value)}
             />
 
-            {/* 생성 시에는 확정된 초기 상태 두 개만 노출하고 수정 시에 전체 상태를 제공합니다. */}
-            <ProjectChoiceField
+            {/* 상태 변경은 상세 정보 탭에서 처리하고 생성 시에만 초기 상태 두 개를 제공합니다. */}
+            {!edit && <ProjectChoiceField
                 name="project-status"
                 legend="프로젝트 상태"
                 value={values.status}
                 options={statusOptions}
                 onChange={value => onChange('status', value)}
-            />
+            />}
             {admin && (
                 <label>
                     <span>프로젝트 그룹 <em>선택</em></span>

@@ -1,5 +1,6 @@
 import type { WorkspaceTaskType } from '../../types/workspaceSettings';
 import type { ApiResponse } from '../types';
+import { isTaskTypeReferenced } from '../projects/projectTaskStore';
 
 export type TaskTypeListRequest = {
     activeOnly?: boolean;
@@ -37,11 +38,10 @@ let mockTaskTypesByWorkspace: Record<number, WorkspaceTaskType[]> = {
     ]
 };
 
-// 기존 작업 참조를 흉내 내어 삭제 가능 여부를 서버 Mock에서 최종 판정합니다.
-const mockUsedTaskTypeIdsByWorkspace: Record<number, ReadonlySet<number>> = {
-    1: new Set([1, 2, 3, 5]),
-    2: new Set([21])
-};
+/** 작업 화면과 관리 화면이 같은 원본을 보도록 현재 제작팀의 작업 종류 복사본을 동기 조회합니다. */
+export function readWorkspaceTaskTypes(workspaceId: number): WorkspaceTaskType[] {
+    return (mockTaskTypesByWorkspace[workspaceId] ?? []).map(taskType => ({ ...taskType }));
+}
 
 /**
  * Task Type Mock의 정상·빈 목록·서버 오류 시나리오를 변경합니다.
@@ -331,7 +331,7 @@ export async function deleteWorkspaceTaskType(
         };
     }
 
-    if (mockUsedTaskTypeIdsByWorkspace[workspaceId]?.has(taskTypeId)) {
+    if (isTaskTypeReferenced(workspaceId, taskTypeId)) {
         return {
             success: false,
             errorCode: 'TASK_TYPE_IN_USE',

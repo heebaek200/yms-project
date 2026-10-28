@@ -12,6 +12,7 @@ import {
     markNotificationAsRead,
     type NotificationItem
 } from '../api/notifications/notifications';
+import { useAuth } from './AuthContext';
 import { NotificationContext } from './notificationContextStore';
 
 type NotificationProviderProps = {
@@ -24,6 +25,7 @@ type NotificationProviderProps = {
  * 읽음 API가 성공하면 로컬 상태도 함께 변경해 배지와 목록을 즉시 동기화합니다.
  */
 function NotificationProvider({ children }: NotificationProviderProps) {
+    const { user } = useAuth();
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [updatingNotificationIds, setUpdatingNotificationIds] =
@@ -37,11 +39,17 @@ function NotificationProvider({ children }: NotificationProviderProps) {
      * 실패하면 기존 목록 대신 명확한 오류 상태를 화면에 제공합니다.
      */
     const refreshNotifications = useCallback(async () => {
+        if (!user) {
+            setNotifications([]);
+            setErrorMessage(null);
+            setIsLoading(false);
+            return;
+        }
         try {
             setIsLoading(true);
             setErrorMessage(null);
 
-            const response = await getNotifications({
+            const response = await getNotifications(user.userId, {
                 unreadOnly: false,
                 limit: 100
             });
@@ -60,11 +68,14 @@ function NotificationProvider({ children }: NotificationProviderProps) {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [user]);
 
-    // 공통 레이아웃이 처음 표시될 때 한 번만 알림을 조회합니다.
+    // 공통 레이아웃 최초 조회와 Mock 작업 변경 이벤트를 같은 새로고침 흐름으로 처리합니다.
     useEffect(() => {
-        refreshNotifications();
+        const handleNotificationsChanged = () => void refreshNotifications();
+        void refreshNotifications();
+        window.addEventListener('yms:notifications-changed', handleNotificationsChanged);
+        return () => window.removeEventListener('yms:notifications-changed', handleNotificationsChanged);
     }, [refreshNotifications]);
 
     /**
@@ -73,6 +84,7 @@ function NotificationProvider({ children }: NotificationProviderProps) {
      * 서로 다른 알림은 독립적으로 조작할 수 있도록 ID 집합을 불변 갱신합니다.
      */
     const readNotification = useCallback(async (notificationId: number) => {
+        if (!user) return false;
         try {
             setUpdatingNotificationIds(currentIds => {
                 const nextIds = new Set(currentIds);
@@ -81,7 +93,7 @@ function NotificationProvider({ children }: NotificationProviderProps) {
             });
             setErrorMessage(null);
 
-            const response = await markNotificationAsRead(notificationId);
+            const response = await markNotificationAsRead(user.userId, notificationId);
 
             if (!response.success) {
                 setErrorMessage(response.message);
@@ -110,7 +122,7 @@ function NotificationProvider({ children }: NotificationProviderProps) {
                 return nextIds;
             });
         }
-    }, []);
+    }, [user]);
 
     /**
      * 전체 또는 특정 Workspace의 미확인 알림을 한 번에 읽음 처리합니다.
@@ -118,11 +130,12 @@ function NotificationProvider({ children }: NotificationProviderProps) {
      * 단건 처리 상태와 분리하여 전체 읽음 버튼과 목록만 필요한 동안 잠급니다.
      */
     const readAllNotifications = useCallback(async (workspaceId?: number) => {
+        if (!user) return false;
         try {
             setIsReadingAll(true);
             setErrorMessage(null);
 
-            const response = await markAllNotificationsAsRead(workspaceId);
+            const response = await markAllNotificationsAsRead(user.userId, workspaceId);
 
             if (!response.success) {
                 setErrorMessage(response.message);
@@ -149,7 +162,7 @@ function NotificationProvider({ children }: NotificationProviderProps) {
         } finally {
             setIsReadingAll(false);
         }
-    }, []);
+    }, [user]);
 
     // 읽지 않은 개수는 목록에서 파생하여 별도 상태와 불일치할 가능성을 없앱니다.
     const unreadCount = useMemo(

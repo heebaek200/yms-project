@@ -1,3 +1,5 @@
+import { normalizeUnsignedNumericInput } from './currencyInput';
+
 export type MoneyNormalizationResult =
     | { success: true; value: string }
     | { success: false; message: string };
@@ -5,7 +7,6 @@ export type MoneyNormalizationResult =
 const MONEY_SCALE = 2;
 const ROI_SCALE = 6;
 const MAX_MONEY_INTEGER_DIGITS = 13;
-const MONEY_INPUT_PATTERN = /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/;
 const DECIMAL_PATTERN = /^(-?)(\d+)(?:\.(\d+))?$/;
 
 /** 10의 양의 정수 거듭제곱을 bigint로 만들어 고정 소수점 자릿수를 맞춥니다. */
@@ -60,29 +61,43 @@ function divideRounded(dividend: bigint, divisor: bigint): bigint {
 
 /** 사용자 금액 입력을 DECIMAL(15,2)에 맞는 부호 없는 문자열로 정규화합니다. */
 export function normalizeMoneyInput(value: string): MoneyNormalizationResult {
-    const trimmed = value.trim();
-    if (!MONEY_INPUT_PATTERN.test(trimmed)) {
+    return normalizeMoney(value, true);
+}
+
+/** 금액 입력을 저장 자릿수를 덧붙이지 않고 사용자가 입력한 정밀도로 정규화합니다. */
+export function normalizeEditableMoneyInput(value: string): MoneyNormalizationResult {
+    return normalizeMoney(value, false);
+}
+
+/** 저장된 금액을 입력 필드에 표시할 때 의미 없는 소수부 0을 제거합니다. */
+export function toEditableMoneyValue(value: string): string {
+    const [integerPart, fractionPart = ''] = value.split('.');
+    const visibleFraction = fractionPart.replace(/0+$/, '');
+    return visibleFraction ? `${integerPart}.${visibleFraction}` : integerPart;
+}
+
+/** 금액 공통 규칙을 적용하고 저장 경계 여부에 따라 고정 소수점 변환을 선택합니다. */
+function normalizeMoney(value: string, forStorage: boolean): MoneyNormalizationResult {
+    const result = normalizeUnsignedNumericInput(value, {
+        maxFractionDigits: MONEY_SCALE,
+        ...(forStorage ? { fixedScale: MONEY_SCALE } : {}),
+        maxIntegerDigits: MAX_MONEY_INTEGER_DIGITS
+    });
+    if (!result.success && result.reason === 'INVALID_FORMAT') {
         return {
             success: false,
             message: '금액은 0 이상의 숫자로 입력해 주세요. 소수점 둘째 자리까지 허용됩니다.'
         };
     }
 
-    const [rawIntegerPart, rawFractionPart = ''] = trimmed
-        .replaceAll(',', '')
-        .split('.');
-    const integerPart = rawIntegerPart.replace(/^0+(?=\d)/, '');
-    if (integerPart.length > MAX_MONEY_INTEGER_DIGITS) {
+    if (!result.success) {
         return {
             success: false,
             message: '금액은 9,999,999,999,999.99 이하로 입력해 주세요.'
         };
     }
 
-    return {
-        success: true,
-        value: `${integerPart}.${rawFractionPart.padEnd(MONEY_SCALE, '0')}`
-    };
+    return result;
 }
 
 /** DECIMAL(15,2) 금액 문자열들을 정수 센트로 합산한 뒤 문자열로 반환합니다. */

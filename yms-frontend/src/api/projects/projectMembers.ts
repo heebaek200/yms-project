@@ -105,6 +105,9 @@ function buildMemberList(project: ProjectDetail, context: ProjectMemberRequestCo
     return {
         projectId: project.projectId,
         projectTitle: project.title,
+        channelName: project.channelName,
+        ownerName: project.ownerName,
+        status: project.status,
         archived: project.archivedAt !== null,
         canManage: canManageMembers(project, context),
         activeMembers: members.filter(member => member.active).sort(byOwnerThenName),

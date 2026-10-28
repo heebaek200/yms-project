@@ -18,6 +18,23 @@ export type LoginSuccessResponse = ApiSuccessResponse<LoginSuccessData>;
 export type LoginFailureResponse = ApiFailureResponse;
 export type LoginResponse = ApiResponse<LoginSuccessData>;
 
+// 수동 테스트에서 제작팀별 권한 경계를 확인할 수 있도록 로그인 가능한 Mock 계정을 구분합니다.
+const MOCK_LOGIN_USERS: Record<string, Omit<AuthSession, 'email' | 'accessToken' | 'tokenType'>> = {
+    'test@test.com': {
+        userId: 24601,
+        name: '테스트 사용자',
+        roles: ['CREATOR', 'EDITOR'],
+        profileSetupRequired: false
+    },
+    'creator@sample.test': {
+        userId: 24621,
+        name: '샘플 크리에이터',
+        roles: ['CREATOR'],
+        profileSetupRequired: false
+    }
+};
+
+/** 이메일에 대응하는 Mock 사용자 세션을 발급하며 모든 테스트 계정은 공통 비밀번호를 사용합니다. */
 export async function login(
     request: LoginRequest
 ): Promise<LoginResponse> {
@@ -25,20 +42,16 @@ export async function login(
 
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    if (
-        request.email === 'test@test.com' &&
-        request.password === '123456'
-    ) {
+    const email = request.email.trim().toLocaleLowerCase();
+    const mockUser = MOCK_LOGIN_USERS[email];
+
+    if (mockUser && request.password === '123456') {
         return {
             success: true,
             message: '로그인에 성공했습니다.',
             data: {
-                userId: 24601,
-                email: request.email,
-                name: '테스트 사용자',
-                //roles: [],
-                roles: ["CREATOR", "EDITOR"],
-                profileSetupRequired: false,
+                ...mockUser,
+                email,
                 accessToken: 'mock-access-token',
                 tokenType: 'Bearer'
             }

@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router';
+import { NavLink, useLocation } from 'react-router';
 
 import './ProjectDetailTabs.css';
 
@@ -8,8 +8,11 @@ type ProjectDetailTabsProps = {
 
 /** 프로젝트의 정보·영상 결과물·참여자 기능을 화면 크기와 무관하게 같은 순서로 제공합니다. */
 function ProjectDetailTabs({ projectId }: ProjectDetailTabsProps) {
+    const location = useLocation();
+    const listSearch = (location.state as { listSearch?: string } | null)?.listSearch;
     const tabs = [
         { to: `/projects/${projectId}`, label: '📋 상세 정보', end: true },
+        { to: `/projects/${projectId}/tasks`, label: '✅ 작업', end: false },
         { to: `/projects/${projectId}/videos`, label: '🎬 영상 결과물', end: false },
         { to: `/projects/${projectId}/members`, label: '👥 참여자 관리', end: false }
     ];
@@ -21,6 +24,7 @@ function ProjectDetailTabs({ projectId }: ProjectDetailTabsProps) {
                     key={tab.to}
                     to={tab.to}
                     end={tab.end}
+                    state={listSearch ? { listSearch } : undefined}
                     className={({ isActive }) => isActive ? 'project-detail-tabs__link project-detail-tabs__link--active' : 'project-detail-tabs__link'}
                 >
                     {tab.label}

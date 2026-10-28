@@ -1,0 +1,35 @@
+.project-detail-shell__back {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.project-detail-shell__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.project-detail-shell__header h1 {
+    margin: 2px 0 6px;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+}
+
+.project-detail-shell__header p {
+    margin: 0;
+    color: #747681;
+}
+
+.project-detail-shell__eyebrow {
+    color: #737681 !important;
+    font-size: 0.75rem;
+    font-weight: 750;
+    letter-spacing: 0.05em;
+}
+
+@media (max-width: 560px) {
+    .project-detail-shell__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

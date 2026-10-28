@@ -64,6 +64,9 @@ export type ProjectMemberHistoryItem = {
 export type ProjectMemberListData = {
     projectId: number;
     projectTitle: string;
+    channelName: string;
+    ownerName: string;
+    status: ProjectStatus;
     archived: boolean;
     canManage: boolean;
     activeMembers: ProjectMemberItem[];
