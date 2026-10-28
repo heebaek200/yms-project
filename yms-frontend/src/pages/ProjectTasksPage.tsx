@@ -133,8 +133,19 @@ function ProjectTasksPage() {
         ? createContext(user.userId, user.name, currentWorkspace.myRole)
         : null, [currentWorkspace, user]);
     const activeMembers = useMemo(() => project?.members.filter(member => member.active && member.permission === 'EDIT') ?? [], [project]);
+    /** 작업 추가 UI도 API와 같은 Workspace 역할·Project 참여 권한으로 노출 여부를 판정합니다. */
+    const canManageTasks = useMemo(() => {
+        if (!project || !user || !currentWorkspace || project.archivedAt) return false;
+        if (currentWorkspace.myRole !== 'MEMBER') return true;
+        return project.members.some(member => (
+            member.userId === user.userId
+            && member.active
+            && member.permission === 'EDIT'
+        ));
+    }, [currentWorkspace, project, user]);
     const formDirty = form !== null && JSON.stringify(form) !== JSON.stringify(initialFormRef.current);
     const directTaskId = Number(searchParams.get('taskId')) || null;
+    const requestedPage = Math.max(1, Number(searchParams.get('page')) || 1);
     const requestedDeletionState = searchParams.get('deletedState');
     const blocker = useBlocker(({ currentLocation, nextLocation }) => !allowSuccessfulSaveNavigationRef.current && formDirty
         && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search));
@@ -246,8 +257,8 @@ function ProjectTasksPage() {
     }, [context, currentWorkspace, directTaskId, projectId, requestedDeletionState, setSearchParams]);
 
     useEffect(() => {
-        if (!loading) void refreshTasks(1);
-    }, [deletedOpen, loading, refreshTasks]);
+        if (!loading) void refreshTasks(requestedPage);
+    }, [deletedOpen, loading, refreshTasks, requestedPage]);
 
     /** 직접 링크로 조회된 작업 카드가 화면에 들어오도록 목록 갱신 뒤 부드럽게 이동합니다. */
     useEffect(() => {
@@ -262,8 +273,18 @@ function ProjectTasksPage() {
         if (value && value !== 'ALL') next.set(name, value);
         else next.delete(name);
         next.delete('taskId');
+        next.delete('page');
         setSearchParams(next, { replace: true });
         setPage(1);
+    }
+
+    /** 사용자가 페이지를 이동하면 직접 진입 anchor를 해제하고 새 페이지를 URL의 단일 상태로 저장합니다. */
+    function moveToPage(nextPage: number) {
+        const next = new URLSearchParams(searchParams);
+        next.delete('taskId');
+        if (nextPage > 1) next.set('page', String(nextPage));
+        else next.delete('page');
+        setSearchParams(next);
     }
 
     /** 새 작업 또는 선택 작업의 값을 모달 폼으로 준비합니다. */
@@ -474,7 +495,7 @@ function ProjectTasksPage() {
                     <label className="project-tasks-mine"><input type="checkbox" checked={searchParams.get('mineOnly') === 'true'} onChange={event => setFilter('mineOnly', event.target.checked ? 'true' : '')} /> 내 작업만</label>
                     <FilterResetButton onClick={() => setSearchParams({}, { replace: true })} />
                 </div>
-                {!project.archivedAt && activeMembers.length > 0 && <button type="button" className="primary-button" onClick={() => openForm()}>작업 추가</button>}
+                {canManageTasks && activeMembers.length > 0 && <button type="button" className="primary-button" onClick={() => openForm()}>작업 추가</button>}
             </div>
 
             <div className="project-task-list">
@@ -499,8 +520,8 @@ function ProjectTasksPage() {
                     </article>
                 ))}
             </div>
-            {totalPages > 1 && <nav className="project-task-pagination" aria-label="작업 페이지"><button type="button" disabled={page <= 1} onClick={() => void refreshTasks(page - 1)}>이전</button><span>{page} / {totalPages}</span><button type="button" disabled={page >= totalPages} onClick={() => void refreshTasks(page + 1)}>다음</button></nav>}
-            <button type="button" className="deleted-task-toggle" onClick={() => { const next = !deletedOpen; setDeletedOpen(next); const params = new URLSearchParams(searchParams); if (next) params.set('deletedState', 'DELETED'); else params.delete('deletedState'); params.delete('taskId'); setSearchParams(params, { replace: true }); }}>{deletedOpen ? '활성 작업 보기' : `삭제된 작업 ${deletedCount}개`}</button>
+            {totalPages > 1 && <nav className="project-task-pagination" aria-label="작업 페이지"><button type="button" disabled={page <= 1} onClick={() => moveToPage(page - 1)}>이전</button><span>{page} / {totalPages}</span><button type="button" disabled={page >= totalPages} onClick={() => moveToPage(page + 1)}>다음</button></nav>}
+            <button type="button" className="deleted-task-toggle" onClick={() => { const next = !deletedOpen; setDeletedOpen(next); const params = new URLSearchParams(searchParams); if (next) params.set('deletedState', 'DELETED'); else params.delete('deletedState'); params.delete('taskId'); params.delete('page'); setSearchParams(params, { replace: true }); }}>{deletedOpen ? '활성 작업 보기' : `삭제된 작업 ${deletedCount}개`}</button>
 
             {form && <ProjectGroupModal titleId="task-form-title" title={dueDateConfirmationOpen ? '프로젝트 마감일을 넘습니다' : form.taskId ? '작업 수정' : '작업 추가'} description={dueDateConfirmationOpen && project.dueDate ? `프로젝트 마감일은 ${project.dueDate}, 작업 종료일은 ${form.endDate}입니다.` : '작업 종류와 담당자, 일정과 금액을 입력합니다.'} onRequestClose={() => dueDateConfirmationOpen ? setDueDateConfirmationOpen(false) : closeForm()}>{dueDateConfirmationOpen ? <div className="project-task-dialog-body"><p>일정을 다시 확인해 주세요. 그대로 저장해도 프로젝트 마감일은 변경되지 않습니다.</p><div><button type="button" onClick={() => setDueDateConfirmationOpen(false)}>돌아가기</button><button type="button" className="primary-button" disabled={submitting} onClick={() => void persistForm()}>그래도 저장</button></div></div> : <form className="project-task-form" onSubmit={event => void submitForm(event)}>
                 <label>작업 종류<select data-autofocus value={form.taskTypeId} onChange={event => setForm({ ...form, taskTypeId: Number(event.target.value) })}>{taskTypes.filter(type => type.active || type.taskTypeId === form.taskTypeId).map(type => <option key={type.taskTypeId} value={type.taskTypeId}>{type.name}</option>)}</select>{fieldErrors.taskTypeId && <span>{fieldErrors.taskTypeId}</span>}</label>

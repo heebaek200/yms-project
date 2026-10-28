@@ -1286,7 +1286,7 @@ Query:
 
 `deletedState=ACTIVE`는 논리 삭제되지 않은 작업만, `deletedState=DELETED`는 논리 삭제된 작업만 반환합니다. 활성 작업과 삭제된 작업을 한 응답에 섞는 ALL 값은 제공하지 않습니다. 두 목록은 필터와 페이지 상태를 독립적으로 관리합니다.
 
-`anchorTaskId`가 있으면 서버는 `page` 대신 현재 `size`와 기본 정렬을 기준으로 대상 작업이 포함된 페이지를 계산해 반환합니다. 일반 필터가 대상 작업을 제외하는 경우 직접 이동을 우선하여 해당 페이지를 반환하고 응답 메타데이터에 `filtersOverridden=true`를 포함합니다. 화면은 작업 필터 Query를 제거하고 필터 초기화 안내를 표시합니다. `anchorTaskId`가 요청한 Project 또는 `deletedState` 범위에 없거나 처리 중 상태가 바뀌면 `anchorMatched=false`를 반환하며 클라이언트는 9.1.1 단건 조회로 최신 상태를 다시 확인합니다.
+`anchorTaskId`가 있으면 서버는 `page` 대신 현재 `size`와 기본 정렬을 기준으로 대상 작업이 포함된 페이지를 계산해 반환합니다. 일반 필터가 대상 작업을 제외하는 경우 직접 이동을 우선하여 해당 페이지를 반환하고 응답 메타데이터에 `filtersOverridden=true`를 포함합니다. 화면은 작업 필터 Query를 제거하고 필터 초기화 안내를 표시합니다. 사용자가 직접 이전·다음 페이지를 선택한 뒤에는 클라이언트가 `anchorTaskId`를 보내지 않고 선택한 `page`로 일반 목록을 조회합니다. `anchorTaskId`가 요청한 Project 또는 `deletedState` 범위에 없거나 처리 중 상태가 바뀌면 `anchorMatched=false`를 반환하며 클라이언트는 9.1.1 단건 조회로 최신 상태를 다시 확인합니다.
 
 ### 9.1.1. Task 단건 조회와 직접 이동
 
