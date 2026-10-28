@@ -164,7 +164,7 @@ function resolveProject(workspaceId: number, projectId: number, context: Project
 }
 
 /** 생성·수정 입력을 검증하고 서버 저장 형식으로 정규화합니다. */
-function validateInput(project: ProjectDetail, request: SaveProjectTaskRequest): ApiFailureResponse | {
+function validateInput(project: ProjectDetail, request: SaveProjectTaskRequest, currentTaskTypeId?: number): ApiFailureResponse | {
     taskTypeId: number;
     assigneeProjectMemberId: number;
     assigneeWorkspaceMemberId: number;
@@ -174,7 +174,7 @@ function validateInput(project: ProjectDetail, request: SaveProjectTaskRequest):
     workerAmount: string;
 } {
     const taskType = readWorkspaceTaskTypes(project.workspaceId).find(item => item.taskTypeId === request.taskTypeId);
-    if (!taskType?.active) return failure('TASK_TYPE_NOT_AVAILABLE', '사용 가능한 작업 종류를 선택해 주세요.', 'taskTypeId', String(request.taskTypeId));
+    if (!taskType || (!taskType.active && taskType.taskTypeId !== currentTaskTypeId)) return failure('TASK_TYPE_NOT_AVAILABLE', '사용 가능한 작업 종류를 선택해 주세요.', 'taskTypeId', String(request.taskTypeId));
 
     const exactAssignee = project.members.find(member => (
         project.projectId * 100_000 + member.workspaceMemberId === request.assigneeProjectMemberId
@@ -225,9 +225,11 @@ function synchronizeAggregates(project: ProjectDetail) {
     });
 }
 
-/** 작업 변경을 프로젝트·작업 식별자가 포함된 공통 알림으로 발행합니다. */
-function notifyTask(project: ProjectDetail, task: StoredProjectTask, context: ProjectTaskRequestContext, messageSummary: string) {
+/** 작업 사건의 실제 수신자에게만 사용자별 알림을 만들고 요청자 자신의 알림은 생략합니다. */
+function notifyTask(project: ProjectDetail, task: StoredProjectTask, context: ProjectTaskRequestContext, recipientUserId: number | undefined, messageSummary: string) {
+    if (!recipientUserId || recipientUserId === context.userId) return;
     appendTaskNotification({
+        recipientUserId,
         workspaceId: project.workspaceId,
         projectId: project.projectId,
         taskId: task.taskId,
@@ -315,7 +317,8 @@ export async function createProjectTask(workspaceId: number, projectId: number, 
     const now = new Date().toISOString();
     const task = insertStoredProjectTask({ ...validated, workspaceId, projectId, status: 'WAITING', completedAt: null, version: 1, createdAt: now, deletedAt: null, deletedByName: null, settled: false });
     appendProjectTaskHistory(task.taskId, { eventType: 'CREATED', toStatus: 'WAITING', processedByName: context.userName, processedAt: now });
-    notifyTask(resolved, task, context, `${readWorkspaceTaskTypes(workspaceId).find(type => type.taskTypeId === task.taskTypeId)?.name ?? '작업'} 담당자로 배정되었습니다.`);
+    const assignee = readWorkspaceMembers(workspaceId).find(member => member.workspaceMemberId === task.assigneeWorkspaceMemberId);
+    notifyTask(resolved, task, context, assignee?.userId, `${readWorkspaceTaskTypes(workspaceId).find(type => type.taskTypeId === task.taskTypeId)?.name ?? '작업'} 담당자로 배정되었습니다.`);
     synchronizeAggregates(resolved);
     return { success: true, message: '작업을 추가했습니다.', data: { task: toResponse(readProject(workspaceId, projectId)!, task, context), dueDateWarning: Boolean(task.endDate && resolved.dueDate && task.endDate > resolved.dueDate), suggestProjectUpload: false } };
 }
@@ -327,18 +330,28 @@ export async function updateProjectTask(workspaceId: number, projectId: number, 
     if (!('projectId' in resolved)) return resolved;
     const current = readStoredProjectTask(workspaceId, projectId, taskId);
     if (!current) return failure('TASK_NOT_FOUND', '작업을 찾을 수 없습니다.');
-    if (!canManage(resolved, context) || current.deletedAt || current.settled || !['WAITING', 'PROGRESS'].includes(current.status)) return failure('TASK_EDIT_NOT_ALLOWED', '현재 상태에서는 작업 정보를 수정할 수 없습니다.');
+    if (current.settled) return failure('TASK_ALREADY_SETTLED', '정산이 확정된 작업은 수정할 수 없습니다.');
+    if (!canManage(resolved, context) || current.deletedAt || !['WAITING', 'PROGRESS'].includes(current.status)) return failure('TASK_EDIT_NOT_ALLOWED', '현재 상태에서는 작업 정보를 수정할 수 없습니다.');
     if (current.version !== request.expectedVersion) return failure('TASK_VERSION_CONFLICT', '다른 사용자가 먼저 변경했습니다. 최신 내용을 다시 확인해 주세요.');
-    const validated = validateInput(resolved, request);
+    const validated = validateInput(resolved, request, current.taskTypeId);
     if ('success' in validated) return validated;
     const labels: Record<keyof typeof validated, string> = { taskTypeId: '작업 종류', assigneeProjectMemberId: '담당자', assigneeWorkspaceMemberId: '담당자', content: '작업 내용', startDate: '시작일', endDate: '종료일', workerAmount: '작업 금액' };
     const changedFields = (Object.keys(validated) as (keyof typeof validated)[])
         .filter(field => field !== 'assigneeWorkspaceMemberId' && String(current[field]) !== String(validated[field]))
         .map(field => ({ field, label: labels[field], previousValue: current[field] === null ? null : String(current[field]), nextValue: validated[field] === null ? null : String(validated[field]) })) as TaskChangedField[];
+    if (changedFields.length === 0) {
+        return { success: true, message: '변경된 내용이 없습니다.', data: { task: toResponse(resolved, current, context), dueDateWarning: Boolean(current.endDate && resolved.dueDate && current.endDate > resolved.dueDate), suggestProjectUpload: false } };
+    }
     const updated = { ...current, ...validated, version: current.version + 1 };
     replaceStoredProjectTask(updated);
     appendProjectTaskHistory(taskId, { eventType: 'UPDATED', changedFields, processedByName: context.userName, processedAt: new Date().toISOString() });
-    if (current.assigneeWorkspaceMemberId !== updated.assigneeWorkspaceMemberId) notifyTask(resolved, updated, context, '작업 담당자로 새로 배정되었습니다.');
+    if (current.assigneeWorkspaceMemberId !== updated.assigneeWorkspaceMemberId) {
+        const members = readWorkspaceMembers(workspaceId);
+        const previousAssignee = members.find(member => member.workspaceMemberId === current.assigneeWorkspaceMemberId);
+        const nextAssignee = members.find(member => member.workspaceMemberId === updated.assigneeWorkspaceMemberId);
+        notifyTask(resolved, updated, context, previousAssignee?.userId, '작업 담당자에서 해제되었습니다.');
+        notifyTask(resolved, updated, context, nextAssignee?.userId, '작업 담당자로 새로 배정되었습니다.');
+    }
     synchronizeAggregates(resolved);
     return { success: true, message: '작업 정보를 수정했습니다.', data: { task: toResponse(readProject(workspaceId, projectId)!, updated, context), dueDateWarning: Boolean(updated.endDate && resolved.dueDate && updated.endDate > resolved.dueDate), suggestProjectUpload: false } };
 }
@@ -352,8 +365,10 @@ export async function changeProjectTaskStatus(workspaceId: number, projectId: nu
     if (!('projectId' in resolved)) return resolved;
     const current = readStoredProjectTask(workspaceId, projectId, taskId);
     if (!current) return failure('TASK_NOT_FOUND', '작업을 찾을 수 없습니다.');
-    if (!canManage(resolved, context) || current.deletedAt || current.settled) return failure('TASK_STATUS_CHANGE_FORBIDDEN', '작업 상태를 변경할 권한이 없습니다.');
+    if (current.settled) return failure('TASK_ALREADY_SETTLED', '정산이 확정된 작업은 상태를 변경할 수 없습니다.');
+    if (!canManage(resolved, context) || current.deletedAt) return failure('TASK_STATUS_CHANGE_FORBIDDEN', '작업 상태를 변경할 권한이 없습니다.');
     if (current.version !== request.expectedVersion) return failure('TASK_VERSION_CONFLICT', '다른 사용자가 먼저 변경했습니다. 최신 내용을 다시 확인해 주세요.');
+    if (getAssigneeIssue(resolved, current) !== 'NONE') return failure('TASK_ASSIGNEE_REASSIGNMENT_REQUIRED', '담당자를 현재 ACTIVE EDIT 참여자로 다시 지정해 주세요.');
     if (!NEXT_STATUSES[current.status].includes(request.status)) return failure('INVALID_TASK_STATUS_TRANSITION', '현재 상태에서 선택한 상태로 바로 변경할 수 없습니다.');
     const rejectionReason = request.rejectionReason?.trim() || null;
     if (current.status === 'REVIEW' && request.status === 'PROGRESS' && (!rejectionReason || rejectionReason.length > 500)) return failure('INVALID_REJECTION_REASON', '반려 사유를 1자 이상 500자 이하로 입력해 주세요.', 'rejectionReason', request.rejectionReason);
@@ -361,10 +376,18 @@ export async function changeProjectTaskStatus(workspaceId: number, projectId: nu
     const updated = { ...current, status: request.status, completedAt: request.status === 'COMPLETED' ? now : null, version: current.version + 1 };
     replaceStoredProjectTask(updated);
     appendProjectTaskHistory(taskId, { eventType: rejectionReason ? 'REJECTED' : 'STATUS_CHANGED', fromStatus: current.status, toStatus: request.status, rejectionReason, processedByName: context.userName, processedAt: now });
-    notifyTask(resolved, updated, context, rejectionReason ? `작업이 반려되었습니다. 사유: ${rejectionReason}` : `작업 상태가 ${request.status}(으)로 변경되었습니다.`);
+    const assignee = readWorkspaceMembers(workspaceId).find(member => member.workspaceMemberId === updated.assigneeWorkspaceMemberId);
+    if (current.status === 'PROGRESS' && request.status === 'REVIEW') {
+        const owner = resolved.members.find(member => member.workspaceMemberId === resolved.ownerWorkspaceMemberId);
+        notifyTask(resolved, updated, context, owner?.userId, '작업 검수를 요청했습니다.');
+    } else if (rejectionReason) {
+        notifyTask(resolved, updated, context, assignee?.userId, `작업이 반려되었습니다. 사유: ${rejectionReason}`);
+    } else if (request.status === 'COMPLETED') {
+        notifyTask(resolved, updated, context, assignee?.userId, '작업이 완료되었습니다.');
+    }
     synchronizeAggregates(resolved);
     const active = readStoredProjectTasks(workspaceId, projectId).filter(task => task.deletedAt === null);
-    const suggestProjectUpload = request.status === 'COMPLETED' && active.length > 0 && active.every(task => task.status === 'COMPLETED') && resolved.status !== 'UPLOADED';
+    const suggestProjectUpload = request.status === 'COMPLETED' && active.length > 0 && active.every(task => task.status === 'COMPLETED') && !['UPLOADED', 'CANCELLED'].includes(resolved.status);
     return { success: true, message: request.status === 'PROGRESS' && rejectionReason ? '작업을 반려했습니다.' : '작업 상태를 변경했습니다.', data: { task: toResponse(readProject(workspaceId, projectId)!, updated, context), dueDateWarning: false, suggestProjectUpload } };
 }
 
@@ -375,13 +398,15 @@ export async function deleteProjectTask(workspaceId: number, projectId: number, 
     if (!('projectId' in resolved)) return resolved;
     const current = readStoredProjectTask(workspaceId, projectId, taskId);
     if (!current) return failure('TASK_NOT_FOUND', '작업을 찾을 수 없습니다.');
-    if (current.settled) return failure('SETTLED_TASK_READ_ONLY', '정산이 확정된 작업은 삭제할 수 없습니다.');
+    if (current.settled) return failure('TASK_ALREADY_SETTLED', '정산이 확정된 작업은 삭제할 수 없습니다.');
     if (!canManage(resolved, context) || current.deletedAt) return failure('TASK_DELETE_FORBIDDEN', '작업을 삭제할 수 없습니다.');
     if (current.version !== request.expectedVersion) return failure('TASK_VERSION_CONFLICT', '다른 사용자가 먼저 변경했습니다. 최신 내용을 다시 확인해 주세요.');
     const now = new Date().toISOString();
     const updated = { ...current, deletedAt: now, deletedByName: context.userName, version: current.version + 1 };
     replaceStoredProjectTask(updated);
     appendProjectTaskHistory(taskId, { eventType: 'DELETED', processedByName: context.userName, processedAt: now });
+    const assignee = readWorkspaceMembers(workspaceId).find(member => member.workspaceMemberId === updated.assigneeWorkspaceMemberId);
+    notifyTask(resolved, updated, context, assignee?.userId, '작업이 삭제되었습니다.');
     synchronizeAggregates(resolved);
     return { success: true, message: '작업을 삭제했습니다.', data: toResponse(readProject(workspaceId, projectId)!, updated, context) };
 }
@@ -393,13 +418,15 @@ export async function restoreProjectTask(workspaceId: number, projectId: number,
     if (!('projectId' in resolved)) return resolved;
     const current = readStoredProjectTask(workspaceId, projectId, taskId);
     if (!current) return failure('TASK_NOT_FOUND', '작업을 찾을 수 없습니다.');
-    if (current.settled) return failure('SETTLED_TASK_READ_ONLY', '정산이 확정된 작업은 복원할 수 없습니다.');
+    if (current.settled) return failure('TASK_ALREADY_SETTLED', '정산이 확정된 작업은 복원할 수 없습니다.');
     if (!canManage(resolved, context) || !current.deletedAt) return failure('TASK_RESTORE_FORBIDDEN', '작업을 복원할 수 없습니다.');
     if (current.version !== request.expectedVersion) return failure('TASK_VERSION_CONFLICT', '다른 사용자가 먼저 변경했습니다. 최신 내용을 다시 확인해 주세요.');
     const now = new Date().toISOString();
     const updated = { ...current, deletedAt: null, deletedByName: null, version: current.version + 1 };
     replaceStoredProjectTask(updated);
     appendProjectTaskHistory(taskId, { eventType: 'RESTORED', processedByName: context.userName, processedAt: now });
+    const assignee = readWorkspaceMembers(workspaceId).find(member => member.workspaceMemberId === updated.assigneeWorkspaceMemberId);
+    notifyTask(resolved, updated, context, assignee?.userId, '작업이 복원되었습니다.');
     synchronizeAggregates(resolved);
     return { success: true, message: '작업을 복원했습니다.', data: toResponse(readProject(workspaceId, projectId)!, updated, context) };
 }

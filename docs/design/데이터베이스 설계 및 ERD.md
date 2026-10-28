@@ -588,7 +588,7 @@ Project 안에서 실제 수행하는 세부 작업입니다.
 - `deleted_at IS NOT NULL`인 작업은 일반 목록, 일정과 현재 집계에서 제외하지만 기존 FK와 이력은 유지하고 복원할 수 있습니다. 영구 삭제 기능은 제공하지 않습니다.
 - 논리 삭제된 작업도 Task Type 사용 이력으로 간주하여 참조 대상 Task Type의 물리 삭제를 제한합니다.
 - CONFIRMED 정산에 포함된 작업은 조회 전용으로 고정하며 수정·상태 변경·완료 취소·논리 삭제를 차단합니다. 실제 지급 기준 금액은 `settlement_items.amount_snapshot`을 사용합니다.
-- 수정·상태 변경·삭제·복원 시 `version`을 비교하고 성공할 때마다 증가시킵니다.
+- 수정·상태 변경·삭제·복원 시 값 비교보다 먼저 `version`을 검증하고 실제 변경이 성공할 때마다 증가시킵니다. version이 일치하더라도 정규화 후 변경 필드가 없는 수정 요청은 성공으로 응답하되 version과 수정 시각을 유지하고 이력·알림·집계를 갱신하지 않습니다.
 
 ## 7.3. project_task_histories
 
@@ -613,6 +613,7 @@ Project 안에서 실제 수행하는 세부 작업입니다.
 - 검수 반려는 `REJECTED`로 기록하고 REVIEW → PROGRESS 상태와 필수 반려 사유를 함께 보존합니다.
 - 삭제와 복원을 반복하더라도 각 `DELETED` / `RESTORED` 이력을 유지합니다.
 - `changed_fields`의 지급 예정 금액은 API 응답에서 현재 금액 조회 권한이 있는 사용자에게만 제공합니다.
+- `changed_fields`의 담당자와 작업 종류는 참조 ID를 저장합니다. API는 조회 시점의 `project_members` / `workspace_members`와 `task_types`를 조회해 현재 표시명으로 변환하며 이름 스냅샷을 JSON에 중복 저장하지 않습니다.
 
 ---
 
@@ -657,13 +658,14 @@ Project Member별 마지막 읽음 위치를 관리합니다.
 | notification_type | VARCHAR(40) | NOT NULL | TASK_UPDATE / NEW_CHAT / WORKSPACE_INVITATION / SETTLEMENT_UPDATE 등 |
 | actor_user_id | BIGINT | FK → users, NULL | 알림을 발생시킨 사용자 |
 | project_id | BIGINT | FK → video_projects, NULL | 관련 Project |
+| project_task_id | BIGINT | FK → project_tasks, NULL | 관련 Task, 작업 알림 직접 이동 대상 |
 | settlement_id | BIGINT | FK → settlements, NULL | 관련 Settlement |
 | workspace_invitation_id | BIGINT | FK → workspace_invitations, NULL | 관련 초대 |
 | message_summary | VARCHAR(500) | NOT NULL | 화면 표시 요약 |
 | created_at | DATETIME | NOT NULL | 알림 발생 시각 |
 | read_at | DATETIME | NULL | 읽음 시각 |
 
-`read_at IS NULL`이면 읽지 않은 알림으로 판단합니다.
+`read_at IS NULL`이면 읽지 않은 알림으로 판단합니다. 하나의 사건에 수신자가 여러 명이면 `user_id`별 Notification 행을 생성하여 읽음 상태를 독립적으로 관리하고, 요청자와 수신자가 같은 자기 알림은 행을 생성하지 않습니다. 알림 조회와 읽음 처리는 인증 사용자의 `user_id` 범위에서만 수행합니다.
 
 ---
 
@@ -960,6 +962,7 @@ YouTube API에서 마지막으로 성공적으로 동기화한 YouTubePublicatio
 - `project_task_histories(project_task_id, processed_at)`
 - `chat_messages(project_id, chat_message_id)`
 - `notifications(user_id, read_at, created_at)`
+- `notifications(project_task_id, created_at)`
 - `expenses(workspace_id, occurred_on, scope_type)`
 - `revenues(workspace_id, occurred_on, scope_type)`
 - `settlements(workspace_id, worker_member_id, period_start, period_end)`
@@ -1024,6 +1027,7 @@ erDiagram
     TASK_TYPES ||--o{ PROJECT_TASKS : classifies
     PROJECT_TASKS ||--o{ PROJECT_TASK_HISTORIES : records_changes
     WORKSPACE_MEMBERS ||--o{ PROJECT_TASK_HISTORIES : processes
+    PROJECT_TASKS o|--o{ NOTIFICATIONS : links_task
 
     VIDEO_PROJECTS ||--o{ CHAT_MESSAGES : has
     PROJECT_MEMBERS ||--o{ CHAT_MESSAGES : sends
@@ -1335,12 +1339,17 @@ erDiagram
         bigint user_id PK
     }
 
+    PROJECT_TASKS {
+        bigint project_task_id PK
+    }
+
     NOTIFICATIONS {
         bigint notification_id PK
         bigint user_id FK
         bigint workspace_id FK
         varchar notification_type
         bigint project_id FK
+        bigint project_task_id FK
         bigint settlement_id FK
         bigint workspace_invitation_id FK
         datetime created_at
@@ -1352,6 +1361,7 @@ erDiagram
     PROJECT_MEMBERS ||--o| CHAT_ROOM_READS : tracks
     CHAT_MESSAGES o|--o{ CHAT_ROOM_READS : last_read
     USERS ||--o{ NOTIFICATIONS : receives
+    PROJECT_TASKS o|--o{ NOTIFICATIONS : links_task
 ```
 
 ## 14.4. Expense / Revenue / Settlement

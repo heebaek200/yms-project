@@ -12,7 +12,7 @@ import {
     updateProjectTask,
     type ProjectTaskRequestContext
 } from '../api/projects/projectTasks';
-import { getWorkspaceProject, updateWorkspaceProject } from '../api/projects/projects';
+import { getWorkspaceProject, updateWorkspaceProjectStatus } from '../api/projects/projects';
 import { getWorkspaceTaskTypes } from '../api/workspaces/taskTypes';
 import CompositionSafeSearchInput from '../components/common/CompositionSafeSearchInput';
 import FeedbackMessage, { type FeedbackMessageType } from '../components/common/FeedbackMessage';
@@ -159,7 +159,7 @@ function ProjectTasksPage() {
     }, [formDirty]);
 
     /** 현재 URL 필터로 작업 목록을 다시 조회하고 anchor가 있으면 해당 페이지를 선택합니다. */
-    const refreshTasks = useCallback(async (requestedPage = page) => {
+    const refreshTasks = useCallback(async (requestedPage: number) => {
         if (!currentWorkspace || !context || !Number.isInteger(projectId)) return;
         const requestId = ++latestTaskRequestIdRef.current;
         const response = await getProjectTasks(currentWorkspace.workspaceId, projectId, {
@@ -193,7 +193,7 @@ function ProjectTasksPage() {
             setSearchParams(next, { replace: true });
             setFeedback({ type: 'info', message: '요청한 작업을 표시하기 위해 작업 필터를 초기화했습니다.' });
         }
-    }, [context, currentWorkspace, deletedOpen, page, projectId, searchParams, setSearchParams]);
+    }, [context, currentWorkspace, deletedOpen, projectId, searchParams, setSearchParams]);
 
     /** Project 기본 정보와 작업 종류는 Workspace·Project가 바뀔 때만 다시 불러옵니다. */
     useEffect(() => {
@@ -311,6 +311,14 @@ function ProjectTasksPage() {
             : await updateProjectTask(currentWorkspace.workspaceId, projectId, form.taskId, { ...form, expectedVersion: form.expectedVersion! }, context);
         setSubmitting(false);
         if (!response.success) {
+            if (response.errorCode === 'TASK_VERSION_CONFLICT') {
+                setForm(null);
+                initialFormRef.current = null;
+                setDueDateConfirmationOpen(false);
+                setFeedback({ type: 'error', message: '다른 사용자가 먼저 변경했습니다. 최신 내용을 다시 불러왔습니다.' });
+                await refreshTasks(page);
+                return;
+            }
             setFieldErrors(Object.fromEntries((response.errors ?? []).map(error => [error.field, error.reason])));
             // 확인 모달에서 서버 검증 오류가 발생하면 입력 화면으로 돌아가 해당 필드를 바로 수정하게 합니다.
             if (response.errors?.length) setDueDateConfirmationOpen(false);
@@ -361,14 +369,14 @@ function ProjectTasksPage() {
             const rejectionError = response.errors?.find(error => error.field === 'rejectionReason');
             if (rejectionError) setRejectionReasonError(rejectionError.reason);
             setFeedback({ type: 'error', message: response.message });
-            await refreshTasks();
+            await refreshTasks(page);
             return;
         }
         setRejectionTask(null);
         setRejectionReason('');
         setRejectionReasonError('');
         setFeedback({ type: 'success', message: response.message ?? '상태를 변경했습니다.' });
-        await refreshTasks();
+        await refreshTasks(page);
         if (response.data.suggestProjectUpload && project) setUploadPromptOpen(true);
     }
 
@@ -395,16 +403,7 @@ function ProjectTasksPage() {
     async function completeProjectUpload() {
         if (!currentWorkspace || !context || !project) return;
         setSubmitting(true);
-        const updated = await updateWorkspaceProject(currentWorkspace.workspaceId, projectId, {
-            title: project.title,
-            content: project.content,
-            channelId: project.channelId,
-            projectGroupId: project.projectGroupId,
-            videoType: project.videoType,
-            status: 'UPLOADED',
-            dueDate: project.dueDate,
-            plannedUploadDate: project.plannedUploadDate
-        }, context);
+        const updated = await updateWorkspaceProjectStatus(currentWorkspace.workspaceId, projectId, 'UPLOADED', context);
         setSubmitting(false);
         setUploadPromptOpen(false);
         if (updated.success) {
@@ -423,7 +422,7 @@ function ProjectTasksPage() {
         if (!response.success) setFeedback({ type: 'error', message: response.message });
         else setFeedback({ type: 'success', message: response.message ?? (restoring ? '복원했습니다.' : '삭제했습니다.') });
         setDeletionTask(null);
-        await refreshTasks();
+        await refreshTasks(page);
     }
 
     /** 선택 작업의 통합 이력을 불러와 읽기 전용 모달을 엽니다. */

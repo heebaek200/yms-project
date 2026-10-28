@@ -787,6 +787,8 @@ Query:
 - unreadOnly: 기본 true
 - limit: 기본 20, 최대 100
 
+수신 사용자는 Query Parameter로 받지 않고 인증 세션에서 결정합니다. 응답과 `unreadCount`는 항상 현재 인증 사용자의 알림으로 제한하며, `workspaceId`는 이 범위를 넓히지 않고 자신의 알림을 관련 Workspace 기준으로만 좁힙니다. 수신자 식별자는 서버 내부 소유권 검증에 사용하고 응답에는 노출하지 않습니다.
+
 응답:
 
 ~~~json
@@ -800,6 +802,7 @@ Query:
         "notificationType": "TASK_UPDATE",
         "workspaceId": 1,
         "projectId": 12,
+        "taskId": 111,
         "projectTitle": "카메라 리뷰",
         "senderName": "김편집",
         "messageSummary": "종합 편집 작업이 검수 요청 상태로 변경되었습니다.",
@@ -824,7 +827,9 @@ PATCH /api/notifications/{notificationId}/read
 
 PATCH /api/notifications/read-all
 
-read-all은 선택적으로 workspaceId를 Query Parameter로 받을 수 있습니다.
+단건 읽음 처리는 인증 사용자에게 귀속된 알림만 변경합니다. 알림이 없거나 다른 사용자에게 귀속되어 있으면 존재 여부를 구분하지 않고 `404 NOTIFICATION_NOT_FOUND`를 반환합니다.
+
+read-all은 선택적으로 workspaceId를 Query Parameter로 받을 수 있으며, 현재 인증 사용자의 알림만 읽음 처리합니다. 다른 사용자의 알림은 같은 Workspace에 있더라도 변경하지 않습니다.
 
 ## 6.5. 글로벌 실시간 알림
 
@@ -1352,6 +1357,10 @@ PATCH /api/projects/{projectId}/tasks/{taskId}
 - 담당자 변경 시 기존 담당자와 새 담당자에게 알림. 요청자 자신에게 보내는 자기 알림은 생략
 - version 불일치 → TASK_VERSION_CONFLICT 409
 
+`expectedVersion`은 값 비교보다 먼저 검증합니다. 오래된 version이면 정규화된 요청값이 현재 값과 같더라도 `TASK_VERSION_CONFLICT`를 반환하고 화면은 최신 작업 목록을 다시 조회합니다.
+
+version이 일치하고 정규화 후 실제 변경 필드가 없으면 성공으로 처리하되 현재 Task를 그대로 반환합니다. 이 경우 version과 updatedAt을 바꾸지 않고 `UPDATED` 이력, 알림, 집계 재계산을 수행하지 않습니다.
+
 ## 9.4. Task 상태 변경
 
 PATCH /api/projects/{projectId}/tasks/{taskId}/status
@@ -1436,6 +1445,8 @@ GET /api/projects/{projectId}/tasks/{taskId}/histories
 
 응답은 이벤트, 이전·이후 상태, 변경 필드의 이전·변경 값, 반려 사유, 처리자와 처리 시각을 제공합니다. 금액 변경 값은 현재 금액 조회 권한에 따라 제거합니다.
 
+담당자와 작업 종류 변경값은 이력에 보존된 `projectMemberId`, `taskTypeId` 참조를 기준으로 조회 시점의 현재 사용자 이름과 작업 종류명으로 변환합니다. 이름을 이력 JSON에 별도 스냅샷으로 저장하지 않으며, 논리 보존된 멤버를 포함해 참조 대상을 찾을 수 없는 예외에만 `알 수 없는 사용자`, `알 수 없는 작업 종류`를 표시합니다.
+
 ## 9.8. Task 알림
 
 - 신규 배정과 담당자 변경 → 새 담당자
@@ -1445,6 +1456,8 @@ GET /api/projects/{projectId}/tasks/{taskId}/histories
 - 삭제와 복원 → 현재 담당자
 
 요청자와 알림 대상이 같으면 자기 알림은 생성하지 않습니다. 일반 일정·금액 수정만으로는 알림을 생성하지 않습니다.
+
+하나의 사건에 수신자가 여러 명이면 수신자별로 Notification 행을 하나씩 생성하여 읽음 상태를 독립적으로 관리합니다. 수신자는 요청값으로 받지 않고 Task, Project Owner와 멤버십의 최신 상태에서 서버가 결정하며, Task 알림에는 직접 이동을 위한 `taskId`를 함께 기록합니다.
 
 ---
 
@@ -2043,6 +2056,7 @@ Channel 또는 Workspace에 직접 귀속된 Expense / Revenue를 ProjectGroup �
 | PROJECT_GROUP_NOT_FOUND | 404 | ProjectGroup 없음 |
 | CHANNEL_NOT_FOUND | 404 | Channel 없음 |
 | TASK_NOT_FOUND | 404 | Task 없음 또는 현재 Project에 속하지 않음 |
+| NOTIFICATION_NOT_FOUND | 404 | 알림 없음 또는 현재 인증 사용자의 알림이 아님 |
 
 ## 충돌 / 상태 전이
 

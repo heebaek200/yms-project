@@ -38,6 +38,11 @@ export type NotificationItem = {
     read: boolean;
 };
 
+// 수신자별 읽음 상태는 저장 모델에만 유지하고 API 응답에는 인증 사용자의 항목만 노출합니다.
+type StoredNotification = NotificationItem & {
+    recipientUserId: number;
+};
+
 export type NotificationsRequest = {
     workspaceId?: number;
     unreadOnly?: boolean;
@@ -65,9 +70,10 @@ export type NotificationReadResponse =
     | NotificationsFailureResponse;
 
 // 읽음 API 호출 뒤에도 변경 상태가 유지되도록 Mock 목록을 모듈 범위에서 관리합니다.
-let mockNotifications: NotificationItem[] = [
+let mockNotifications: StoredNotification[] = [
     {
         notificationId: 501,
+        recipientUserId: 24601,
         notificationType: 'TASK_UPDATE',
         workspaceId: 1,
         projectId: 12,
@@ -82,6 +88,7 @@ let mockNotifications: NotificationItem[] = [
     },
     {
         notificationId: 502,
+        recipientUserId: 24601,
         notificationType: 'NEW_CHAT',
         workspaceId: 1,
         projectId: 12,
@@ -96,6 +103,7 @@ let mockNotifications: NotificationItem[] = [
     },
     {
         notificationId: 503,
+        recipientUserId: 24601,
         notificationType: 'SETTLEMENT_UPDATE',
         workspaceId: 1,
         projectId: null,
@@ -110,6 +118,7 @@ let mockNotifications: NotificationItem[] = [
     },
     {
         notificationId: 504,
+        recipientUserId: 24601,
         notificationType: 'WORKSPACE_INVITATION',
         workspaceId: null,
         projectId: null,
@@ -124,6 +133,7 @@ let mockNotifications: NotificationItem[] = [
     },
     {
         notificationId: 505,
+        recipientUserId: 24601,
         notificationType: 'TASK_UPDATE',
         workspaceId: 2,
         projectId: 32,
@@ -141,7 +151,7 @@ let mockNotifications: NotificationItem[] = [
 let nextNotificationId = 506;
 
 /** 작업 변경 알림을 Mock 저장소에 추가하고 전역 Provider가 즉시 다시 조회하도록 알립니다. */
-export function appendTaskNotification(notification: Omit<NotificationItem, 'notificationId' | 'notificationType' | 'read' | 'settlementId' | 'workspaceInvitationId'>) {
+export function appendTaskNotification(notification: Omit<StoredNotification, 'notificationId' | 'notificationType' | 'read' | 'settlementId' | 'workspaceInvitationId'>) {
     mockNotifications = [{
         ...notification,
         notificationId: nextNotificationId++,
@@ -204,6 +214,7 @@ export function setNotificationsMockScenario(scenario: MockScenario) {
  * 반환 배열은 가장 최근에 발생한 알림부터 정렬합니다.
  */
 export async function getNotifications(
+    userId: number,
     request: NotificationsRequest = {}
 ): Promise<NotificationsResponse> {
     // TODO: 백엔드 완성 후 GET /api/notifications axios 호출로 교체합니다.
@@ -239,8 +250,9 @@ export async function getNotifications(
 
     const unreadOnly = request.unreadOnly ?? true;
     const workspaceNotifications = mockNotifications.filter(notification =>
-        request.workspaceId === undefined
-        || notification.workspaceId === request.workspaceId
+        notification.recipientUserId === userId
+        && (request.workspaceId === undefined
+            || notification.workspaceId === request.workspaceId)
     );
 
     // 읽지 않은 수는 화면 필터와 무관하게 전체 미확인 수를 표시하도록 계산합니다.
@@ -252,7 +264,8 @@ export async function getNotifications(
         .toSorted((left, right) =>
             Date.parse(right.timestamp) - Date.parse(left.timestamp)
         )
-        .slice(0, limit);
+        .slice(0, limit)
+        .map(({ recipientUserId: _recipientUserId, ...notification }) => notification);
 
     return {
         success: true,
@@ -266,9 +279,10 @@ export async function getNotifications(
 /**
  * 지정한 알림 한 건을 읽음 상태로 변경합니다.
  * 이미 읽은 알림에도 성공을 반환하는 멱등 동작으로 구성합니다.
- * 존재하지 않는 ID는 실제 API 검증을 예상해 NOT_FOUND로 구분합니다.
+ * 없거나 다른 사용자 소유인 ID는 존재 여부를 숨겨 같은 NOTIFICATION_NOT_FOUND로 응답합니다.
  */
 export async function markNotificationAsRead(
+    userId: number,
     notificationId: number
 ): Promise<NotificationReadResponse> {
     // TODO: 백엔드 완성 후 PATCH /api/notifications/{notificationId}/read 호출로 교체합니다.
@@ -282,12 +296,13 @@ export async function markNotificationAsRead(
 
     const notificationExists = mockNotifications.some(
         notification => notification.notificationId === notificationId
+            && notification.recipientUserId === userId
     );
 
     if (!notificationExists) {
         return {
             success: false,
-            errorCode: 'NOT_FOUND',
+            errorCode: 'NOTIFICATION_NOT_FOUND',
             message: '알림을 찾을 수 없습니다.',
             errors: null
         };
@@ -295,7 +310,7 @@ export async function markNotificationAsRead(
 
     // 새 배열을 만들어 Context에서도 같은 방식으로 불변 상태 갱신을 적용합니다.
     mockNotifications = mockNotifications.map(notification =>
-        notification.notificationId === notificationId
+        notification.notificationId === notificationId && notification.recipientUserId === userId
             ? { ...notification, read: true }
             : notification
     );
@@ -309,6 +324,7 @@ export async function markNotificationAsRead(
  * 이미 읽은 항목은 그대로 유지하여 불필요한 데이터 변경을 피합니다.
  */
 export async function markAllNotificationsAsRead(
+    userId: number,
     workspaceId?: number
 ): Promise<NotificationReadResponse> {
     // TODO: 백엔드 완성 후 PATCH /api/notifications/read-all 호출로 교체합니다.
@@ -321,8 +337,8 @@ export async function markAllNotificationsAsRead(
     }
 
     mockNotifications = mockNotifications.map(notification => {
-        const isTarget = workspaceId === undefined
-            || notification.workspaceId === workspaceId;
+        const isTarget = notification.recipientUserId === userId
+            && (workspaceId === undefined || notification.workspaceId === workspaceId);
 
         return isTarget && !notification.read
             ? { ...notification, read: true }
