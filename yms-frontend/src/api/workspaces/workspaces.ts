@@ -39,12 +39,19 @@ let nextWorkspaceId = 3;
  * 실제 연동 시 GET /api/workspaces 요청으로 교체할 Mock 함수입니다.
  * 호출부가 Mock 저장소를 직접 변경하지 못하도록 각 항목을 복사해 반환합니다.
  */
-export async function getWorkspaces(): Promise<WorkspaceListResponse> {
+export async function getWorkspaces(userId?: number): Promise<WorkspaceListResponse> {
     await new Promise(resolve => setTimeout(resolve, 200));
+
+    // 샘플 크리에이터 계정은 Sample Creator Team의 OWNER 경계를 검증하는 전용 계정입니다.
+    const visibleWorkspaces = userId === 24621
+        ? mockWorkspaces
+            .filter(workspace => workspace.workspaceId === 2)
+            .map(workspace => ({ ...workspace, myRole: 'OWNER' as const }))
+        : mockWorkspaces;
 
     return {
         success: true,
-        data: mockWorkspaces.map(workspace => ({ ...workspace }))
+        data: visibleWorkspaces.map(workspace => ({ ...workspace }))
     };
 }
 

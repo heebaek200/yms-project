@@ -1104,6 +1104,8 @@ channelId와 defaultVideoType 변경은 앞으로 생성하는 VideoContent와 Y
 
 상태는 모든 값 사이의 변경을 허용하고 변경 전후 상태, 변경자와 변경 시각을 이력으로 기록합니다. UPLOADED 변경이 YouTube 연결이나 동기화를 실행하지 않으며 보관 Project를 PLANNING / EDITING / REVIEW로 변경하면 보관을 자동 해제합니다.
 
+상세 정보 탭의 인라인 상태 변경은 같은 PATCH API에 `status`만 전달합니다. 서버는 전달되지 않은 기본 정보 필드를 기존 값으로 유지하여 다른 사용자의 제목·일정·Channel 변경을 덮어쓰지 않습니다. 현재 상태와 같은 요청은 새 이력을 만들지 않습니다.
+
 ## 8.5. Project 보관 / 보관 해제
 
 POST /api/projects/{projectId}/archive
@@ -1140,7 +1142,7 @@ DELETE /api/projects/{projectId}
 
 GET /api/projects/{projectId}/members
 
-현재 Project의 활성 참여자를 먼저 반환하고 현재 참여 종료자는 별도 목록으로 구분합니다. 이름, 이메일, 전문 역할, EDIT / VIEW 권한, 참여 상태, 소유자 여부, 현재 Workspace Member 상태(`ACTIVE / LEFT / REMOVED`), 현재 참여·종료 시각을 제공합니다. Project 참여자와 Workspace OWNER / ADMIN이 조회할 수 있습니다. 화면은 현재 참여 종료자라도 Workspace Member가 ACTIVE일 때만 재참여 동작을 제공해야 합니다.
+현재 Project의 활성 참여자를 먼저 반환하고 현재 참여 종료자는 별도 목록으로 구분합니다. 공통 Project 헤더를 구성할 `projectTitle`, `channelName`, `ownerName`, `status`와 함께 이름, 이메일, 전문 역할, EDIT / VIEW 권한, 참여 상태, 소유자 여부, 현재 Workspace Member 상태(`ACTIVE / LEFT / REMOVED`), 현재 참여·종료 시각을 제공합니다. Project 참여자와 Workspace OWNER / ADMIN이 조회할 수 있습니다. 화면은 현재 참여 종료자라도 Workspace Member가 ACTIVE일 때만 재참여 동작을 제공해야 합니다.
 
 Task 담당자 후보를 조회할 때는 `active=true&permissionLevel=EDIT` 조건을 사용합니다. 이 목록은 #18의 Task 생성·수정 화면에서 재사용하며 VIEW와 참여 종료 사용자는 기존 담당 이력에만 표시합니다.
 
@@ -1273,7 +1275,7 @@ Query:
 - page: 기본 0
 - size: 기본 20
 
-기본 정렬은 REVIEW → PROGRESS → WAITING → COMPLETED 순이며 같은 상태에서는 종료일 오름차순, 종료일이 없으면 생성일 내림차순입니다. 일반 작업과 삭제된 작업은 화면에서 각각 독립된 Query와 페이지 상태를 사용합니다.
+`deletedState=ACTIVE`의 기본 정렬은 `createdAt DESC, taskId DESC`입니다. 상태 변경으로 목록 위치가 바뀌지 않게 하여 조작 직후 같은 작업을 계속 추적할 수 있도록 하며, 상태별 우선 확인은 `status` 필터와 대시보드 요약으로 제공합니다. `deletedState=DELETED`는 `deletedAt DESC, taskId DESC`로 정렬합니다. 일반 작업과 삭제된 작업은 화면에서 각각 독립된 Query와 페이지 상태를 사용합니다.
 
 응답에는 현재 상태, 담당 자격 이상 사유, 최근 반려 정보, version과 현재 사용자가 수행할 수 있는 액션을 포함합니다. 전체 변경 이력은 9.7의 별도 API로 조회합니다.
 

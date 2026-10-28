@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 
 import {
     addProjectMembers,
@@ -12,9 +12,8 @@ import {
     type ProjectMemberRequestContext
 } from '../api/projects/projectMembers';
 import FeedbackMessage, { type FeedbackMessageType } from '../components/common/FeedbackMessage';
-import ProjectAreaTabs from '../components/project-groups/ProjectAreaTabs';
 import ProjectGroupModal from '../components/project-groups/ProjectGroupModal';
-import ProjectDetailTabs from '../components/projects/ProjectDetailTabs';
+import ProjectDetailHeader from '../components/projects/ProjectDetailHeader';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { PROFESSIONAL_ROLE_LABELS } from '../professionalRoles';
@@ -28,7 +27,6 @@ import type {
 import './ProjectGroupPage.css';
 import './ProjectsPage.css';
 import './ProjectMembersPage.css';
-import '../components/common/ResourceNavigationLink.css';
 
 type Feedback = { type: FeedbackMessageType; message: string };
 type ConfirmAction = { kind: 'DOWNGRADE' | 'REMOVE'; member: ProjectMemberItem };
@@ -255,22 +253,17 @@ function ProjectMembersPage() {
         else setFeedback({ type: 'error', message: response.message });
     }
 
-    if (loading) return <section className="project-area-page"><ProjectAreaTabs /><p className="project-state">참여자 정보를 불러오는 중...</p></section>;
-    if (!data) return <section className="project-area-page"><ProjectAreaTabs />{feedback && <FeedbackMessage type={feedback.type} message={feedback.message} />}</section>;
+    if (loading) return <section className="project-area-page"><p className="project-state">참여자 정보를 불러오는 중...</p></section>;
+    if (!data) return <section className="project-area-page">{feedback && <FeedbackMessage type={feedback.type} message={feedback.message} />}</section>;
 
     const back = (location.state as { listSearch?: string } | null)?.listSearch;
     const eligibleOwnerCount = data.activeMembers.filter(member => !member.isOwner && member.permission === 'EDIT').length;
     return (
         <section className="project-area-page project-members-page">
-            <ProjectAreaTabs />
-            <div className="project-detail-nav"><Link to={`/projects${back ? `?${back}` : ''}`}>← 프로젝트 목록</Link></div>
-            <header className="project-members-header">
-                <div><p className="project-group-eyebrow">PROJECT MEMBERS</p><h1>{data.projectTitle}</h1><p>참여 권한과 소유권, 참여 이력을 관리합니다.</p></div>
-                {data.canManage && <button className="project-button project-button--primary" disabled={data.archived} title={data.archived ? '보관을 해제한 뒤 참여자를 추가할 수 있습니다.' : undefined} onClick={() => void openAdd()}>참여자 추가</button>}
-            </header>
-            <ProjectDetailTabs projectId={projectId} />
+            <ProjectDetailHeader projectId={projectId} title={data.projectTitle} channelName={data.channelName} ownerName={data.ownerName} status={data.status} listSearch={back} />
             {feedback && <FeedbackMessage type={feedback.type} message={feedback.message} />}
             {data.archived && <FeedbackMessage type="info" message="보관된 프로젝트입니다. 소유권 이전을 제외한 참여자 변경은 보관 해제 후 가능합니다." />}
+            <div className="project-members-toolbar"><div><h2>프로젝트 참여자</h2><p>참여 권한과 소유권, 참여 이력을 관리합니다.</p></div>{data.canManage && <button className="project-button project-button--primary" disabled={data.archived} title={data.archived ? '보관을 해제한 뒤 참여자를 추가할 수 있습니다.' : undefined} onClick={() => void openAdd()}>참여자 추가</button>}</div>
             {data.canManage && eligibleOwnerCount === 0 && <p className="project-members-guide">소유권을 이전하려면 먼저 편집 권한 참여자를 추가하거나 기존 참여자를 편집 권한으로 변경해 주세요.</p>}
 
             <div className="project-member-list">

@@ -62,9 +62,12 @@ function NotificationProvider({ children }: NotificationProviderProps) {
         }
     }, []);
 
-    // 공통 레이아웃이 처음 표시될 때 한 번만 알림을 조회합니다.
+    // 공통 레이아웃 최초 조회와 Mock 작업 변경 이벤트를 같은 새로고침 흐름으로 처리합니다.
     useEffect(() => {
-        refreshNotifications();
+        const handleNotificationsChanged = () => void refreshNotifications();
+        void refreshNotifications();
+        window.addEventListener('yms:notifications-changed', handleNotificationsChanged);
+        return () => window.removeEventListener('yms:notifications-changed', handleNotificationsChanged);
     }, [refreshNotifications]);
 
     /**

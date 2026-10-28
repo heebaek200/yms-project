@@ -55,7 +55,10 @@ function DashboardNotifications({ workspaceId }: DashboardNotificationsProps) {
 
         // 읽음 처리 실패 시 현재 화면과 알림을 유지하여 사용자가 실패를 확인할 수 있게 합니다.
         if (succeeded && notification.projectId !== null) {
-            navigate(`/projects/${notification.projectId}`);
+            const target = notification.notificationType === 'TASK_UPDATE' && notification.taskId
+                ? `/projects/${notification.projectId}/tasks?taskId=${notification.taskId}`
+                : `/projects/${notification.projectId}`;
+            navigate(target);
         }
     };
 

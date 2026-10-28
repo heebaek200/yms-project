@@ -69,7 +69,8 @@ function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         try {
             setIsLoading(true);
 
-            const response = await getWorkspaces();
+            // Mock에서도 로그인 사용자별 실제 멤버십과 제작팀 권한을 구분해 조회합니다.
+            const response = await getWorkspaces(user.userId);
 
             if (requestId !== latestRequestIdRef.current) {
                 return response.data;

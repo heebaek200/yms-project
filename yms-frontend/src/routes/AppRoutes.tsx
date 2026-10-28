@@ -18,6 +18,7 @@ import ComingSoonPage from '../pages/ComingSoonPage';
 import WorkspaceSettingsPage from '../pages/WorkspaceSettingsPage';
 import ProjectsPage from '../pages/ProjectsPage';
 import ProjectMembersPage from '../pages/ProjectMembersPage';
+import ProjectTasksPage from '../pages/ProjectTasksPage';
 import ProjectGroupPage from '../pages/ProjectGroupPage';
 import AppLayout from '../layouts/AppLayout';
 import WorkspaceRouteStatus from '../components/routing/WorkspaceRouteStatus';
@@ -243,6 +244,11 @@ const router = createBrowserRouter(
                 <Route
                     path="/projects/:projectId/videos"
                     element={<ProjectsPage />}
+                />
+
+                <Route
+                    path="/projects/:projectId/tasks"
+                    element={<ProjectTasksPage />}
                 />
 
                 <Route

@@ -6,6 +6,9 @@ import type {
     ApiSuccessResponse
 } from '../types';
 import type { DashboardRequestContext } from './types';
+import { readProjects } from '../projects/projectStore';
+import { readStoredProjectTasks } from '../projects/projectTaskStore';
+import { readWorkspaceMembers } from '../workspaces/members';
 
 // Mock 시나리오 설정
 type MockScenario =
@@ -44,52 +47,37 @@ export type DashboardSummaryFailureResponse = ApiFailureResponse;
 // 최종 응답 타입
 export type DashboardSummaryResponse = ApiResponse<DashboardSummaryData>;
 
-type MockSummaryItem = {
-    workspaceId: number;
-    participantUserIds: number[];
-    progressProjectCount: number;
-    myDueTaskCount: number;
-    reviewTaskCount: number;
-    dueSoonTaskCount: number;
-};
-
-// 프로젝트 참여 범위로 요약값이 달라지는지 검증할 수 있는 Mock 집계 원본입니다.
-const MOCK_SUMMARY_ITEMS: MockSummaryItem[] = [
-    { workspaceId: 1, participantUserIds: [24601, 24604], progressProjectCount: 1, myDueTaskCount: 3, reviewTaskCount: 2, dueSoonTaskCount: 1 },
-    { workspaceId: 1, participantUserIds: [24602], progressProjectCount: 1, myDueTaskCount: 0, reviewTaskCount: 0, dueSoonTaskCount: 1 },
-    { workspaceId: 1, participantUserIds: [24601, 24604], progressProjectCount: 1, myDueTaskCount: 2, reviewTaskCount: 0, dueSoonTaskCount: 1 },
-    { workspaceId: 1, participantUserIds: [24601], progressProjectCount: 1, myDueTaskCount: 2, reviewTaskCount: 0, dueSoonTaskCount: 0 },
-    { workspaceId: 2, participantUserIds: [24601, 24621], progressProjectCount: 1, myDueTaskCount: 1, reviewTaskCount: 0, dueSoonTaskCount: 0 }
-];
-
 /**
- * 제작팀과 인증 사용자의 조회 범위를 먼저 적용한 뒤 Dashboard 요약값을 합산합니다.
- * MEMBER는 참여 프로젝트만 포함하고 OWNER·ADMIN은 제작팀 전체 항목을 포함합니다.
+ * 최신 Project·Task 저장소에 조회 범위를 적용해 Dashboard 요약을 계산합니다.
+ * 삭제 작업과 보관 Project는 모든 카드에서 제외해 목록·일정 집계와 일치시킵니다.
  */
 function createDashboardSummary(
     workspaceId: number,
     context: DashboardRequestContext
 ): DashboardSummaryData {
-    const visibleItems = MOCK_SUMMARY_ITEMS.filter(item => (
-        item.workspaceId === workspaceId
-        && (
-            context.workspaceRole !== 'MEMBER'
-            || item.participantUserIds.includes(context.userId)
-        )
-    ));
+    const visibleProjects = readProjects().filter(project => project.workspaceId === workspaceId
+        && !project.archivedAt
+        && (context.workspaceRole !== 'MEMBER' || project.members.some(member => member.userId === context.userId && member.active))
+    );
+    const visibleProjectIds = new Set(visibleProjects.map(project => project.projectId));
+    const activeTasks = readStoredProjectTasks(workspaceId).filter(task => task.deletedAt === null && visibleProjectIds.has(task.projectId));
+    const userWorkspaceMemberId = readWorkspaceMembers(workspaceId).find(member => member.userId === context.userId && member.status === 'ACTIVE')?.workspaceMemberId;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueSoonLimit = new Date(today);
+    dueSoonLimit.setDate(dueSoonLimit.getDate() + 3);
 
-    // 각 수치는 같은 권한 범위에서 합산하여 카드 사이에 조회 경계 차이가 생기지 않게 합니다.
-    return visibleItems.reduce<DashboardSummaryData>((summary, item) => ({
-        progressProjectCount: summary.progressProjectCount + item.progressProjectCount,
-        myDueTaskCount: summary.myDueTaskCount + item.myDueTaskCount,
-        reviewTaskCount: summary.reviewTaskCount + item.reviewTaskCount,
-        dueSoonTaskCount: summary.dueSoonTaskCount + item.dueSoonTaskCount
-    }), {
-        progressProjectCount: 0,
-        myDueTaskCount: 0,
-        reviewTaskCount: 0,
-        dueSoonTaskCount: 0
-    });
+    // 마감 임박은 완료되지 않았고 오늘부터 사흘 안에 종료되는 작업만 포함합니다.
+    return {
+        progressProjectCount: visibleProjects.filter(project => ['PLANNING', 'EDITING', 'REVIEW'].includes(project.status)).length,
+        myDueTaskCount: activeTasks.filter(task => task.assigneeWorkspaceMemberId === userWorkspaceMemberId && task.status !== 'COMPLETED').length,
+        reviewTaskCount: activeTasks.filter(task => task.status === 'REVIEW').length,
+        dueSoonTaskCount: activeTasks.filter(task => {
+            if (!task.endDate || task.status === 'COMPLETED') return false;
+            const dueDate = new Date(`${task.endDate}T00:00:00`);
+            return dueDate >= today && dueDate <= dueSoonLimit;
+        }).length
+    };
 }
 
 

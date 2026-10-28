@@ -28,6 +28,7 @@ export type NotificationItem = {
     notificationType: NotificationType;
     workspaceId: number | null;
     projectId: number | null;
+    taskId: number | null;
     projectTitle: string | null;
     settlementId: number | null;
     workspaceInvitationId: number | null;
@@ -70,6 +71,7 @@ let mockNotifications: NotificationItem[] = [
         notificationType: 'TASK_UPDATE',
         workspaceId: 1,
         projectId: 12,
+        taskId: 111,
         projectTitle: '8월 여름 휴가 브이로그',
         settlementId: null,
         workspaceInvitationId: null,
@@ -83,6 +85,7 @@ let mockNotifications: NotificationItem[] = [
         notificationType: 'NEW_CHAT',
         workspaceId: 1,
         projectId: 12,
+        taskId: null,
         projectTitle: '8월 여름 휴가 브이로그',
         settlementId: null,
         workspaceInvitationId: null,
@@ -96,6 +99,7 @@ let mockNotifications: NotificationItem[] = [
         notificationType: 'SETTLEMENT_UPDATE',
         workspaceId: 1,
         projectId: null,
+        taskId: null,
         projectTitle: null,
         settlementId: 41,
         workspaceInvitationId: null,
@@ -109,6 +113,7 @@ let mockNotifications: NotificationItem[] = [
         notificationType: 'WORKSPACE_INVITATION',
         workspaceId: null,
         projectId: null,
+        taskId: null,
         projectTitle: null,
         settlementId: null,
         workspaceInvitationId: 71,
@@ -122,6 +127,7 @@ let mockNotifications: NotificationItem[] = [
         notificationType: 'TASK_UPDATE',
         workspaceId: 2,
         projectId: 32,
+        taskId: 202,
         projectTitle: '두 번째 제작팀 마감 작업',
         settlementId: null,
         workspaceInvitationId: null,
@@ -131,6 +137,21 @@ let mockNotifications: NotificationItem[] = [
         read: false
     }
 ];
+
+let nextNotificationId = 506;
+
+/** 작업 변경 알림을 Mock 저장소에 추가하고 전역 Provider가 즉시 다시 조회하도록 알립니다. */
+export function appendTaskNotification(notification: Omit<NotificationItem, 'notificationId' | 'notificationType' | 'read' | 'settlementId' | 'workspaceInvitationId'>) {
+    mockNotifications = [{
+        ...notification,
+        notificationId: nextNotificationId++,
+        notificationType: 'TASK_UPDATE',
+        settlementId: null,
+        workspaceInvitationId: null,
+        read: false
+    }, ...mockNotifications];
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('yms:notifications-changed'));
+}
 
 /**
  * 실제 통신과 비슷한 지연을 만들어 화면의 로딩 상태를 확인합니다.
