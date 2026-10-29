@@ -1613,7 +1613,14 @@ PATCH /api/video-contents/{videoContentId}
 
 첫 요청에서는 `defaultRateChangeConfirmationToken`을 생략합니다. 연결된 논리 삭제되지 않은 활성 Project 중 하나에서 소유자 또는 ACTIVE EDIT인 사용자와 Workspace OWNER·ADMIN이 호출할 수 있습니다. 영상 유형 변경으로 DEFAULT 게시물의 적용 단가가 달라지면 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 일회성 확인 토큰 및 영향 게시물 목록을 반환합니다. OWNER·ADMIN 응답에는 게시물별 Channel, 기존·새 단가와 예상 금액 영향을 포함하고 일반 MEMBER 응답에는 게시물·Channel과 `rateWillChange=true`만 포함하며 모든 단가·예상 금액 필드를 제거합니다.
 
-확인 토큰은 불투명한 짧은 유효기간의 단일 사용 값이며 요청자, Workspace, VideoContent, 요청한 제목·영상 유형, VideoContent version, 영향받는 YouTubePublication의 ID·version·수익 방식·적용 단가와 만료 시각에 결합합니다. 토큰을 제출한 요청은 VideoContent와 영향받는 YouTubePublication을 잠근 뒤 영향을 다시 계산합니다. 토큰이 만료되었거나 최신 version·Channel 단가·영향 범위가 달라졌으면 저장하지 않고 같은 409와 최신 영향에 대한 새 토큰을 반환하여 다시 확인받습니다.
+확인 토큰은 불투명한 짧은 유효기간의 단일 사용 값이며 요청자, Workspace, VideoContent, 요청한 제목·영상 유형, VideoContent version, 영향받는 YouTubePublication의 ID·version·수익 방식·적용 단가와 만료 시각에 결합합니다. 토큰을 제출한 요청은 VideoContent와 영향받는 YouTubePublication을 잠근 뒤 다음 순서로 검증합니다.
+
+1. 요청의 `expectedVersion`과 토큰에 결합된 영향 YouTubePublication version을 현재 값과 비교합니다.
+2. VideoContent version이 다르면 `409 VIDEO_CONTENT_VERSION_CONFLICT`, 영향 Publication version이 하나라도 다르면 `409 YOUTUBE_PUBLICATION_VERSION_CONFLICT`를 반환합니다. 두 경우 모두 새 확인 토큰을 발급하지 않습니다.
+3. version이 모두 유효할 때만 토큰 만료 여부와 최신 Channel 기본 단가·영향 범위를 다시 계산합니다.
+4. 토큰이 만료되었거나 단가·영향 범위가 달라졌으면 저장하지 않고 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 최신 영향에 대한 새 토큰을 반환합니다.
+
+version 충돌 응답을 받은 클라이언트는 기존 토큰과 오래된 `expectedVersion`을 폐기하고 최신 VideoContent 상세를 다시 조회해야 합니다. 최신 version만 요청에 대입하여 자동 재시도해서는 안 되며 사용자가 최신 상태에서 변경과 영향을 다시 확인하게 합니다.
 
 검증이 끝나면 제목·유형·DEFAULT 단가 스냅샷을 한 트랜잭션으로 변경합니다. VideoContent version과 실제 적용 단가가 달라진 각 YouTubePublication version을 증가시키고 CUSTOM·DISABLED 또는 계산 결과가 같은 게시물 version은 유지합니다. 한 건이라도 충돌하거나 검증에 실패하면 전체 변경을 롤백합니다.
 
@@ -1688,7 +1695,9 @@ PATCH /api/youtube-publications/{publicationId}
 
 대상 Channel에 다른 CURRENT가 있으면 그 ID와 version으로 명시적 대체 의사를 전달합니다. 첫 요청에서는 `defaultRateChangeConfirmationToken`을 생략합니다. DEFAULT 단가가 달라지면 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 최신 영향에 결합된 일회성 토큰을 반환하며 OWNER·ADMIN에게만 기존·새 단가와 예상 금액 영향을 포함합니다. 일반 MEMBER에게는 이동·대체 대상, Channel과 단가 변경 사실만 반환합니다.
 
-토큰을 제출한 요청은 이동·대체 대상 게시물을 잠근 뒤 최신 상태, version, 대상 Channel과 적용 단가 영향을 다시 검증합니다. 토큰 발급 당시와 다르면 저장하지 않고 최신 영향과 새 토큰으로 다시 확인받습니다. 검증이 끝나면 Channel 변경, 기존 CURRENT의 SUPERSEDED 전환, 대체 관계·이력 및 DEFAULT 단가를 한 트랜잭션으로 반영하고 실제로 변경된 각 게시물 version을 증가시킵니다. 실제 게시 일시만 바꾸면 대체·단가 확인은 필요하지 않습니다.
+토큰을 제출한 요청은 이동·대체 대상 게시물을 잠근 뒤 `expectedVersion`, `replaceCurrentPublicationVersion`과 토큰에 결합된 영향 Publication version을 먼저 검증합니다. 하나라도 다르면 `409 YOUTUBE_PUBLICATION_VERSION_CONFLICT`를 반환하고 새 토큰을 발급하지 않습니다. 클라이언트는 기존 토큰과 오래된 version을 폐기하고 최신 게시물 상세를 다시 조회합니다.
+
+모든 version이 유효할 때만 토큰 만료 여부, 최신 상태, 대상 Channel과 적용 단가 영향을 다시 검증합니다. 토큰이 만료되었거나 Channel 기본 단가·영향 범위가 달라졌으면 저장하지 않고 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 최신 영향 및 새 토큰으로 다시 확인받습니다. 검증이 끝나면 Channel 변경, 기존 CURRENT의 SUPERSEDED 전환, 대체 관계·이력 및 DEFAULT 단가를 한 트랜잭션으로 반영하고 실제로 변경된 각 게시물 version을 증가시킵니다. 실제 게시 일시만 바꾸면 대체·단가 확인은 필요하지 않습니다.
 
 ### 11.4.1. 게시물 생명주기 변경
 
@@ -1788,9 +1797,9 @@ GET /api/video-contents/{videoContentId}/performance-summary
 | INVALID_REMOVAL_REASON | 400 | REMOVED 상태의 종료 사유 누락 또는 허용되지 않은 값 |
 | PRIMARY_PROJECT_REASSIGNMENT_REQUIRED | 409 | Project 삭제 전 다른 활성 연결 Project로 대표 변경 필요 |
 | CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED | 409 | 대표 또는 ProjectGroup 변경으로 콘텐츠 성과 귀속 이동 확인 필요 |
-| DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED | 409 | Channel·영상 유형 변경에 따른 DEFAULT 단가 영향 확인 또는 만료·불일치한 확인 토큰의 재확인 필요 |
-| VIDEO_CONTENT_VERSION_CONFLICT | 409 | 오래된 VideoContent version으로 변경 시도 |
-| YOUTUBE_PUBLICATION_VERSION_CONFLICT | 409 | 오래된 YouTubePublication version으로 변경 시도 |
+| DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED | 409 | version은 유효하지만 Channel·영상 유형 변경에 따른 DEFAULT 단가 영향 확인 또는 만료·불일치한 확인 토큰의 재확인 필요 |
+| VIDEO_CONTENT_VERSION_CONFLICT | 409 | 오래된 VideoContent version으로 변경 시도. 단가 확인 토큰 재발급 없이 최신 상세 재조회 필요 |
+| YOUTUBE_PUBLICATION_VERSION_CONFLICT | 409 | 오래된 YouTubePublication version으로 변경 시도. 단가 확인 토큰 재발급 없이 최신 상세 재조회 필요 |
 | ARCHIVED_PROJECT_VIDEO_CONTENT_CHANGE_FORBIDDEN | 409 | 보관 Project 연결·해제·대표 변경 시도 |
 | CUSTOM_REVENUE_RATE_REQUIRED | 400 | CUSTOM인데 단가 누락 |
 | YOUTUBE_API_UNAVAILABLE | 503 | 외부 API 일시 장애 |
