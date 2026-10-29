@@ -395,6 +395,7 @@ Workspace에서 관리하는 YouTube 채널입니다.
 | primary_project_id | BIGINT | FK → video_projects | 콘텐츠 성과 집계 기준 대표 Project |
 | title | VARCHAR(150) | NOT NULL | 영상 결과물 제목 |
 | video_type | VARCHAR(20) | NOT NULL | LONG / SHORTS |
+| version | BIGINT | NOT NULL, DEFAULT 0 | 낙관적 잠금 버전 |
 | created_at | DATETIME | NOT NULL | 생성 시각 |
 | deleted_at | DATETIME | NULL | 논리 삭제 시각 |
 
@@ -404,6 +405,8 @@ Workspace에서 관리하는 YouTube 채널입니다.
 - `primary_project_id`는 `project_video_contents`에 연결된 Project 중 하나여야 하며 같은 Workspace에 속해야 합니다.
 - 연결된 모든 Project 상세에서 결과물과 공개 성과를 조회할 수 있지만 Project 및 ProjectGroup 집계에는 대표 Project만 사용합니다.
 - 대표를 같은 ProjectGroup 안에서 변경하거나 양쪽 모두 그룹이 없으면 현재·새 Project를 모두 관리할 수 있는 프로젝트 소유자, EDIT 참여자와 Workspace 관리자가 변경할 수 있습니다. ProjectGroup 경계가 달라지는 변경은 OWNER와 ADMIN만 수행합니다.
+- 연결된 활성 Project 중 하나의 소유자 또는 ACTIVE EDIT 참여자와 Workspace OWNER·ADMIN은 공유 VideoContent의 제목과 영상 유형을 수정할 수 있습니다.
+- 제목·유형·Project 연결·대표 변경은 최신 `version`을 검증한 뒤 성공 시 증가시킵니다. 하위 YouTubePublication 변경이나 파생 성과 재계산은 이 version을 증가시키지 않습니다.
 - Project 삭제 시 연결과 결과물 이력은 보존하되 삭제 Project를 집계 대상으로 사용하지 않습니다. 다른 활성 연결 Project가 있으면 사용자가 새 대표를 지정한 뒤 삭제하고, 없으면 기존 `primary_project_id`를 역사적 대표로 유지한 채 활성 집계에서 제외합니다.
 
 ## 6.4. project_video_contents
@@ -421,6 +424,7 @@ Project와 VideoContent의 다대다 관계를 관리합니다.
 - 복합 PK `PRIMARY KEY(project_id, video_content_id)`로 중복 연결을 차단합니다.
 - 하나의 Project는 0개 이상의 VideoContent와 연결할 수 있고 하나의 VideoContent는 1개 이상의 Project와 연결할 수 있습니다.
 - 양쪽 데이터는 반드시 같은 Workspace에 속해야 하며 서비스 계층에서 검증합니다.
+- 새 연결은 요청자가 기존 VideoContent를 관리할 수 있고 연결 대상의 논리 삭제되지 않은 활성 Project에서도 소유자 또는 ACTIVE EDIT이거나 Workspace OWNER·ADMIN일 때만 허용합니다. 보관 Project는 복원 전까지 신규 연결·해제·대표 변경 대상에서 제외합니다.
 - VideoContent의 마지막 Project 연결은 해제할 수 없습니다. Project 논리 삭제는 연결 행을 제거하지 않으므로 별도로 허용합니다.
 
 ## 6.5. video_content_primary_project_histories
@@ -435,6 +439,7 @@ VideoContent의 대표 Project와 ProjectGroup별 성과 귀속이 변경된 사
 | to_project_id | BIGINT | FK → video_projects | 새 대표 Project |
 | from_project_group_id | BIGINT | NULL | 변경 당시 이전 ProjectGroup ID 스냅샷 |
 | to_project_group_id | BIGINT | NULL | 변경 당시 새 ProjectGroup ID 스냅샷 |
+| change_reason_type | VARCHAR(40) | NULL | 사용자 대표 변경 사유: MERGED / CONNECTION_CORRECTION / PERFORMANCE_ATTRIBUTION / OTHER, 최초·시스템 이력은 NULL |
 | change_reason | VARCHAR(255) | NULL | 변경 사유 |
 | changed_by_member_id | BIGINT | FK → workspace_members | 변경 사용자 |
 | changed_at | DATETIME | NOT NULL | 변경 시각 |
@@ -567,7 +572,7 @@ Project 안에서 실제 수행하는 세부 작업입니다.
 | worker_amount | DECIMAL(15,2) | NOT NULL | 작업자 지급 예정 금액 |
 | status | VARCHAR(20) | NOT NULL | WAITING / PROGRESS / REVIEW / COMPLETED |
 | completed_at | DATETIME | NULL | 완료 시각 |
-| version | BIGINT | NOT NULL | 낙관적 잠금 버전 |
+| version | BIGINT | NOT NULL, DEFAULT 0 | 낙관적 잠금 버전 |
 | created_by_member_id | BIGINT | FK → workspace_members | 생성 사용자 |
 | created_at | DATETIME | NOT NULL | 생성 시각 |
 | updated_by_member_id | BIGINT | FK → workspace_members, NULL | 최종 수정 사용자 |
@@ -832,6 +837,7 @@ VideoContent가 YouTube에 실제로 게시된 개별 이력을 관리합니다.
 | revenue_option | VARCHAR(20) | NOT NULL | DEFAULT / CUSTOM / DISABLED |
 | applied_revenue_per_view | DECIMAL(12,6) | NOT NULL | 게시물별 조회수 1회당 적용 단가 스냅샷 |
 | published_at | DATETIME | NULL | 실제 게시 일시 |
+| version | BIGINT | NOT NULL | 낙관적 잠금 버전 |
 | created_at | DATETIME | NOT NULL | 등록 시각 |
 
 정책:
@@ -845,6 +851,9 @@ VideoContent가 YouTube에 실제로 게시된 개별 이력을 관리합니다.
 - REMOVED는 `removal_reason`이 필수이며 UNAVAILABLE은 누적 집계에 포함하고 INCORRECT는 모든 집계에서 제외합니다. CURRENT와 SUPERSEDED의 `removal_reason`은 NULL입니다.
 - SUPERSEDED와 REMOVED는 명시적 복원으로 CURRENT가 될 수 있습니다. 다른 CURRENT가 있으면 교체 확인 후 상태, 대체 관계와 이력을 한 트랜잭션에서 갱신합니다.
 - `DEFAULT`는 게시 Channel과 VideoContent 영상 유형에 맞는 Channel 기본 단가를 스냅샷하고, `DISABLED`는 적용 단가를 0으로 저장합니다.
+- 일반 정보 수정은 CURRENT 게시물의 `channel_id`와 모든 상태의 `published_at`만 허용하고 `youtube_video_id`는 변경하지 않습니다. 대상 Channel에 다른 CURRENT가 있으면 명시적 대체 확인과 관련 행 잠금 후 한 트랜잭션으로 처리합니다.
+- CURRENT, SUPERSEDED와 REMOVED/UNAVAILABLE은 OWNER·ADMIN이 수익 설정을 바꿀 수 있고 REMOVED/INCORRECT는 설정 대상에서 제외합니다.
+- 일반 정보·생명주기·수익 설정은 최신 `version`을 검증하고 성공 시 증가시킵니다. 여러 게시물의 상태를 함께 바꾸는 대체·복원은 영향받는 각 게시물의 최신 version과 상태를 잠금 후 재검증합니다.
 - 실제 게시물 삭제나 공개 범위 변경과 YMS 내부 행의 물리 삭제를 동일하게 취급하지 않습니다. 외부 API 오류나 영상 없음 응답만으로 생명주기 상태를 자동 변경하지 않고 마지막 성공값을 유지합니다.
 
 ## 11.2. youtube_publication_status_histories
@@ -1176,6 +1185,7 @@ erDiagram
         bigint primary_project_id FK
         varchar title
         varchar video_type
+        bigint version
         datetime created_at
         datetime deleted_at
     }
@@ -1184,6 +1194,19 @@ erDiagram
         bigint project_id PK,FK
         bigint video_content_id PK,FK
         datetime linked_at
+    }
+
+    VIDEO_CONTENT_PRIMARY_PROJECT_HISTORIES {
+        bigint primary_project_history_id PK
+        bigint video_content_id FK
+        bigint from_project_id FK
+        bigint to_project_id FK
+        bigint from_project_group_id
+        bigint to_project_group_id
+        varchar change_reason_type
+        varchar change_reason
+        bigint changed_by_member_id FK
+        datetime changed_at
     }
 
     VIDEO_CONTENT_PRIMARY_PROJECT_HISTORIES {
@@ -1501,6 +1524,7 @@ erDiagram
         varchar revenue_option
         decimal applied_revenue_per_view
         datetime published_at
+        bigint version
     }
 
     YOUTUBE_PUBLICATION_STATUS_HISTORIES {
@@ -1530,6 +1554,7 @@ erDiagram
     VIDEO_PROJECTS ||--o{ PROJECT_VIDEO_CONTENTS : contributes
     VIDEO_CONTENTS ||--|{ PROJECT_VIDEO_CONTENTS : built_from
     VIDEO_PROJECTS ||--o{ VIDEO_CONTENTS : primarily_attributes
+    VIDEO_CONTENTS ||--o{ VIDEO_CONTENT_PRIMARY_PROJECT_HISTORIES : records_primary_changes
     VIDEO_CONTENTS ||--o{ YOUTUBE_PUBLICATIONS : published_as
     CHANNELS ||--o{ YOUTUBE_PUBLICATIONS : publishes
     YOUTUBE_PUBLICATIONS ||--o{ YOUTUBE_PUBLICATION_STATUS_HISTORIES : records_status_changes
