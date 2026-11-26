@@ -28,6 +28,7 @@ import {
     unlinkVideoContentFromProject
 } from './projectStore';
 import { toProjectDetailResponse } from './projectResponses';
+import { canViewProject } from './projects';
 
 export type YouTubeContext = { userId: number; userName: string; workspaceRole: WorkspaceRole };
 export type InitialPublicationRequest = {
@@ -149,7 +150,7 @@ function duplicateVideoLocation(workspaceId: number, content: VideoContent, publ
     const accessibleProjects = content.connectedProjectIds
         .map(projectId => readProject(workspaceId, projectId))
         .filter((project): project is ProjectDetail => Boolean(project))
-        .filter(project => context.workspaceRole !== 'MEMBER' || project.members.some(member => member.userId === context.userId && member.active));
+        .filter(project => canViewProject(project, context));
     const project = accessibleProjects.find(item => item.projectId === content.primaryProjectId) ?? accessibleProjects[0];
     if (!project) return { canAccess: false };
     return {
@@ -162,15 +163,28 @@ function duplicateVideoLocation(workspaceId: number, content: VideoContent, publ
     };
 }
 
-/** 연결된 활성 Project 중 하나의 권한으로 공유 결과물을 관리할 수 있는지 확인합니다. */
-function findManageableContent(workspaceId: number, projectId: number, videoContentId: number, context: YouTubeContext) {
+/** 조회 권한이 있는 기준 프로젝트에 연결된 콘텐츠만 반환합니다. */
+function findReadableContent(workspaceId: number, projectId: number, videoContentId: number, context: YouTubeContext) {
     const anchorProject = readProject(workspaceId, projectId);
-    const content = anchorProject?.videoContents.find(item => item.videoContentId === videoContentId) ?? null;
-    if (!anchorProject || !content) return null;
-    const manageableProject = content.connectedProjectIds
+    if (!anchorProject || !canViewProject(anchorProject, context)) return null;
+    const content = anchorProject.videoContents.find(item => item.videoContentId === videoContentId);
+    return content ? { project: anchorProject, content } : null;
+}
+
+/** 연결된 활성 Project 중 하나의 권한으로 공유 콘텐츠를 관리할 수 있는지 확인합니다. */
+function findManageableContent(workspaceId: number, projectId: number, videoContentId: number, context: YouTubeContext) {
+    const target = findReadableContent(workspaceId, projectId, videoContentId, context);
+    if (!target) return null;
+    const manageableProject = target.content.connectedProjectIds
         .map(connectedId => readProject(workspaceId, connectedId))
         .find(project => project && project.archivedAt === null && canManageProject(project, context));
-    return manageableProject ? { project: anchorProject, content } : null;
+    return manageableProject ? target : null;
+}
+
+/** 보관 프로젝트를 기준으로 공유 콘텐츠를 변경할 수 있는 경로를 차단합니다. */
+function findWritableContent(workspaceId: number, projectId: number, videoContentId: number, context: YouTubeContext) {
+    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    return target?.project.archivedAt === null ? target : null;
 }
 
 /** 현재 또는 누적 기준에 포함되는 게시물의 마지막 성공 성과를 합산합니다. */
@@ -204,7 +218,9 @@ function recalculateContent(content: VideoContent): VideoContent {
 
 /** 결과물과 게시물 변경 성공 응답을 현재 Project 상세로 만듭니다. */
 function successDetail(workspaceId: number, projectId: number, context: YouTubeContext, message: string): MutationResponse {
-    return { success: true, message, data: toProjectDetailResponse(readProject(workspaceId, projectId) as ProjectDetail, context.workspaceRole) };
+    const project = readProject(workspaceId, projectId);
+    if (!project || !canViewProject(project, context)) return { success: false, errorCode: 'PROJECT_NOT_FOUND', message: '현재 제작팀에서 확인할 수 있는 프로젝트가 없습니다.', errors: null };
+    return { success: true, message, data: toProjectDetailResponse(project, context.workspaceRole) };
 }
 
 /** 변경된 DEFAULT 단가의 권한별 확인 응답을 구성합니다. */
@@ -327,7 +343,7 @@ function videoTypeRateImpacts(workspaceId: number, content: VideoContent, videoT
 export async function createProjectVideoContent(workspaceId: number, projectId: number, request: CreateVideoContentRequest, context: YouTubeContext): Promise<MutationResponse> {
     await new Promise(resolve => setTimeout(resolve, 200));
     const project = readProject(workspaceId, projectId);
-    if (!project || project.archivedAt || !canManageProject(project, context)) return { success: false, errorCode: 'VIDEO_CONTENT_FORBIDDEN', message: '콘텐츠를 추가할 권한이 없습니다.', errors: null };
+    if (!project || project.archivedAt || !canViewProject(project, context) || !canManageProject(project, context)) return { success: false, errorCode: 'VIDEO_CONTENT_FORBIDDEN', message: '콘텐츠를 추가할 권한이 없습니다.', errors: null };
     const title = request.title.trim();
     if (!title || title.length > 150) return { success: false, errorCode: 'INVALID_INPUT_VALUE', message: '콘텐츠 제목은 1자 이상 150자 이하로 입력해 주세요.', errors: [{ field: 'title', value: request.title, reason: '콘텐츠 제목은 1자 이상 150자 이하로 입력해 주세요.' }] };
     if (request.videoType !== 'LONG' && request.videoType !== 'SHORTS') return { success: false, errorCode: 'INVALID_INPUT_VALUE', message: '콘텐츠 유형을 선택해 주세요.', errors: [{ field: 'videoType', value: request.videoType, reason: 'LONG 또는 SHORTS' }] };
@@ -385,12 +401,15 @@ export async function createProjectVideoContent(workspaceId: number, projectId: 
 /** 제목·영상 유형과 DEFAULT 단가 스냅샷을 낙관적 잠금으로 함께 변경합니다. */
 export async function updateVideoContent(workspaceId: number, projectId: number, videoContentId: number, request: UpdateVideoContentRequest, context: YouTubeContext): Promise<MutationResponse> {
     await new Promise(resolve => setTimeout(resolve, 200));
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, projectId, videoContentId, context);
     if (!target) return { success: false, errorCode: 'VIDEO_CONTENT_FORBIDDEN', message: '콘텐츠를 수정할 권한이 없습니다.', errors: null };
     if (request.expectedVersion !== target.content.version) return { success: false, errorCode: 'VIDEO_CONTENT_VERSION_CONFLICT', message: '다른 사용자가 콘텐츠를 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null };
     const title = request.title.trim();
     if (!title || title.length > 150) return { success: false, errorCode: 'INVALID_INPUT_VALUE', message: '콘텐츠 제목은 1자 이상 150자 이하로 입력해 주세요.', errors: [{ field: 'title', value: request.title, reason: '콘텐츠 제목은 1자 이상 150자 이하로 입력해 주세요.' }] };
-    const impacts = videoTypeRateImpacts(workspaceId, target.content, request.videoType);
+    if (request.videoType !== 'LONG' && request.videoType !== 'SHORTS') return { success: false, errorCode: 'INVALID_INPUT_VALUE', message: '콘텐츠 유형을 선택해 주세요.', errors: null };
+    const impacts = request.videoType === target.content.videoType
+        ? []
+        : videoTypeRateImpacts(workspaceId, target.content, request.videoType);
     if (impacts.length > 0) {
         const checked = validateConfirmation(request.defaultRateChangeConfirmationToken, 'VIDEO_TYPE', workspaceId, videoContentId, null, JSON.stringify({ title, videoType: request.videoType }), impacts, target.content, context);
         if (!checked.valid) return checked.response;
@@ -409,7 +428,7 @@ export async function updateVideoContent(workspaceId: number, projectId: number,
 /** 게시·공유 이력이 없는 결과물만 최신 version을 확인한 뒤 완전히 삭제합니다. */
 export async function deleteProjectVideoContent(workspaceId: number, projectId: number, videoContentId: number, expectedVersion: number, context: YouTubeContext): Promise<MutationResponse> {
     await new Promise(resolve => setTimeout(resolve, 200));
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, projectId, videoContentId, context);
     if (!target) return { success: false, errorCode: 'VIDEO_CONTENT_FORBIDDEN', message: '콘텐츠를 삭제할 권한이 없습니다.', errors: null };
     if (expectedVersion !== target.content.version) return { success: false, errorCode: 'VIDEO_CONTENT_VERSION_CONFLICT', message: '다른 사용자가 콘텐츠를 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null };
     if (target.content.publications.length > 0) return { success: false, errorCode: 'VIDEO_CONTENT_HAS_PUBLICATIONS', message: 'YouTube 동영상이 연결된 콘텐츠는 삭제할 수 없습니다. 동영상 이력을 보존해 주세요.', errors: null };
@@ -419,24 +438,50 @@ export async function deleteProjectVideoContent(workspaceId: number, projectId: 
 }
 
 /** 연결 현황과 현재 사용자가 연결할 수 있는 Project 후보를 반환합니다. */
-export async function getVideoContentProjectCandidates(workspaceId: number, projectId: number, videoContentId: number, keyword: string, context: YouTubeContext): Promise<ApiResponse<VideoContentProjectCandidate[]>> {
+export async function getVideoContentProjectCandidates(
+    workspaceId: number,
+    projectId: number,
+    videoContentId: number,
+    { keyword = '', page = 1, size = 20 }: { keyword?: string; page?: number; size?: number },
+    context: YouTubeContext
+): Promise<ApiResponse<{
+    connectedProjects: VideoContentProjectCandidate[];
+    items: VideoContentProjectCandidate[];
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+}>> {
     await new Promise(resolve => setTimeout(resolve, 120));
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const readable = findReadableContent(workspaceId, projectId, videoContentId, context);
+    const target = readable?.project.archivedAt ? readable : findManageableContent(workspaceId, projectId, videoContentId, context);
     if (!target) return { success: false, errorCode: 'VIDEO_CONTENT_FORBIDDEN', message: '연결을 관리할 권한이 없습니다.', errors: null };
     const normalizedKeyword = keyword.trim().toLowerCase();
-    const items = readProjects().filter(project => project.workspaceId === workspaceId).flatMap(project => {
+    const connectedProjects: VideoContentProjectCandidate[] = [];
+    const candidates: VideoContentProjectCandidate[] = [];
+    for (const project of readProjects()) {
+        if (project.workspaceId !== workspaceId || !canViewProject(project, context)) continue;
         const connected = target.content.connectedProjectIds.includes(project.projectId);
-        const manageable = project.archivedAt === null && canManageProject(project, context);
-        if (normalizedKeyword && !project.title.toLowerCase().includes(normalizedKeyword)) return [];
-        if (!connected && !manageable) return [];
-        return [{ projectId: project.projectId, title: project.title, projectGroupId: project.projectGroupId, projectGroupName: project.projectGroupName, archived: project.archivedAt !== null, connected, primary: target.content.primaryProjectId === project.projectId, canManage: manageable }];
-    });
-    return { success: true, data: items };
+        const canManage = target.project.archivedAt === null && project.archivedAt === null && canManageProject(project, context);
+        const item = {
+            projectId: project.projectId, title: project.title, projectGroupId: project.projectGroupId,
+            projectGroupName: project.projectGroupName, archived: project.archivedAt !== null, connected,
+            primary: target.content.primaryProjectId === project.projectId, canManage
+        };
+        if (connected) connectedProjects.push(item);
+        else if (canManage && project.title.toLowerCase().includes(normalizedKeyword)) candidates.push(item);
+    }
+    const pageSize = Number.isInteger(size) && size > 0 ? Math.min(size, 100) : 20;
+    const totalCount = candidates.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const currentPage = Number.isInteger(page) ? Math.min(Math.max(1, page), totalPages) : 1;
+    const start = (currentPage - 1) * pageSize;
+    return { success: true, data: { connectedProjects, items: candidates.slice(start, start + pageSize), page: currentPage, pageSize, totalCount, totalPages } };
 }
 
 /** 관리 가능한 활성 Project를 공유 VideoContent에 연결합니다. */
 export async function connectVideoContentProject(workspaceId: number, anchorProjectId: number, videoContentId: number, targetProjectId: number, expectedVersion: number, context: YouTubeContext): Promise<MutationResponse> {
-    const target = findManageableContent(workspaceId, anchorProjectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, anchorProjectId, videoContentId, context);
     const project = readProject(workspaceId, targetProjectId);
     if (!target || !project || project.archivedAt || !canManageProject(project, context)) return { success: false, errorCode: 'VIDEO_CONTENT_PROJECT_FORBIDDEN', message: '연결할 수 있는 활성 프로젝트를 선택해 주세요.', errors: null };
     if (expectedVersion !== target.content.version) return { success: false, errorCode: 'VIDEO_CONTENT_VERSION_CONFLICT', message: '다른 사용자가 콘텐츠를 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null };
@@ -449,10 +494,11 @@ export async function connectVideoContentProject(workspaceId: number, anchorProj
 
 /** 대표·마지막 연결을 보호하면서 Project 연결을 해제합니다. */
 export async function disconnectVideoContentProject(workspaceId: number, anchorProjectId: number, videoContentId: number, targetProjectId: number, expectedVersion: number, context: YouTubeContext): Promise<MutationResponse> {
-    const target = findManageableContent(workspaceId, anchorProjectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, anchorProjectId, videoContentId, context);
     const project = readProject(workspaceId, targetProjectId);
     if (!target || !project || project.archivedAt || !canManageProject(project, context)) return { success: false, errorCode: 'ARCHIVED_PROJECT_VIDEO_CONTENT_CHANGE_FORBIDDEN', message: '보관 프로젝트는 복원한 뒤 연결을 해제할 수 있습니다.', errors: null };
     if (expectedVersion !== target.content.version) return { success: false, errorCode: 'VIDEO_CONTENT_VERSION_CONFLICT', message: '다른 사용자가 콘텐츠를 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null };
+    if (!target.content.connectedProjectIds.includes(targetProjectId)) return { success: false, errorCode: 'PROJECT_NOT_LINKED_TO_VIDEO_CONTENT', message: '연결된 프로젝트만 해제할 수 있습니다.', errors: null };
     if (target.content.primaryProjectId === targetProjectId) return { success: false, errorCode: 'PRIMARY_PROJECT_UNLINK_FORBIDDEN', message: '성과 집계 프로젝트는 다른 프로젝트로 변경한 뒤 연결을 해제할 수 있습니다.', errors: null };
     if (target.content.connectedProjectIds.length <= 1) return { success: false, errorCode: 'LAST_VIDEO_CONTENT_PROJECT', message: '마지막 프로젝트 연결은 해제할 수 없습니다.', errors: null };
     const next = { ...target.content, connectedProjectIds: target.content.connectedProjectIds.filter(id => id !== targetProjectId), version: target.content.version + 1 };
@@ -464,7 +510,7 @@ export async function disconnectVideoContentProject(workspaceId: number, anchorP
 /** 연결된 Project 사이에서 권한·그룹 경계·사유를 검증해 콘텐츠 성과 집계 대상을 변경합니다. */
 export async function changeVideoContentPrimaryProject(workspaceId: number, projectId: number, videoContentId: number, request: ChangePrimaryProjectRequest, context: YouTubeContext): Promise<MutationResponse> {
     await new Promise(resolve => setTimeout(resolve, 180));
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, projectId, videoContentId, context);
     const oldPrimary = target ? readProject(workspaceId, target.content.primaryProjectId) : null;
     const newPrimary = target ? readProject(workspaceId, request.newPrimaryProjectId) : null;
     if (!target || !oldPrimary || !newPrimary || newPrimary.archivedAt || !target.content.connectedProjectIds.includes(request.newPrimaryProjectId)) return { success: false, errorCode: 'PROJECT_NOT_LINKED_TO_VIDEO_CONTENT', message: '연결된 활성 프로젝트만 성과 집계 대상으로 지정할 수 있습니다.', errors: null };
@@ -484,7 +530,7 @@ export async function changeVideoContentPrimaryProject(workspaceId: number, proj
 /** 동일 Workspace 중복과 Channel별 단일 CURRENT 규칙을 확인해 게시 이력을 추가합니다. */
 export async function createYouTubePublication(workspaceId: number, projectId: number, videoContentId: number, request: CreatePublicationRequest, context: YouTubeContext): Promise<MutationResponse> {
     await new Promise(resolve => setTimeout(resolve, 200));
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, projectId, videoContentId, context);
     const videoId = normalizeVideoId(request.youtubeVideo);
     const primaryProject = target ? readProject(workspaceId, target.content.primaryProjectId) : null;
     const channelId = request.channelId ?? primaryProject?.channelId ?? 0;
@@ -522,7 +568,7 @@ export async function createYouTubePublication(workspaceId: number, projectId: n
 /** 실제 게시 Channel·일시와 DEFAULT 단가 영향을 원자적으로 변경합니다. */
 export async function updateYouTubePublication(workspaceId: number, projectId: number, videoContentId: number, publicationId: number, request: UpdatePublicationRequest, context: YouTubeContext): Promise<MutationResponse> {
     await new Promise(resolve => setTimeout(resolve, 180));
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, projectId, videoContentId, context);
     const publication = target?.content.publications.find(item => item.publicationId === publicationId);
     const channel = findWorkspaceChannel(workspaceId, request.channelId);
     if (!target || !publication) return { success: false, errorCode: 'PUBLICATION_NOT_FOUND', message: 'YouTube 동영상을 찾을 수 없습니다.', errors: null };
@@ -532,6 +578,7 @@ export async function updateYouTubePublication(workspaceId: number, projectId: n
     const channelChanged = publication.channelId !== request.channelId;
     if (channelChanged && publication.lifecycleStatus !== 'CURRENT') return { success: false, errorCode: 'PUBLICATION_NOT_CURRENT', message: '게시 중인 동영상만 Channel을 변경할 수 있습니다.', errors: null };
     const replaced = channelChanged ? target.content.publications.find(item => item.publicationId !== publicationId && item.channelId === request.channelId && item.lifecycleStatus === 'CURRENT') : undefined;
+    if (request.replaceCurrentPublicationId != null && request.replaceCurrentPublicationId !== replaced?.publicationId) return { success: false, errorCode: 'YOUTUBE_PUBLICATION_VERSION_CONFLICT', message: '대체 대상 동영상이 변경되었습니다. 최신 내용을 다시 확인해 주세요.', errors: null };
     if (replaced && request.replaceCurrentPublicationId !== replaced.publicationId) return { success: false, errorCode: 'CURRENT_PUBLICATION_EXISTS', message: `${channel.name}의 게시 중 영상을 대체할지 확인해 주세요.`, errors: null };
     if (replaced && request.replaceCurrentPublicationVersion !== replaced.version) return { success: false, errorCode: 'YOUTUBE_PUBLICATION_VERSION_CONFLICT', message: '다른 사용자가 대체할 동영상을 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null };
     const nextRate = publication.revenueOption === 'DEFAULT' && channelChanged ? defaultRate(workspaceId, request.channelId, target.content.videoType) ?? '0' : publication.appliedRate;
@@ -553,7 +600,7 @@ export async function updateYouTubePublication(workspaceId: number, projectId: n
 
 /** OWNER·ADMIN이 게시물의 예상 수익 방식을 명시적으로 변경합니다. */
 export async function updateYouTubePublicationRevenue(workspaceId: number, projectId: number, videoContentId: number, publicationId: number, request: UpdatePublicationRevenueRequest, context: YouTubeContext): Promise<MutationResponse> {
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, projectId, videoContentId, context);
     const publication = target?.content.publications.find(item => item.publicationId === publicationId);
     if (context.workspaceRole === 'MEMBER') return { success: false, errorCode: 'PUBLICATION_REVENUE_FORBIDDEN', message: '예상 수익 설정은 제작팀 소유자 또는 관리자만 변경할 수 있습니다.', errors: null };
     if (!target || !publication) return { success: false, errorCode: 'PUBLICATION_NOT_FOUND', message: 'YouTube 동영상을 찾을 수 없습니다.', errors: null };
@@ -571,7 +618,7 @@ export async function updateYouTubePublicationRevenue(workspaceId: number, proje
 /** 선택한 게시물만 Mock 동기화하며 version과 생명주기는 변경하지 않습니다. */
 export async function syncYouTubePublication(workspaceId: number, projectId: number, videoContentId: number, publicationId: number, context: YouTubeContext): Promise<MutationResponse> {
     await new Promise(resolve => setTimeout(resolve, 250));
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, projectId, videoContentId, context);
     const publication = target?.content.publications.find(item => item.publicationId === publicationId);
     if (!target || !publication) return { success: false, errorCode: 'PUBLICATION_NOT_FOUND', message: '동기화할 YouTube 동영상을 찾을 수 없습니다.', errors: null };
     if (publication.lifecycleStatus !== 'CURRENT') return { success: false, errorCode: 'PUBLICATION_NOT_CURRENT', message: '게시 중인 동영상만 성과를 동기화할 수 있습니다.', errors: null };
@@ -584,10 +631,12 @@ export async function syncYouTubePublication(workspaceId: number, projectId: num
 
 /** 사용자 확인에 따라 게시물을 종료하고 version과 생명주기 이력을 갱신합니다. */
 export async function removeYouTubePublication(workspaceId: number, projectId: number, videoContentId: number, publicationId: number, removalReason: YouTubeRemovalReason, expectedVersion: number, context: YouTubeContext): Promise<MutationResponse> {
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, projectId, videoContentId, context);
     const publication = target?.content.publications.find(item => item.publicationId === publicationId);
     if (!target || !publication) return { success: false, errorCode: 'PUBLICATION_NOT_FOUND', message: 'YouTube 동영상을 찾을 수 없습니다.', errors: null };
     if (expectedVersion !== publication.version) return { success: false, errorCode: 'YOUTUBE_PUBLICATION_VERSION_CONFLICT', message: '다른 사용자가 동영상을 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null };
+    if (removalReason !== 'UNAVAILABLE' && removalReason !== 'INCORRECT') return { success: false, errorCode: 'INVALID_REMOVAL_REASON', message: '올바른 게시 종료 사유를 선택해 주세요.', errors: null };
+    if (publication.lifecycleStatus === 'REMOVED' && publication.removalReason === removalReason) return successDetail(workspaceId, projectId, context, '이미 같은 사유로 게시 종료되었습니다.');
     const now = new Date().toISOString();
     const publications = target.content.publications.map(item => item.publicationId !== publicationId ? item : ({ ...item, lifecycleStatus: 'REMOVED' as const, removalReason, supersededByPublicationId: null, version: item.version + 1, statusHistory: [...item.statusHistory, { fromStatus: item.lifecycleStatus, toStatus: 'REMOVED' as const, fromRemovalReason: item.removalReason, toRemovalReason: removalReason, relatedPublicationId: null, changedByName: context.userName, changedAt: now, reason: removalReason === 'INCORRECT' ? '잘못 연결한 동영상' : '게시 운영 종료' }] }));
     replaceVideoContent(videoContentId, recalculateContent({ ...target.content, publications }));
@@ -596,11 +645,13 @@ export async function removeYouTubePublication(workspaceId: number, projectId: n
 
 /** 종료·대체 게시물을 CURRENT로 복원하고 같은 Channel의 기존 CURRENT를 명시적으로 대체합니다. */
 export async function restoreYouTubePublication(workspaceId: number, projectId: number, videoContentId: number, publicationId: number, expectedVersion: number, replaceCurrentPublicationId: number | null, replaceCurrentPublicationVersion: number | null, context: YouTubeContext): Promise<MutationResponse> {
-    const target = findManageableContent(workspaceId, projectId, videoContentId, context);
+    const target = findWritableContent(workspaceId, projectId, videoContentId, context);
     const publication = target?.content.publications.find(item => item.publicationId === publicationId);
     if (!target || !publication) return { success: false, errorCode: 'PUBLICATION_NOT_FOUND', message: '복원할 YouTube 동영상을 찾을 수 없습니다.', errors: null };
     if (expectedVersion !== publication.version) return { success: false, errorCode: 'YOUTUBE_PUBLICATION_VERSION_CONFLICT', message: '다른 사용자가 동영상을 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null };
+    if (publication.lifecycleStatus === 'CURRENT') return { success: false, errorCode: 'PUBLICATION_ALREADY_CURRENT', message: '이미 게시 중인 동영상입니다.', errors: null };
     const current = target.content.publications.find(item => item.channelId === publication.channelId && item.lifecycleStatus === 'CURRENT' && item.publicationId !== publicationId);
+    if (replaceCurrentPublicationId !== null && replaceCurrentPublicationId !== current?.publicationId) return { success: false, errorCode: 'YOUTUBE_PUBLICATION_VERSION_CONFLICT', message: '대체 대상 동영상이 변경되었습니다. 최신 내용을 다시 확인해 주세요.', errors: null };
     if (current && current.publicationId !== replaceCurrentPublicationId) return { success: false, errorCode: 'CURRENT_PUBLICATION_EXISTS', message: '같은 채널의 게시 중 영상을 대체할지 확인해 주세요.', errors: null };
     if (current && current.version !== replaceCurrentPublicationVersion) return { success: false, errorCode: 'YOUTUBE_PUBLICATION_VERSION_CONFLICT', message: '다른 사용자가 대체할 동영상을 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null };
     const now = new Date().toISOString();

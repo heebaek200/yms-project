@@ -252,6 +252,8 @@
 .youtube-replacement-confirm span { line-height: 1.5; }
 .youtube-replacement-notice { margin: 0; padding: 12px 14px; border: 1px solid #efd0d3; border-radius: 10px; background: #fff5f6; color: #6f4045; line-height: 1.5; }
 .youtube-connection-manager { display: grid; width: 100%; min-width: 0; gap: 14px; }
+.youtube-connection-manager h3 { margin: 0; font-size: .92rem; }
+.project-content-readonly { margin: 0; color: var(--color-text-muted); }
 .youtube-connection-search { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .youtube-connection-manager ul { display: grid; min-width: 0; gap: 9px; padding: 0; margin: 0; list-style: none; }
 .youtube-connection-manager li { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid #e2e3e8; border-radius: 11px; background: rgba(255, 255, 255, .58); }

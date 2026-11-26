@@ -78,7 +78,7 @@ function optional(value?: string | null): string | null {
 }
 
 /** 조회 권한이 있는지 제작팀 관리 권한과 활성 참여 정보를 함께 확인합니다. */
-function canViewProject(project: ProjectDetail, context: ProjectMutationContext): boolean {
+export function canViewProject(project: ProjectDetail, context: Pick<ProjectMutationContext, 'workspaceRole' | 'userId'>): boolean {
     return context.workspaceRole !== 'MEMBER'
         || project.members.some(member => member.userId === context.userId && member.active);
 }

@@ -1654,7 +1654,9 @@ DELETE /api/video-contents/{videoContentId}
 
 GET /api/video-contents/{videoContentId}/project-candidates?keyword=&page=1&size=20
 
-현재 사용자가 연결할 수 있는 같은 Workspace의 논리 삭제되지 않은 활성 Project를 이름 검색과 페이지 단위로 반환합니다. 현재 연결 Project, VIEW·미참여 Project와 보관 Project는 제외하고 Workspace OWNER·ADMIN에게는 모든 활성 Project를 반환합니다.
+`data.items`는 현재 사용자가 연결할 수 있는 같은 Workspace의 활성 Project 중 미연결 항목을 반환합니다. 이름 부분 검색은 대소문자를 무시합니다. `page`는 1부터 시작하고 `size`는 기본 20, 최대 100입니다. 응답에 `page`, `pageSize`, `totalCount`, `totalPages`를 포함합니다. 검색 결과가 없어도 `totalPages`는 1이며 범위를 넘는 페이지는 마지막 페이지로 보정합니다.
+
+`data.connectedProjects`에는 조회 권한이 있는 현재 연결 Project를 검색·페이지와 무관하게 반환합니다. 두 목록의 항목 필드는 `projectId`, `title`, `projectGroupId`, `projectGroupName`, `archived`, `connected`, `primary`, `canManage`입니다. 보관 Project를 기준으로 조회하면 연결 목록만 반환하며 `canManage=false`를 적용합니다.
 
 POST /api/video-contents/{videoContentId}/projects/{projectId}
 
@@ -1823,6 +1825,7 @@ GET /api/video-contents/{videoContentId}/performance-summary
 | INVALID_PUBLICATION_REPLACEMENT | 409 | 자기 참조, 순환 또는 다른 VideoContent 게시물로 대체 관계 지정 |
 | CURRENT_PUBLICATION_EXISTS | 409 | 같은 VideoContent와 Channel에 CURRENT 게시물이 있으나 명시적 대체 대상 누락 |
 | INVALID_REMOVAL_REASON | 400 | REMOVED 상태의 종료 사유 누락 또는 허용되지 않은 값 |
+| PUBLICATION_ALREADY_CURRENT | 409 | 게시 중인 동영상의 복원 요청 |
 | PRIMARY_PROJECT_REASSIGNMENT_REQUIRED | 409 | Project 삭제 전 다른 활성 연결 Project로 대표 변경 필요 |
 | CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED | 409 | 대표 또는 ProjectGroup 변경으로 콘텐츠 성과 귀속 이동 확인 필요 |
 | DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED | 409 | version은 유효하지만 Channel·영상 유형 변경에 따른 DEFAULT 단가 영향 확인 또는 만료·불일치한 확인 토큰의 재확인 필요 |
