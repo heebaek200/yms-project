@@ -112,7 +112,7 @@ Transaction 테이블에는 일반 감사 컬럼을 기본 적용하지 않습�
 | revenues | Transaction | **최소 추적 예외 적용** | 실제 수익 수정은 재무 성과에 직접 영향하므로 등록자 / 수정자와 시각 유지 |
 | settlements | Transaction | 미적용 | 생성 / 확정 / 지급 단계별 행위자와 시각을 명시적으로 보관 |
 | settlement_items | Transaction | 미적용 | CONFIRMED 시점의 불변 스냅샷 성격 |
-| video_contents | Transaction | 미적용 | 생성 시각과 논리 삭제 라이프사이클 정보는 별도 보존 |
+| video_contents | Transaction | 미적용 | 게시 이력이 없는 단일 연결 초안만 물리 삭제하고 그 밖의 생명주기는 보존 |
 | project_video_contents | Mapping | 미적용 | Project와 영상 결과물의 연결 사실만 관리 |
 | video_content_primary_project_histories | Transaction | 미적용 | 대표 Project 및 성과 귀속 변경 사건을 보존 |
 | youtube_publications | Transaction | 미적용 | 게시물과 대체 관계, 생성 시각을 업무 데이터로 보존 |
@@ -362,7 +362,6 @@ Workspace에서 관리하는 YouTube 채널입니다.
 | archived_by_member_id | BIGINT | FK → workspace_members, NULL | 보관 처리 사용자 |
 | archived_at | DATETIME | NULL | 보관 시각 |
 | deleted_by_member_id | BIGINT | FK → workspace_members, NULL | 삭제 처리 사용자 |
-| deleted_at | DATETIME | NULL | 논리 삭제 시각 |
 
 정책:
 
@@ -408,6 +407,7 @@ Workspace에서 관리하는 YouTube 채널입니다.
 - 연결된 활성 Project 중 하나의 소유자 또는 ACTIVE EDIT 참여자와 Workspace OWNER·ADMIN은 공유 VideoContent의 제목과 영상 유형을 수정할 수 있습니다.
 - 제목·유형·Project 연결·대표 변경은 최신 `version`을 검증한 뒤 성공 시 증가시킵니다. 영상 유형 변경으로 DEFAULT 적용 단가가 실제로 달라지면 영향받는 YouTubePublication을 함께 잠그고 단가가 변경된 각 행의 `version`도 같은 트랜잭션에서 증가시킵니다. 그 밖의 하위 YouTubePublication 변경이나 파생 성과 재계산은 이 version을 증가시키지 않습니다.
 - Project 삭제 시 연결과 결과물 이력은 보존하되 삭제 Project를 집계 대상으로 사용하지 않습니다. 다른 활성 연결 Project가 있으면 사용자가 새 대표를 지정한 뒤 삭제하고, 없으면 기존 `primary_project_id`를 역사적 대표로 유지한 채 활성 집계에서 제외합니다.
+- YouTubePublication이 한 건도 없고 Project 연결이 하나뿐인 VideoContent는 사용자 확인과 최신 version 검증 후 `video_content_primary_project_histories`, `project_video_contents`, `video_contents` 순서로 한 트랜잭션에서 물리 삭제합니다. 게시 이력이 있거나 여러 Project에 연결된 결과물은 삭제하지 않습니다.
 
 ## 6.4. project_video_contents
 
@@ -821,6 +821,8 @@ Task의 `worker_amount`는 이미 Project 비용에 포함되므로 동일 금�
 # 11. YouTube 성과 도메인
 
 ## 11.1. youtube_publications
+
+최초 `콘텐츠 추가` 요청에 YouTube 동영상 정보가 포함되면 `video_contents`, 대표 `project_video_contents`, `youtube_publications`와 최초 상태 이력을 하나의 트랜잭션으로 생성합니다. 동영상 정보 검증이나 저장이 실패하면 VideoContent만 남기는 부분 커밋을 허용하지 않습니다. 테이블 관계는 분리하여 이후 재업로드와 다중 Channel 게시 이력을 같은 구조로 누적합니다.
 
 VideoContent가 YouTube에 실제로 게시된 개별 이력을 관리합니다. 같은 결과물을 수정하여 재업로드하거나 기존 게시물을 일부 공개로 돌린 경우에도 기존 행을 덮어쓰지 않습니다.
 

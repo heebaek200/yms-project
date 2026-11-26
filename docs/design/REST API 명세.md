@@ -1577,7 +1577,9 @@ WebSocket / STOMP
 
 # 11. 영상 결과물 및 YouTube 연동 API
 
-영상 결과물 생성, Project 연결, YouTube 게시물 등록, Project 상태 변경, 외부 API 동기화와 예상 수익 계산을 한 요청에 묶지 않습니다.
+이 절의 `VideoContent`와 `YouTubePublication`은 API·도메인 식별자이므로 유지합니다. 사용자에게 반환하는 안내 메시지와 화면 표시명은 각각 `콘텐츠`와 `YouTube 동영상`을 사용하며, `게시 이력`은 실제 상태·감사 이력에만 사용합니다. Route, DTO와 오류 코드는 이 표시명 변경으로 바꾸지 않습니다.
+
+VideoContent와 YouTubePublication은 독립 자원으로 유지합니다. 다만 화면의 최초 `콘텐츠 추가`는 사용자의 한 번 저장이 부분 성공하지 않도록 VideoContent 생성 요청에 선택적인 최초 YouTube 동영상 정보를 포함할 수 있습니다. 기존 콘텐츠의 추가 YouTubePublication, Project 연결, Project 상태 변경, 외부 API 동기화와 예상 수익 계산은 별도 요청으로 유지합니다.
 
 ## 11.1. 영상 결과물 생성
 
@@ -1588,15 +1590,22 @@ POST /api/projects/{projectId}/video-contents
 ~~~json
 {
   "title": "카메라 리뷰 본편",
-  "videoType": "LONG"
+  "videoType": "LONG",
+  "initialPublication": {
+    "channelId": 3,
+    "youtubeVideo": "https://youtu.be/dQw4w9WgXcQ",
+    "publishedAt": "2026-10-29T16:30:00+09:00",
+    "revenueOption": "DEFAULT",
+    "customRevenuePerView": null
+  }
 }
 ~~~
 
-요청 Project를 `primaryProjectId`로 지정하고 `project_video_contents` 연결을 함께 생성합니다. 화면은 Project의 title과 defaultVideoType을 제안하지만 API 요청에서는 두 값을 필수로 전달합니다. YouTube 게시물은 자동 생성하지 않습니다.
+요청 Project를 `primaryProjectId`로 지정하고 `project_video_contents` 연결을 함께 생성합니다. 화면은 Project의 title과 defaultVideoType을 제안하지만 API 요청에서는 두 값을 필수로 전달합니다. `initialPublication`은 선택값이며 생략하거나 NULL이면 게시 전 VideoContent만 생성합니다. 값이 있으면 URL·ID, Channel, 게시 일시, 권한별 수익 설정을 11.3과 같은 규칙으로 검증하고 VideoContent, Project 연결, 최초 YouTubePublication과 상태 이력을 한 트랜잭션으로 생성합니다. 어느 검증이나 저장이라도 실패하면 전체를 롤백합니다.
 
 프로젝트 소유자, EDIT 참여자와 Workspace OWNER / ADMIN이 호출할 수 있습니다. 결과물 생성은 Project 상태를 자동 변경하지 않습니다.
 
-화면은 Project 제목과 defaultVideoType을 초기값으로 제안하지만 API는 trim 후 1~150자의 title과 LONG / SHORTS videoType을 필수로 검증합니다. 생성 응답의 version은 0이며 YouTube 게시물은 자동 생성하지 않습니다.
+화면은 Project 제목과 defaultVideoType을 초기값으로 제안하지만 API는 trim 후 1~150자의 title과 LONG / SHORTS videoType을 필수로 검증합니다. 생성 응답의 VideoContent와 선택적으로 생성한 최초 YouTubePublication version은 각각 0입니다. Project 상태와 성과 동기화는 자동 실행하지 않습니다.
 
 ### 11.1.1. 영상 결과물 일반 정보 수정
 
@@ -1623,6 +1632,23 @@ PATCH /api/video-contents/{videoContentId}
 version 충돌 응답을 받은 클라이언트는 기존 토큰과 오래된 `expectedVersion`을 폐기하고 최신 VideoContent 상세를 다시 조회해야 합니다. 최신 version만 요청에 대입하여 자동 재시도해서는 안 되며 사용자가 최신 상태에서 변경과 영향을 다시 확인하게 합니다.
 
 검증이 끝나면 제목·유형·DEFAULT 단가 스냅샷을 한 트랜잭션으로 변경합니다. VideoContent version과 실제 적용 단가가 달라진 각 YouTubePublication version을 증가시키고 CUSTOM·DISABLED 또는 계산 결과가 같은 게시물 version은 유지합니다. 한 건이라도 충돌하거나 검증에 실패하면 전체 변경을 롤백합니다.
+
+### 11.1.2. 게시 전 영상 결과물 삭제
+
+DELETE /api/video-contents/{videoContentId}
+
+~~~json
+{
+  "expectedVersion": 0
+}
+~~~
+
+연결된 활성 Project 중 하나에서 소유자 또는 ACTIVE EDIT인 사용자와 Workspace OWNER·ADMIN이 호출할 수 있습니다. 서버는 최신 version을 먼저 검증한 뒤 YouTubePublication이 역사적으로 0건이고 Project 연결이 정확히 1건인지 확인합니다. 성공하면 VideoContent, 단일 `project_video_contents` 연결과 `video_content_primary_project_histories`를 한 트랜잭션에서 물리 삭제하고 갱신된 Project 상세를 반환합니다. 복원 API는 제공하지 않습니다.
+
+- 게시 이력이 한 건이라도 있으면 `409 VIDEO_CONTENT_HAS_PUBLICATIONS`
+- Project 연결이 여러 건이면 `409 VIDEO_CONTENT_MULTIPLE_PROJECTS`
+- version이 다르면 `409 VIDEO_CONTENT_VERSION_CONFLICT`
+- 권한이 없거나 보관 Project만 연결되어 있으면 `403 VIDEO_CONTENT_FORBIDDEN`
 
 ## 11.2. 영상 결과물의 Project 연결 관리
 
@@ -1655,6 +1681,8 @@ PATCH /api/video-contents/{videoContentId}/primary-project
 ## 11.3. YouTube 게시물 등록
 
 POST /api/video-contents/{videoContentId}/youtube-publications
+
+이미 존재하는 VideoContent의 재업로드, 다른 Channel 게시 또는 추가 게시 이력을 생성할 때 사용합니다. 최초 영상과 최초 게시를 함께 등록하는 일반 흐름은 11.1의 `initialPublication`을 사용합니다.
 
 요청:
 
@@ -1789,7 +1817,7 @@ GET /api/video-contents/{videoContentId}/performance-summary
 | --- | --- | --- |
 | INVALID_YOUTUBE_VIDEO | 400 | URL / ID 형식 오류 |
 | YOUTUBE_VIDEO_NOT_FOUND | 404 | API에서 영상을 확인할 수 없음 |
-| DUPLICATE_YOUTUBE_VIDEO | 409 | 같은 Workspace에 이미 YouTubePublication으로 등록 |
+| DUPLICATE_YOUTUBE_VIDEO | 409 | 같은 Workspace에 이미 YouTubePublication으로 등록. 권한에 따라 기존 등록 위치 data 제공 |
 | PROJECT_NOT_LINKED_TO_VIDEO_CONTENT | 409 | 대표 Project 또는 해제 대상 Project가 VideoContent에 연결되지 않음 |
 | LAST_VIDEO_CONTENT_PROJECT | 409 | VideoContent의 마지막 Project 연결 해제 시도 |
 | INVALID_PUBLICATION_REPLACEMENT | 409 | 자기 참조, 순환 또는 다른 VideoContent 게시물로 대체 관계 지정 |
@@ -1807,6 +1835,21 @@ GET /api/video-contents/{videoContentId}/performance-summary
 | YOUTUBE_UPSTREAM_ERROR | 502 | 외부 API 비정상 응답 |
 
 동기화 실패 시 마지막 성공 데이터를 삭제하거나 게시물 생명주기를 변경하지 않습니다. 성공 이력이 없는 게시물은 0이 아닌 미집계로 응답하고, 성공 이력이 있으면 마지막 성공값과 마지막 시도 시각·오류를 함께 반환합니다.
+
+`DUPLICATE_YOUTUBE_VIDEO` 응답의 `data`는 권한에 따라 다음 형태를 사용합니다.
+
+```json
+{
+  "canAccess": true,
+  "videoContentId": 101,
+  "contentTitle": "카메라 롱폼 리뷰 완성본",
+  "projectId": 11,
+  "projectTitle": "카메라 롱폼 리뷰",
+  "channelName": "YMS 메인 채널"
+}
+```
+
+Workspace OWNER·ADMIN은 대표 Project를 우선 이동 위치로 받고, MEMBER는 접근 가능한 연결 Project 중 대표를 우선합니다. 접근 가능한 연결 Project가 없으면 `{"canAccess": false}`만 반환하여 콘텐츠·Project 식별 정보를 노출하지 않습니다.
 
 ---
 

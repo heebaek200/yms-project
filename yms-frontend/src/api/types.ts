@@ -25,14 +25,15 @@ export type ApiSuccessResponse<TData> = {
  * HTTP 상태는 Axios 오류에 별도로 보존하고 여기에는 업무 오류 코드를 유지합니다.
  * errors는 입력 필드에 연결할 상세 오류가 없을 때 null입니다.
  */
-export type ApiFailureResponse = {
+export type ApiFailureResponse<TErrorData = never> = {
     success: false;
     errorCode: string;
     message: string;
     errors: ApiFieldError[] | null;
+    data?: TErrorData;
 };
 
 // 기존 Mock API와 실제 API가 같은 성공·실패 판별 방식을 사용하도록 구성합니다.
-export type ApiResponse<TData> =
+export type ApiResponse<TData, TErrorData = never> =
     | ApiSuccessResponse<TData>
-    | ApiFailureResponse;
+    | ApiFailureResponse<TErrorData>;
