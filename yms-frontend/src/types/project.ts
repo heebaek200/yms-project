@@ -6,6 +6,11 @@ export type ProjectVideoType = 'LONG' | 'SHORTS';
 export type ProjectRevenueOption = 'DEFAULT' | 'CUSTOM' | 'DISABLED';
 export type YouTubePublicationStatus = 'CURRENT' | 'SUPERSEDED' | 'REMOVED';
 export type YouTubeRemovalReason = 'UNAVAILABLE' | 'INCORRECT';
+export type PrimaryProjectChangeReasonType =
+    | 'MERGED'
+    | 'CONNECTION_CORRECTION'
+    | 'PERFORMANCE_ATTRIBUTION'
+    | 'OTHER';
 export type PerformanceCompleteness = 'COMPLETE' | 'PARTIAL' | 'UNAVAILABLE';
 export type ProjectMemberPermission = 'EDIT' | 'VIEW';
 export type ProjectMemberAuditEvent =
@@ -115,6 +120,7 @@ export type YouTubePublication = {
     createdAt: string;
     performance: VideoPerformance | null;
     statusHistory: YouTubePublicationStatusHistory[];
+    version: number;
 };
 
 export type PerformanceAggregate = {
@@ -130,11 +136,16 @@ export type PerformanceAggregate = {
 export type PrimaryProjectHistory = {
     fromProjectId: number | null;
     toProjectId: number;
+    fromProjectName: string | null;
+    toProjectName: string;
     fromProjectGroupId: number | null;
     toProjectGroupId: number | null;
+    fromProjectGroupName: string | null;
+    toProjectGroupName: string | null;
     changedByName: string;
     changedAt: string;
-    reason: string;
+    reasonType: PrimaryProjectChangeReasonType;
+    reason: string | null;
 };
 
 export type VideoContent = {
@@ -147,6 +158,48 @@ export type VideoContent = {
     publications: YouTubePublication[];
     currentPerformance: PerformanceAggregate;
     cumulativePerformance: PerformanceAggregate;
+    version: number;
+};
+
+export type VideoContentProjectCandidate = {
+    projectId: number;
+    title: string;
+    projectGroupId: number | null;
+    projectGroupName: string | null;
+    archived: boolean;
+    connected: boolean;
+    primary: boolean;
+    canManage: boolean;
+};
+
+/** 중복 YouTube 동영상 오류에서 현재 사용자가 이동할 수 있는 기존 등록 위치입니다. */
+export type DuplicateYouTubeVideoLocation =
+    | {
+        canAccess: true;
+        videoContentId: number;
+        contentTitle: string;
+        projectId: number;
+        projectTitle: string;
+        channelName: string;
+    }
+    | {
+        canAccess: false;
+    };
+
+export type DefaultRateChangeImpactItem = {
+    publicationId: number;
+    channelId: number;
+    channelName: string;
+    rateWillChange: true;
+    currentRate?: string;
+    nextRate?: string;
+    estimatedRevenueDelta?: string;
+};
+
+export type DefaultRateChangeConfirmation = {
+    confirmationToken: string;
+    expiresAt: string;
+    impacts: DefaultRateChangeImpactItem[];
 };
 
 export type ProjectSummary = {

@@ -19,13 +19,13 @@ let projects: ProjectDetail[] = [
         members: [{ workspaceMemberId: 101, userId: 24601, name: '테스트 사용자', permission: 'EDIT', active: true, isOwner: true }, { workspaceMemberId: 104, userId: 24604, name: '이편집', permission: 'EDIT', active: true, isOwner: false }, { workspaceMemberId: 103, userId: 24603, name: '김관리', permission: 'VIEW', active: false, isOwner: false }],
         statusHistory: [{ status: 'PLANNING', changedAt: '2026-09-01T09:00:00+09:00', changedByName: '테스트 사용자' }, { status: 'REVIEW', changedAt: '2026-10-19T14:10:00+09:00', changedByName: '테스트 사용자' }],
         videoContents: [{
-            videoContentId: 101, title: '카메라 롱폼 리뷰 완성본', videoType: 'LONG', primaryProjectId: 11, connectedProjectIds: [11], primaryProjectHistory: [{ fromProjectId: null, toProjectId: 11, fromProjectGroupId: null, toProjectGroupId: 1, changedByName: '테스트 사용자', changedAt: '2026-10-01T17:00:00+09:00', reason: '영상 결과물 생성' }],
+            videoContentId: 101, title: '카메라 롱폼 리뷰 완성본', videoType: 'LONG', primaryProjectId: 11, connectedProjectIds: [11], version: 0, primaryProjectHistory: [{ fromProjectId: null, toProjectId: 11, fromProjectName: null, toProjectName: '카메라 롱폼 리뷰', fromProjectGroupId: null, toProjectGroupId: 1, fromProjectGroupName: null, toProjectGroupName: '신제품 카메라 협찬', changedByName: '테스트 사용자', changedAt: '2026-10-01T17:00:00+09:00', reasonType: 'CONNECTION_CORRECTION', reason: '콘텐츠 생성' }],
             currentPerformance: { viewCount: 50000, likeCount: 3200, commentCount: 180, estimatedRevenue: '150000.00', completeness: 'COMPLETE', includedPublicationCount: 1, missingPublicationCount: 0 },
             cumulativePerformance: { viewCount: 170000, likeCount: 11100, commentCount: 590, estimatedRevenue: '480000.00', completeness: 'COMPLETE', includedPublicationCount: 3, missingPublicationCount: 0 },
             publications: [
-                { publicationId: 1000, channelId: 1, channelName: 'YMS 메인 채널', youtubeVideoId: 'a7Kx_9Qm2Lp', youtubeVideoUrl: 'https://www.youtube.com/watch?v=a7Kx_9Qm2Lp', lifecycleStatus: 'REMOVED', removalReason: 'UNAVAILABLE', supersededByPublicationId: null, revenueOption: 'CUSTOM', appliedRate: '2.50', publishedAt: '2026-09-20T18:00:00+09:00', createdAt: '2026-09-20T18:00:00+09:00', performance: { viewCount: 20000, likeCount: 1200, commentCount: 60, syncStatus: 'SUCCESS', lastAttemptedAt: '2026-09-28T13:00:00+09:00', lastSuccessAt: '2026-09-28T13:00:00+09:00', lastErrorMessage: null }, statusHistory: [{ fromStatus: null, toStatus: 'CURRENT', fromRemovalReason: null, toRemovalReason: null, relatedPublicationId: null, changedByName: '테스트 사용자', changedAt: '2026-09-20T18:00:00+09:00', reason: '최초 게시' }, { fromStatus: 'CURRENT', toStatus: 'REMOVED', fromRemovalReason: null, toRemovalReason: 'UNAVAILABLE', relatedPublicationId: null, changedByName: '테스트 사용자', changedAt: '2026-09-29T09:00:00+09:00', reason: '외부 게시 종료' }] },
-                { publicationId: 1001, channelId: 1, channelName: 'YMS 메인 채널', youtubeVideoId: 'V3n-pR8zX1c', youtubeVideoUrl: 'https://www.youtube.com/watch?v=V3n-pR8zX1c', lifecycleStatus: 'SUPERSEDED', removalReason: null, supersededByPublicationId: 1002, revenueOption: 'CUSTOM', appliedRate: '2.80', publishedAt: '2026-10-01T18:00:00+09:00', createdAt: '2026-10-01T18:00:00+09:00', performance: { viewCount: 100000, likeCount: 6700, commentCount: 350, syncStatus: 'SUCCESS', lastAttemptedAt: '2026-10-12T13:00:00+09:00', lastSuccessAt: '2026-10-12T13:00:00+09:00', lastErrorMessage: null }, statusHistory: [{ fromStatus: null, toStatus: 'CURRENT', fromRemovalReason: null, toRemovalReason: null, relatedPublicationId: null, changedByName: '테스트 사용자', changedAt: '2026-10-01T18:00:00+09:00', reason: '최초 게시' }, { fromStatus: 'CURRENT', toStatus: 'SUPERSEDED', fromRemovalReason: null, toRemovalReason: null, relatedPublicationId: 1002, changedByName: '테스트 사용자', changedAt: '2026-10-13T18:00:00+09:00', reason: '수정본으로 교체' }] },
-                { publicationId: 1002, channelId: 1, channelName: 'YMS 메인 채널', youtubeVideoId: 'qM5tY_2wK9B', youtubeVideoUrl: 'https://www.youtube.com/watch?v=qM5tY_2wK9B', lifecycleStatus: 'CURRENT', removalReason: null, supersededByPublicationId: null, revenueOption: 'DEFAULT', appliedRate: '3.00', publishedAt: '2026-10-13T18:00:00+09:00', createdAt: '2026-10-13T18:00:00+09:00', performance: { viewCount: 50000, likeCount: 3200, commentCount: 180, syncStatus: 'SUCCESS', lastAttemptedAt: '2026-10-19T13:00:00+09:00', lastSuccessAt: '2026-10-19T13:00:00+09:00', lastErrorMessage: null }, statusHistory: [{ fromStatus: null, toStatus: 'CURRENT', fromRemovalReason: null, toRemovalReason: null, relatedPublicationId: 1001, changedByName: '테스트 사용자', changedAt: '2026-10-13T18:00:00+09:00', reason: '수정본 게시' }] }
+                { publicationId: 1000, channelId: 1, channelName: 'YMS 메인 채널', youtubeVideoId: 'a7Kx_9Qm2Lp', youtubeVideoUrl: 'https://www.youtube.com/watch?v=a7Kx_9Qm2Lp', lifecycleStatus: 'REMOVED', removalReason: 'UNAVAILABLE', supersededByPublicationId: null, revenueOption: 'CUSTOM', appliedRate: '2.50', publishedAt: '2026-09-20T18:00:00+09:00', createdAt: '2026-09-20T18:00:00+09:00', version: 0, performance: { viewCount: 20000, likeCount: 1200, commentCount: 60, syncStatus: 'SUCCESS', lastAttemptedAt: '2026-09-28T13:00:00+09:00', lastSuccessAt: '2026-09-28T13:00:00+09:00', lastErrorMessage: null }, statusHistory: [{ fromStatus: null, toStatus: 'CURRENT', fromRemovalReason: null, toRemovalReason: null, relatedPublicationId: null, changedByName: '테스트 사용자', changedAt: '2026-09-20T18:00:00+09:00', reason: '최초 게시' }, { fromStatus: 'CURRENT', toStatus: 'REMOVED', fromRemovalReason: null, toRemovalReason: 'UNAVAILABLE', relatedPublicationId: null, changedByName: '테스트 사용자', changedAt: '2026-09-29T09:00:00+09:00', reason: '외부 게시 종료' }] },
+                { publicationId: 1001, channelId: 1, channelName: 'YMS 메인 채널', youtubeVideoId: 'V3n-pR8zX1c', youtubeVideoUrl: 'https://www.youtube.com/watch?v=V3n-pR8zX1c', lifecycleStatus: 'SUPERSEDED', removalReason: null, supersededByPublicationId: 1002, revenueOption: 'CUSTOM', appliedRate: '2.80', publishedAt: '2026-10-01T18:00:00+09:00', createdAt: '2026-10-01T18:00:00+09:00', version: 0, performance: { viewCount: 100000, likeCount: 6700, commentCount: 350, syncStatus: 'SUCCESS', lastAttemptedAt: '2026-10-12T13:00:00+09:00', lastSuccessAt: '2026-10-12T13:00:00+09:00', lastErrorMessage: null }, statusHistory: [{ fromStatus: null, toStatus: 'CURRENT', fromRemovalReason: null, toRemovalReason: null, relatedPublicationId: null, changedByName: '테스트 사용자', changedAt: '2026-10-01T18:00:00+09:00', reason: '최초 게시' }, { fromStatus: 'CURRENT', toStatus: 'SUPERSEDED', fromRemovalReason: null, toRemovalReason: null, relatedPublicationId: 1002, changedByName: '테스트 사용자', changedAt: '2026-10-13T18:00:00+09:00', reason: '수정본으로 교체' }] },
+                { publicationId: 1002, channelId: 1, channelName: 'YMS 메인 채널', youtubeVideoId: 'qM5tY_2wK9B', youtubeVideoUrl: 'https://www.youtube.com/watch?v=qM5tY_2wK9B', lifecycleStatus: 'CURRENT', removalReason: null, supersededByPublicationId: null, revenueOption: 'DEFAULT', appliedRate: '3.00', publishedAt: '2026-10-13T18:00:00+09:00', createdAt: '2026-10-13T18:00:00+09:00', version: 0, performance: { viewCount: 50000, likeCount: 3200, commentCount: 180, syncStatus: 'SUCCESS', lastAttemptedAt: '2026-10-19T13:00:00+09:00', lastSuccessAt: '2026-10-19T13:00:00+09:00', lastErrorMessage: null }, statusHistory: [{ fromStatus: null, toStatus: 'CURRENT', fromRemovalReason: null, toRemovalReason: null, relatedPublicationId: 1001, changedByName: '테스트 사용자', changedAt: '2026-10-13T18:00:00+09:00', reason: '수정본 게시' }] }
             ]
         }]
     },
@@ -292,6 +292,43 @@ export function replaceVideoContent(videoContentId: number, nextContent: Project
         ));
         return cloneProject({ ...project, videoContents, updatedAt: new Date().toISOString() });
     });
+}
+
+/** 게시 이력이 없는 단일 연결 결과물을 모든 Project 복사본에서 물리적으로 제거합니다. */
+export function deleteVideoContent(videoContentId: number) {
+    projects = projects.map(project => {
+        if (!project.videoContents.some(content => content.videoContentId === videoContentId)) return project;
+        return cloneProject({
+            ...project,
+            videoContents: project.videoContents.filter(content => content.videoContentId !== videoContentId),
+            updatedAt: new Date().toISOString()
+        });
+    });
+}
+
+/** 검증된 공유 결과물을 대상 Project 상세에 연결합니다. */
+export function linkVideoContentToProject(projectId: number, content: ProjectDetail['videoContents'][number]) {
+    projects = projects.map(project => {
+        if (project.projectId !== projectId || project.videoContents.some(item => item.videoContentId === content.videoContentId)) {
+            return project;
+        }
+        return cloneProject({
+            ...project,
+            videoContents: [...project.videoContents, content],
+            updatedAt: new Date().toISOString()
+        });
+    });
+}
+
+/** 대표·마지막 연결 검증을 마친 결과물을 대상 Project 상세에서 해제합니다. */
+export function unlinkVideoContentFromProject(projectId: number, videoContentId: number) {
+    projects = projects.map(project => project.projectId !== projectId
+        ? project
+        : cloneProject({
+            ...project,
+            videoContents: project.videoContents.filter(content => content.videoContentId !== videoContentId),
+            updatedAt: new Date().toISOString()
+        }));
 }
 
 /** Workspace 안에서 중복 게시물과 공유 결과물을 검증할 수 있도록 고유 VideoContent 목록을 반환합니다. */

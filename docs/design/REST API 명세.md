@@ -1577,7 +1577,9 @@ WebSocket / STOMP
 
 # 11. 영상 결과물 및 YouTube 연동 API
 
-영상 결과물 생성, Project 연결, YouTube 게시물 등록, Project 상태 변경, 외부 API 동기화와 예상 수익 계산을 한 요청에 묶지 않습니다.
+이 절의 `VideoContent`와 `YouTubePublication`은 API·도메인 식별자이므로 유지합니다. 사용자에게 반환하는 안내 메시지와 화면 표시명은 각각 `콘텐츠`와 `YouTube 동영상`을 사용하며, `게시 이력`은 실제 상태·감사 이력에만 사용합니다. Route, DTO와 오류 코드는 이 표시명 변경으로 바꾸지 않습니다.
+
+VideoContent와 YouTubePublication은 독립 자원으로 유지합니다. 다만 화면의 최초 `콘텐츠 추가`는 사용자의 한 번 저장이 부분 성공하지 않도록 VideoContent 생성 요청에 선택적인 최초 YouTube 동영상 정보를 포함할 수 있습니다. 기존 콘텐츠의 추가 YouTubePublication, Project 연결, Project 상태 변경, 외부 API 동기화와 예상 수익 계산은 별도 요청으로 유지합니다.
 
 ## 11.1. 영상 결과물 생성
 
@@ -1588,33 +1590,93 @@ POST /api/projects/{projectId}/video-contents
 ~~~json
 {
   "title": "카메라 리뷰 본편",
-  "videoType": "LONG"
+  "videoType": "LONG",
+  "initialPublication": {
+    "channelId": 3,
+    "youtubeVideo": "https://youtu.be/dQw4w9WgXcQ",
+    "publishedAt": "2026-10-29T16:30:00+09:00",
+    "revenueOption": "DEFAULT",
+    "customRevenuePerView": null
+  }
 }
 ~~~
 
-요청 Project를 `primaryProjectId`로 지정하고 `project_video_contents` 연결을 함께 생성합니다. title과 videoType을 생략하면 Project의 title과 defaultVideoType을 초기값으로 사용합니다. YouTube 게시물은 자동 생성하지 않습니다.
+요청 Project를 `primaryProjectId`로 지정하고 `project_video_contents` 연결을 함께 생성합니다. 화면은 Project의 title과 defaultVideoType을 제안하지만 API 요청에서는 두 값을 필수로 전달합니다. `initialPublication`은 선택값이며 생략하거나 NULL이면 게시 전 VideoContent만 생성합니다. 값이 있으면 URL·ID, Channel, 게시 일시, 권한별 수익 설정을 11.3과 같은 규칙으로 검증하고 VideoContent, Project 연결, 최초 YouTubePublication과 상태 이력을 한 트랜잭션으로 생성합니다. 어느 검증이나 저장이라도 실패하면 전체를 롤백합니다.
 
 프로젝트 소유자, EDIT 참여자와 Workspace OWNER / ADMIN이 호출할 수 있습니다. 결과물 생성은 Project 상태를 자동 변경하지 않습니다.
 
+화면은 Project 제목과 defaultVideoType을 초기값으로 제안하지만 API는 trim 후 1~150자의 title과 LONG / SHORTS videoType을 필수로 검증합니다. 생성 응답의 VideoContent와 선택적으로 생성한 최초 YouTubePublication version은 각각 0입니다. Project 상태와 성과 동기화는 자동 실행하지 않습니다.
+
+### 11.1.1. 영상 결과물 일반 정보 수정
+
+PATCH /api/video-contents/{videoContentId}
+
+~~~json
+{
+  "title": "카메라 리뷰 쇼츠 편집본",
+  "videoType": "SHORTS",
+  "expectedVersion": 3,
+  "defaultRateChangeConfirmationToken": "opaque-single-use-token"
+}
+~~~
+
+첫 요청에서는 `defaultRateChangeConfirmationToken`을 생략합니다. 연결된 논리 삭제되지 않은 활성 Project 중 하나에서 소유자 또는 ACTIVE EDIT인 사용자와 Workspace OWNER·ADMIN이 호출할 수 있습니다. 영상 유형 변경으로 DEFAULT 게시물의 적용 단가가 달라지면 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 일회성 확인 토큰 및 영향 게시물 목록을 반환합니다. OWNER·ADMIN 응답에는 게시물별 Channel, 기존·새 단가와 예상 금액 영향을 포함하고 일반 MEMBER 응답에는 게시물·Channel과 `rateWillChange=true`만 포함하며 모든 단가·예상 금액 필드를 제거합니다.
+
+확인 토큰은 불투명한 짧은 유효기간의 단일 사용 값이며 요청자, Workspace, VideoContent, 요청한 제목·영상 유형, VideoContent version, 영향받는 YouTubePublication의 ID·version·수익 방식·적용 단가와 만료 시각에 결합합니다. 토큰을 제출한 요청은 VideoContent와 영향받는 YouTubePublication을 잠근 뒤 다음 순서로 검증합니다.
+
+1. 요청의 `expectedVersion`과 토큰에 결합된 영향 YouTubePublication version을 현재 값과 비교합니다.
+2. VideoContent version이 다르면 `409 VIDEO_CONTENT_VERSION_CONFLICT`, 영향 Publication version이 하나라도 다르면 `409 YOUTUBE_PUBLICATION_VERSION_CONFLICT`를 반환합니다. 두 경우 모두 새 확인 토큰을 발급하지 않습니다.
+3. version이 모두 유효할 때만 토큰 만료 여부와 최신 Channel 기본 단가·영향 범위를 다시 계산합니다.
+4. 토큰이 만료되었거나 단가·영향 범위가 달라졌으면 저장하지 않고 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 최신 영향에 대한 새 토큰을 반환합니다. 유형·게시 채널 변경 모두 제출된 토큰은 최신 영향이 0건이어도 검증합니다. 최신 영향이 0건으로 바뀌면 `impacts: []`로 새 토큰을 발급하며, 그 토큰의 검증을 통과하면 적용 단가를 유지한 채 변경을 저장합니다.
+
+version 충돌 응답을 받은 클라이언트는 기존 토큰과 오래된 `expectedVersion`을 폐기하고 최신 VideoContent 상세를 다시 조회해야 합니다. 최신 version만 요청에 대입하여 자동 재시도해서는 안 되며 사용자가 최신 상태에서 변경과 영향을 다시 확인하게 합니다.
+
+검증이 끝나면 제목·유형·DEFAULT 단가 스냅샷을 한 트랜잭션으로 변경합니다. VideoContent version과 실제 적용 단가가 달라진 각 YouTubePublication version을 증가시키고 CUSTOM·DISABLED 또는 계산 결과가 같은 게시물 version은 유지합니다. 한 건이라도 충돌하거나 검증에 실패하면 전체 변경을 롤백합니다.
+
+### 11.1.2. 게시 전 영상 결과물 삭제
+
+DELETE /api/video-contents/{videoContentId}
+
+~~~json
+{
+  "expectedVersion": 0
+}
+~~~
+
+연결된 활성 Project 중 하나에서 소유자 또는 ACTIVE EDIT인 사용자와 Workspace OWNER·ADMIN이 호출할 수 있습니다. 서버는 최신 version을 먼저 검증한 뒤 YouTubePublication이 역사적으로 0건이고 Project 연결이 정확히 1건인지 확인합니다. 성공하면 VideoContent, 단일 `project_video_contents` 연결과 `video_content_primary_project_histories`를 한 트랜잭션에서 물리 삭제하고 갱신된 Project 상세를 반환합니다. 복원 API는 제공하지 않습니다.
+
+- 게시 이력이 한 건이라도 있으면 `409 VIDEO_CONTENT_HAS_PUBLICATIONS`
+- Project 연결이 여러 건이면 `409 VIDEO_CONTENT_MULTIPLE_PROJECTS`
+- version이 다르면 `409 VIDEO_CONTENT_VERSION_CONFLICT`
+- 권한이 없거나 보관 Project만 연결되어 있으면 `403 VIDEO_CONTENT_FORBIDDEN`
+
 ## 11.2. 영상 결과물의 Project 연결 관리
+
+GET /api/video-contents/{videoContentId}/project-candidates?keyword=&page=1&size=20
+
+`data.items`는 현재 사용자가 연결할 수 있는 같은 Workspace의 활성 Project 중 미연결 항목을 반환합니다. 이름 부분 검색은 대소문자를 무시합니다. `page`는 1부터 시작하고 `size`는 기본 20, 최대 100입니다. 응답에 `page`, `pageSize`, `totalCount`, `totalPages`를 포함합니다. 검색 결과가 없어도 `totalPages`는 1이며 범위를 넘는 페이지는 마지막 페이지로 보정합니다.
+
+`data.connectedProjects`에는 조회 권한이 있는 현재 연결 Project를 검색·페이지와 무관하게 반환합니다. 두 목록의 항목 필드는 `projectId`, `title`, `projectGroupId`, `projectGroupName`, `archived`, `connected`, `primary`, `canManage`입니다. 보관 Project를 기준으로 조회하면 연결 목록만 반환하며 `canManage=false`를 적용합니다.
 
 POST /api/video-contents/{videoContentId}/projects/{projectId}
 
 DELETE /api/video-contents/{videoContentId}/projects/{projectId}
 
-여러 Project를 하나의 VideoContent에 연결하거나 해제합니다. 모든 대상은 같은 Workspace에 속해야 하며 요청 사용자가 대상 Project를 모두 관리할 수 있는지 검증합니다. 대표 Project 연결은 바로 해제할 수 없으며 먼저 다른 연결 Project를 대표로 지정해야 합니다.
+연결·해제 요청은 `expectedVersion`을 전달합니다. 여러 Project를 하나의 VideoContent에 연결하거나 해제하며 요청자는 기존 VideoContent를 관리할 수 있고 대상 Project에서도 소유자 또는 ACTIVE EDIT이거나 Workspace OWNER·ADMIN이어야 합니다. 모든 대상은 같은 Workspace에 속한 논리 삭제되지 않은 활성 Project여야 하며 보관 Project는 복원 전까지 변경할 수 없습니다. 대표 Project와 마지막 Project 연결은 해제할 수 없습니다. 성공하면 VideoContent version을 증가시키고 연결된 모든 Project 상세에 같은 결과를 반영합니다.
 
 PATCH /api/video-contents/{videoContentId}/primary-project
 
 ~~~json
 {
   "primaryProjectId": 12,
+  "changeReasonType": "MERGED",
   "changeReason": "합본 영상의 주 제작 프로젝트 변경",
+  "expectedVersion": 4,
   "confirmContentPerformanceMove": true
 }
 ~~~
 
-대표 Project는 같은 Workspace의 논리 삭제되지 않은 연결 Project 중에서만 선택할 수 있습니다. 같은 ProjectGroup 안의 변경 또는 양쪽 모두 그룹이 없는 변경은 두 Project를 모두 관리할 수 있는 프로젝트 소유자, EDIT 참여자와 Workspace OWNER·ADMIN이 수행할 수 있습니다. ProjectGroup 경계를 넘는 변경은 Workspace OWNER·ADMIN만 수행할 수 있습니다.
+대표 Project는 같은 Workspace의 논리 삭제되지 않고 보관되지 않은 연결 Project 중에서만 선택할 수 있습니다. 같은 ProjectGroup 안의 변경 또는 양쪽 모두 그룹이 없는 변경은 두 Project를 모두 관리할 수 있는 프로젝트 소유자, EDIT 참여자와 Workspace OWNER·ADMIN이 수행할 수 있습니다. ProjectGroup 경계를 넘는 변경은 Workspace OWNER·ADMIN만 수행할 수 있습니다. changeReasonType은 `MERGED / CONNECTION_CORRECTION / PERFORMANCE_ATTRIBUTION / OTHER` 중 필수이고 changeReason은 모든 유형에서 255자 이하 선택값입니다.
 
 동기화된 성과 또는 계산 가능한 예상 플랫폼 수익의 ProjectGroup 귀속이 바뀌는데 확인값이 없으면 `409 CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED`와 영향 정보를 반환합니다. 대표 변경 시 이전·새 Project, 양쪽 ProjectGroup 스냅샷, 사유, 변경자와 시각을 이력으로 기록합니다. 실제 Expense, Revenue, 손익과 ROI는 대표 변경으로 이동하지 않습니다.
 
@@ -1622,37 +1684,71 @@ PATCH /api/video-contents/{videoContentId}/primary-project
 
 POST /api/video-contents/{videoContentId}/youtube-publications
 
+이미 존재하는 VideoContent의 재업로드, 다른 Channel 게시 또는 추가 게시 이력을 생성할 때 사용합니다. 최초 영상과 최초 게시를 함께 등록하는 일반 흐름은 11.1의 `initialPublication`을 사용합니다.
+
 요청:
 
 ~~~json
 {
   "channelId": 3,
   "youtubeVideo": "https://youtu.be/dQw4w9WgXcQ",
-  "publishedAt": null,
-  "supersedesPublicationId": null
+  "publishedAt": "2026-10-29T16:30:00+09:00",
+  "revenueOption": "DEFAULT",
+  "customRevenuePerView": null,
+  "supersedesPublicationId": null,
+  "supersedesPublicationVersion": null
 }
 ~~~
 
 HTTP·HTTPS의 `youtube.com`, `www.youtube.com`, `m.youtube.com`, `music.youtube.com`, `youtu.be` 호스트에서 제공되는 `watch`, `shorts`, 단축 URL 또는 11자리 Video ID를 받아 정규화한 ID를 저장합니다. 호스트 이름은 정확히 일치해야 하며 YouTube가 아닌 호스트에서 같은 형식의 ID를 제공해도 `INVALID_YOUTUBE_VIDEO`로 거부합니다. 동일 Workspace 안에서 이미 등록된 YouTube Video ID는 다시 등록할 수 없습니다. channelId를 생략하면 대표 Project의 담당 Channel을 기본값으로 사용합니다.
 
-재업로드는 기존 게시물의 Video ID를 교체하지 않고 새 YouTubePublication으로 생성합니다. 서로 다른 Channel에는 CURRENT 게시물을 각각 둘 수 있지만 같은 VideoContent와 Channel에는 CURRENT를 최대 하나만 허용합니다. 같은 Channel의 기존 CURRENT가 있을 때는 `supersedesPublicationId`를 명시하여 대체 의사를 확인해야 합니다. 값이 전달되면 대체 대상은 같은 Workspace, VideoContent와 Channel의 실제 CURRENT 게시물과 정확히 일치해야 하며, CURRENT가 없거나 ID가 다르면 `INVALID_PUBLICATION_REPLACEMENT`로 거부합니다. 등록·기존 게시물의 SUPERSEDED 전환·대체 관계 및 상태 이력 기록을 하나의 트랜잭션에서 처리합니다. 게시물 등록과 Project 상태 변경 및 성과 동기화는 서로 자동 실행하지 않습니다.
+publishedAt은 선택값이며 화면은 사용자 현지 기준 현재 날짜·시각을 분 단위 초기값으로 제안합니다. OWNER·ADMIN은 등록 요청에서 DEFAULT / CUSTOM / DISABLED를 선택하고 CUSTOM일 때 최대 소수점 여섯째 자리의 부호 없는 문자열 customRevenuePerView를 필수로 전달합니다. 일반 MEMBER 요청은 수익 설정을 받지 않고 서버가 DEFAULT를 적용하며 응답에서 방식·단가·예상 수익을 제거합니다. 새 게시물 version은 0입니다.
 
-## 11.4. YouTube 게시물 생명주기 변경
+재업로드는 기존 게시물의 Video ID를 교체하지 않고 새 YouTubePublication으로 생성합니다. 서로 다른 Channel에는 CURRENT 게시물을 각각 둘 수 있지만 같은 VideoContent와 Channel에는 CURRENT를 최대 하나만 허용합니다. 같은 Channel의 기존 CURRENT가 있을 때는 `supersedesPublicationId`와 `supersedesPublicationVersion`을 명시하여 대체 의사를 확인해야 합니다. 값이 전달되면 대체 대상은 같은 Workspace, VideoContent와 Channel의 실제 CURRENT 게시물과 정확히 일치해야 하며, CURRENT가 없거나 ID·version이 다르면 전체 요청을 거부합니다. 등록·기존 게시물의 SUPERSEDED 전환·대체 관계 및 상태 이력 기록을 하나의 트랜잭션에서 처리합니다. 게시물 등록과 Project 상태 변경 및 성과 동기화는 서로 자동 실행하지 않습니다.
+
+## 11.4. YouTube 게시물 일반 정보 및 생명주기 변경
 
 PATCH /api/youtube-publications/{publicationId}
 
-게시 일시 등 일반 정보와 생명주기 변경 의도를 구분해 요청합니다. 상태 표시명은 CURRENT `게시 중`, SUPERSEDED `대체됨`, REMOVED `게시 종료`입니다. REMOVED로 바꿀 때는 `removalReason`에 `UNAVAILABLE` 또는 `INCORRECT`를 필수로 지정합니다. UNAVAILABLE은 누적 성과에 포함하고 INCORRECT는 현재·누적 집계에서 제외합니다.
+게시물 일반 정보는 Channel과 publishedAt만 수정할 수 있고 YouTube Video ID는 변경하지 않습니다. Channel 변경은 CURRENT에만 허용하고 publishedAt은 모든 상태에서 NULL을 포함해 수정할 수 있습니다.
+
+~~~json
+{
+  "channelId": 4,
+  "publishedAt": null,
+  "expectedVersion": 2,
+  "replaceCurrentPublicationId": 52,
+  "replaceCurrentPublicationVersion": 1,
+  "defaultRateChangeConfirmationToken": "opaque-single-use-token"
+}
+~~~
+
+대상 Channel에 다른 CURRENT가 있으면 그 ID와 version으로 명시적 대체 의사를 전달합니다. 첫 요청에서는 `defaultRateChangeConfirmationToken`을 생략합니다. DEFAULT 단가가 달라지면 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 최신 영향에 결합된 일회성 토큰을 반환하며 OWNER·ADMIN에게만 기존·새 단가와 예상 금액 영향을 포함합니다. 일반 MEMBER에게는 이동·대체 대상, Channel과 단가 변경 사실만 반환합니다.
+
+토큰을 제출한 요청은 이동·대체 대상 게시물을 잠근 뒤 `expectedVersion`, `replaceCurrentPublicationVersion`과 토큰에 결합된 영향 Publication version을 먼저 검증합니다. 하나라도 다르면 `409 YOUTUBE_PUBLICATION_VERSION_CONFLICT`를 반환하고 새 토큰을 발급하지 않습니다. 클라이언트는 기존 토큰과 오래된 version을 폐기하고 최신 게시물 상세를 다시 조회합니다.
+
+모든 version이 유효할 때만 토큰 만료 여부, 최신 상태, 대상 Channel과 적용 단가 영향을 다시 검증합니다. 토큰이 만료되었거나 Channel 기본 단가·영향 범위가 달라졌으면 저장하지 않고 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 최신 영향 및 새 토큰으로 다시 확인받습니다. 검증이 끝나면 Channel 변경, 기존 CURRENT의 SUPERSEDED 전환, 대체 관계·이력 및 DEFAULT 단가를 한 트랜잭션으로 반영하고 실제로 변경된 각 게시물 version을 증가시킵니다. 실제 게시 일시만 바꾸면 대체·단가 확인은 필요하지 않습니다.
+
+### 11.4.1. 게시물 생명주기 변경
+
+PATCH /api/youtube-publications/{publicationId}/lifecycle
+
+일반 정보 수정과 구분하여 생명주기 변경 의도만 요청합니다. 상태 표시명은 CURRENT `게시 중`, SUPERSEDED `대체됨`, REMOVED `게시 종료`입니다. REMOVED로 바꿀 때는 `removalReason`에 `UNAVAILABLE` 또는 `INCORRECT`를 필수로 지정합니다. UNAVAILABLE은 누적 성과에 포함하고 INCORRECT는 현재·누적 집계에서 제외합니다.
 
 ~~~json
 {
   "lifecycleStatus": "REMOVED",
   "removalReason": "UNAVAILABLE",
   "changeReason": "외부 게시 종료",
-  "replaceCurrentPublicationId": null
+  "expectedVersion": 2,
+  "replaceCurrentPublicationId": null,
+  "replaceCurrentPublicationVersion": null
 }
 ~~~
 
 SUPERSEDED 또는 REMOVED를 CURRENT로 복원할 수 있습니다. 같은 Channel에 다른 CURRENT가 있으면 `replaceCurrentPublicationId`로 대체 대상을 명시해야 합니다. 상태·종료 사유·대체 관계 변경과 생명주기 이력 기록은 하나의 트랜잭션에서 처리하며 자기 참조, 순환과 다른 Workspace·VideoContent·Channel 간 대체를 차단합니다. 외부 API의 조회 실패나 일시 오류만으로 REMOVED로 자동 변경하지 않습니다.
+
+### 11.4.2. 게시물 생명주기 이력
 
 GET /api/youtube-publications/{publicationId}/status-histories
 
@@ -1667,7 +1763,8 @@ PATCH /api/youtube-publications/{publicationId}/revenue-settings
 ~~~json
 {
   "revenueOption": "DEFAULT",
-  "customRevenuePerView": null
+  "customRevenuePerView": null,
+  "expectedVersion": 3
 }
 ~~~
 
@@ -1677,13 +1774,15 @@ revenueOption:
 - CUSTOM: customRevenuePerView 필수
 - DISABLED: appliedRevenuePerView를 0으로 적용
 
-Workspace OWNER와 ADMIN만 조회·변경할 수 있습니다. Channel 기본 단가가 0이어도 DEFAULT를 정상 저장하며 설정 누락 오류로 처리하지 않습니다.
+Workspace OWNER와 ADMIN만 조회·변경할 수 있습니다. CURRENT, SUPERSEDED와 REMOVED/UNAVAILABLE에서 변경할 수 있고 REMOVED/INCORRECT는 거부합니다. Channel 기본 단가가 0이어도 DEFAULT를 정상 저장하며 설정 누락 오류로 처리하지 않습니다. 성공하면 해당 Publication version만 증가시키고 VideoContent version은 바꾸지 않은 채 현재·누적 예상 수익을 다시 계산합니다.
 
 ## 11.6. YouTube 성과 동기화
 
 POST /api/youtube-publications/{publicationId}/sync
 
 외부 API에서 최신 성과를 조회하여 해당 publication_id의 video_performances를 갱신합니다.
+
+성과 동기화는 YouTubePublication의 일반 정보나 생명주기를 바꾸지 않으므로 Publication과 VideoContent version을 증가시키지 않습니다.
 
 응답:
 
@@ -1720,20 +1819,40 @@ GET /api/video-contents/{videoContentId}/performance-summary
 | --- | --- | --- |
 | INVALID_YOUTUBE_VIDEO | 400 | URL / ID 형식 오류 |
 | YOUTUBE_VIDEO_NOT_FOUND | 404 | API에서 영상을 확인할 수 없음 |
-| DUPLICATE_YOUTUBE_VIDEO | 409 | 같은 Workspace에 이미 YouTubePublication으로 등록 |
+| DUPLICATE_YOUTUBE_VIDEO | 409 | 같은 Workspace에 이미 YouTubePublication으로 등록. 권한에 따라 기존 등록 위치 data 제공 |
 | PROJECT_NOT_LINKED_TO_VIDEO_CONTENT | 409 | 대표 Project 또는 해제 대상 Project가 VideoContent에 연결되지 않음 |
 | LAST_VIDEO_CONTENT_PROJECT | 409 | VideoContent의 마지막 Project 연결 해제 시도 |
 | INVALID_PUBLICATION_REPLACEMENT | 409 | 자기 참조, 순환 또는 다른 VideoContent 게시물로 대체 관계 지정 |
 | CURRENT_PUBLICATION_EXISTS | 409 | 같은 VideoContent와 Channel에 CURRENT 게시물이 있으나 명시적 대체 대상 누락 |
 | INVALID_REMOVAL_REASON | 400 | REMOVED 상태의 종료 사유 누락 또는 허용되지 않은 값 |
+| PUBLICATION_ALREADY_CURRENT | 409 | 게시 중인 동영상의 복원 요청 |
 | PRIMARY_PROJECT_REASSIGNMENT_REQUIRED | 409 | Project 삭제 전 다른 활성 연결 Project로 대표 변경 필요 |
 | CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED | 409 | 대표 또는 ProjectGroup 변경으로 콘텐츠 성과 귀속 이동 확인 필요 |
+| DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED | 409 | version은 유효하지만 Channel·영상 유형 변경에 따른 DEFAULT 단가 영향 확인 또는 만료·불일치한 확인 토큰의 재확인 필요 |
+| VIDEO_CONTENT_VERSION_CONFLICT | 409 | 오래된 VideoContent version으로 변경 시도. 단가 확인 토큰 재발급 없이 최신 상세 재조회 필요 |
+| YOUTUBE_PUBLICATION_VERSION_CONFLICT | 409 | 오래된 YouTubePublication version으로 변경 시도. 단가 확인 토큰 재발급 없이 최신 상세 재조회 필요 |
+| ARCHIVED_PROJECT_VIDEO_CONTENT_CHANGE_FORBIDDEN | 409 | 보관 Project 연결·해제·대표 변경 시도 |
 | CUSTOM_REVENUE_RATE_REQUIRED | 400 | CUSTOM인데 단가 누락 |
 | YOUTUBE_API_UNAVAILABLE | 503 | 외부 API 일시 장애 |
 | YOUTUBE_QUOTA_EXCEEDED | 503 | API 할당량 제한 |
 | YOUTUBE_UPSTREAM_ERROR | 502 | 외부 API 비정상 응답 |
 
 동기화 실패 시 마지막 성공 데이터를 삭제하거나 게시물 생명주기를 변경하지 않습니다. 성공 이력이 없는 게시물은 0이 아닌 미집계로 응답하고, 성공 이력이 있으면 마지막 성공값과 마지막 시도 시각·오류를 함께 반환합니다.
+
+`DUPLICATE_YOUTUBE_VIDEO` 응답의 `data`는 권한에 따라 다음 형태를 사용합니다.
+
+```json
+{
+  "canAccess": true,
+  "videoContentId": 101,
+  "contentTitle": "카메라 롱폼 리뷰 완성본",
+  "projectId": 11,
+  "projectTitle": "카메라 롱폼 리뷰",
+  "channelName": "YMS 메인 채널"
+}
+```
+
+Workspace OWNER·ADMIN은 대표 Project를 우선 이동 위치로 받고, MEMBER는 접근 가능한 연결 Project 중 대표를 우선합니다. 접근 가능한 연결 Project가 없으면 `{"canAccess": false}`만 반환하여 콘텐츠·Project 식별 정보를 노출하지 않습니다.
 
 ---
 

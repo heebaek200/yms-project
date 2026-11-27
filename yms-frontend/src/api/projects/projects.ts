@@ -78,7 +78,7 @@ function optional(value?: string | null): string | null {
 }
 
 /** 조회 권한이 있는지 제작팀 관리 권한과 활성 참여 정보를 함께 확인합니다. */
-function canViewProject(project: ProjectDetail, context: ProjectMutationContext): boolean {
+export function canViewProject(project: ProjectDetail, context: Pick<ProjectMutationContext, 'workspaceRole' | 'userId'>): boolean {
     return context.workspaceRole !== 'MEMBER'
         || project.members.some(member => member.userId === context.userId && member.active);
 }
@@ -221,7 +221,7 @@ export async function updateWorkspaceProject(workspaceId: number, projectId: num
         request.projectGroupId ?? null
     );
     if (contentPerformanceMoves && !request.confirmContentPerformanceMove) {
-        return { success: false, errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED', message: '프로젝트 그룹을 변경하면 이 프로젝트가 성과 집계 대상인 영상 결과물의 콘텐츠 성과도 이동합니다.', errors: null };
+        return { success: false, errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED', message: '프로젝트 그룹을 변경하면 이 프로젝트가 성과 집계 대상인 콘텐츠의 성과도 이동합니다.', errors: null };
     }
 
     const now = new Date().toISOString();
@@ -296,7 +296,7 @@ export async function deleteWorkspaceProject(workspaceId: number, projectId: num
 
         const replacementId = replacements.get(content.videoContentId);
         const replacement = activeCandidates.find(candidate => candidate.projectId === replacementId);
-        if (!replacement) return { success: false, errorCode: 'PRIMARY_PROJECT_REASSIGNMENT_REQUIRED', message: `${content.title} 결과물의 새 성과 집계 프로젝트를 선택해 주세요.`, errors: null };
+        if (!replacement) return { success: false, errorCode: 'PRIMARY_PROJECT_REASSIGNMENT_REQUIRED', message: `${content.title} 콘텐츠의 새 성과 집계 프로젝트를 선택해 주세요.`, errors: null };
 
         const crossesGroupBoundary = project.projectGroupId !== replacement.projectGroupId;
         if (crossesGroupBoundary && context.workspaceRole === 'MEMBER') return { success: false, errorCode: 'PRIMARY_PROJECT_GROUP_PERMISSION_REQUIRED', message: '프로젝트 그룹 경계를 넘는 집계 프로젝트 변경은 제작팀 소유자 또는 관리자만 할 수 있습니다.', errors: null };
@@ -305,7 +305,7 @@ export async function deleteWorkspaceProject(workspaceId: number, projectId: num
             crossesGroupBoundary
             && content.cumulativePerformance.includedPublicationCount > 0
             && !request.confirmContentPerformanceMove
-        ) return { success: false, errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED', message: '프로젝트를 삭제하면 영상 결과물의 콘텐츠 성과가 새 프로젝트 그룹으로 이동합니다. 실제 비용·수익은 이동하지 않습니다.', errors: null };
+        ) return { success: false, errorCode: 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED', message: '프로젝트를 삭제하면 콘텐츠 성과가 새 프로젝트 그룹으로 이동합니다. 실제 비용·수익은 이동하지 않습니다.', errors: null };
 
         // 모든 검증이 끝난 뒤 아래에서 일괄 적용할 수 있도록 다음 루프까지 변경하지 않습니다.
     }
@@ -316,13 +316,19 @@ export async function deleteWorkspaceProject(workspaceId: number, projectId: num
         if (replacement) replaceVideoContent(content.videoContentId, {
             ...content,
             primaryProjectId: replacement.projectId,
+            version: content.version + 1,
             primaryProjectHistory: [...content.primaryProjectHistory, {
                 fromProjectId: project.projectId,
                 toProjectId: replacement.projectId,
+                fromProjectName: project.title,
+                toProjectName: replacement.title,
                 fromProjectGroupId: project.projectGroupId,
                 toProjectGroupId: replacement.projectGroupId,
+                fromProjectGroupName: project.projectGroupName,
+                toProjectGroupName: replacement.projectGroupName,
                 changedByName: context.userName,
                 changedAt: new Date().toISOString(),
+                reasonType: 'CONNECTION_CORRECTION',
                 reason: '성과 집계 프로젝트 삭제에 따른 이전'
             }]
         });

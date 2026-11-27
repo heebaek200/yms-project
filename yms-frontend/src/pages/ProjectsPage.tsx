@@ -4,11 +4,18 @@ import { getWorkspaceChannels } from '../api/workspaces/channels';
 import { createWorkspaceProject, deleteWorkspaceProject, getProjectGroupOptions, getWorkspaceProject, getWorkspaceProjects, setWorkspaceProjectArchived, updateWorkspaceProject, updateWorkspaceProjectStatus, type SaveProjectRequest } from '../api/projects/projects';
 import {
     changeVideoContentPrimaryProject,
+    connectVideoContentProject,
     createProjectVideoContent,
     createYouTubePublication,
+    deleteProjectVideoContent,
+    disconnectVideoContentProject,
+    getVideoContentProjectCandidates,
     removeYouTubePublication,
     restoreYouTubePublication,
-    syncYouTubePublication
+    syncYouTubePublication,
+    updateVideoContent,
+    updateYouTubePublication,
+    updateYouTubePublicationRevenue
 } from '../api/projects/youtube';
 import CompositionSafeSearchInput from '../components/common/CompositionSafeSearchInput';
 import FeedbackMessage, { type FeedbackMessageType } from '../components/common/FeedbackMessage';
@@ -20,11 +27,12 @@ import ProjectDetailHeader from '../components/projects/ProjectDetailHeader';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { registerUnsavedChangesGuard } from '../navigation/unsavedChangesGuard';
-import type { ProjectAccessRole, ProjectDetailResponse, ProjectListItemResponse, ProjectVideoType, VideoContentResponse, YouTubePublicationResponse, YouTubeRemovalReason } from '../types/project';
+import type { DefaultRateChangeConfirmation, DuplicateYouTubeVideoLocation, PrimaryProjectChangeReasonType, ProjectAccessRole, ProjectDetailResponse, ProjectListItemResponse, ProjectRevenueOption, ProjectVideoType, VideoContentProjectCandidate, VideoContentResponse, YouTubePublicationResponse, YouTubeRemovalReason } from '../types/project';
 import type { ProjectStatus } from '../types/projectGroup';
 import type { WorkspaceChannelListItem } from '../types/workspaceSettings';
 import { PROJECT_STATUS_LABELS } from '../projectStatuses';
 import { formatMoney } from '../utils/decimal';
+import { normalizeRateInput } from '../utils/format';
 import './ProjectGroupPage.css';
 import './ProjectsPage.css';
 import '../components/common/ResourceNavigationLink.css';
@@ -32,9 +40,43 @@ import '../components/common/ResourceNavigationLink.css';
 type FormValues = { title: string; content: string; channelId: string; projectGroupId: string; videoType: '' | ProjectVideoType; status: ProjectStatus; dueDate: string; plannedUploadDate: string };
 type Feedback = { type: FeedbackMessageType; message: string };
 type Errors = Partial<Record<keyof FormValues, string>>;
-type PublicationDraft = { youtubeVideo: string; channelId: string };
+type ContentFormField = 'title' | 'youtubeVideo' | 'channelId' | 'publishedAt' | 'customRevenuePerView';
+type YouTubeModalState =
+    | { kind: 'CONTENT_FORM'; content: VideoContentResponse | null; title: string; videoType: ProjectVideoType; youtubeVideo: string; channelId: string; publishedAt: string; revenueOption: ProjectRevenueOption; customRate: string; confirmation: DefaultRateChangeConfirmation | null; duplicateLocation: DuplicateYouTubeVideoLocation | null; fieldErrors: Partial<Record<ContentFormField, string>>; error: string | null }
+    | { kind: 'PUBLICATION_FORM'; content: VideoContentResponse; publication: YouTubePublicationResponse | null; youtubeVideo: string; channelId: string; publishedAt: string; revenueOption: ProjectRevenueOption; customRate: string; confirmation: DefaultRateChangeConfirmation | null; duplicateLocation: DuplicateYouTubeVideoLocation | null; fieldError: string | null }
+    | { kind: 'REVENUE_FORM'; content: VideoContentResponse; publication: YouTubePublicationResponse; revenueOption: ProjectRevenueOption; customRate: string; fieldError: string | null }
+    | { kind: 'CONNECTIONS'; content: VideoContentResponse; connectedProjects: VideoContentProjectCandidate[]; candidates: VideoContentProjectCandidate[]; keyword: string; appliedKeyword: string; page: number; totalPages: number; requestId: number; readOnly: boolean; loading: boolean; error: string | null }
+    | { kind: 'PRIMARY_FORM'; content: VideoContentResponse; candidates: VideoContentProjectCandidate[]; projectId: string; reasonType: PrimaryProjectChangeReasonType; reason: string; needsPerformanceConfirmation: boolean; error: string | null }
+    | { kind: 'CONTENT_DELETE'; content: VideoContentResponse; error: string | null }
+    | { kind: 'CONTENT_HISTORY'; content: VideoContentResponse }
+    | { kind: 'PUBLICATION_HISTORY'; publication: YouTubePublicationResponse };
 const STATUS_LABEL = PROJECT_STATUS_LABELS;
 const EMPTY_FORM: FormValues = { title: '', content: '', channelId: '', projectGroupId: '', videoType: '', status: 'PLANNING', dueDate: '', plannedUploadDate: '' };
+
+/** 현재 현지 시각을 datetime-local 입력값의 분 정밀도로 변환합니다. */
+function currentLocalDateTimeValue(): string {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+/** 저장된 ISO 시각을 datetime-local 입력값으로 변환합니다. */
+function toLocalDateTimeValue(value: string | null): string {
+    if (!value) return '';
+    const date = new Date(value);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+/** 오류 응답의 data가 DEFAULT 단가 영향 확인 계약인지 판별합니다. */
+function isDefaultRateChangeConfirmation(value: unknown): value is DefaultRateChangeConfirmation {
+    return typeof value === 'object' && value !== null
+        && 'confirmationToken' in value
+        && 'impacts' in value;
+}
+
+/** 오류 응답의 data가 중복 YouTube 동영상 위치 계약인지 판별합니다. */
+function isDuplicateYouTubeVideoLocation(value: unknown): value is DuplicateYouTubeVideoLocation {
+    return typeof value === 'object' && value !== null && 'canAccess' in value;
+}
 
 /** 새 프로젝트에서 선택 가능한 채널이 하나뿐이면 해당 채널을 초기값으로 사용합니다. */
 function createProjectForm(channels: WorkspaceChannelListItem[]): FormValues {
@@ -78,12 +120,13 @@ function ProjectsPage() {
     const [initialForm, setInitialForm] = useState<FormValues>(EMPTY_FORM);
     const [errors, setErrors] = useState<Errors>({});
     const [submitting, setSubmitting] = useState(false);
-    const [publicationDrafts, setPublicationDrafts] = useState<Record<number, PublicationDraft>>({});
-    const [publicationErrors, setPublicationErrors] = useState<Record<number, string>>({});
+    const [youtubeModal, setYoutubeModal] = useState<YouTubeModalState | null>(null);
+    const [youtubeSubmitting, setYoutubeSubmitting] = useState(false);
     const allowNavigation = useRef(false);
     const formRef = useRef<HTMLFormElement>(null);
     const latestReadRequestIdRef = useRef(0);
     const latestChannelRequestIdRef = useRef(0);
+    const latestConnectionRequestIdRef = useRef(0);
     const activeViewContextRef = useRef('');
     const activeWorkspaceIdRef = useRef<number | null>(null);
     const isAdmin = currentWorkspace?.myRole !== 'MEMBER';
@@ -140,7 +183,7 @@ function ProjectsPage() {
     useEffect(() => { void loadChannels(); }, [loadChannels]);
     useEffect(() => { if (projectId === null) void loadList(); else if (Number.isInteger(projectId)) void loadDetail(); else { latestReadRequestIdRef.current += 1; setLoading(false); setError('올바르지 않은 프로젝트 주소입니다.'); } }, [loadDetail, loadList, projectId]);
     useEffect(() => { setDetail(null); setProjects([]); setFeedback(null); setModalOpen(false); setEditingProject(null); }, [currentWorkspace?.workspaceId]);
-    useEffect(() => { setPublicationDrafts({}); setPublicationErrors({}); }, [currentWorkspace?.workspaceId, projectId]);
+    useEffect(() => { setYoutubeModal(null); }, [currentWorkspace?.workspaceId, projectId]);
     useEffect(() => {
         if (!modalOpen || editingProject || channels.length !== 1) return;
         const channelId = String(channels[0].channelId);
@@ -240,7 +283,7 @@ function ProjectsPage() {
     /** 입력값을 API 요청으로 변환해 생성 또는 수정을 수행합니다. */
     const submit = async (event: React.SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
-        if (!currentWorkspace || !form.videoType) { setErrors(current => ({ ...current, videoType: '영상 유형을 선택해 주세요.' })); return; }
+        if (!currentWorkspace || !form.videoType) { setErrors(current => ({ ...current, videoType: '기본 콘텐츠 유형을 선택해 주세요.' })); return; }
         let confirmContentPerformanceMove = false;
         if (editingProject && isAdmin && Number(form.projectGroupId || 0) !== (editingProject.projectGroupId ?? 0)) {
             const hasFinance = [editingProject.workerAmount, editingProject.directExpenseAmount, editingProject.directRevenueAmount]
@@ -249,7 +292,7 @@ function ProjectsPage() {
                 content.primaryProjectId === editingProject.projectId
                 && content.cumulativePerformance.includedPublicationCount > 0
             ));
-            if ((hasFinance || hasContentPerformance) && !window.confirm(`프로젝트 그룹을 변경할까요?\n\n${hasFinance ? '• 작업자 금액과 직접 비용·수익의 그룹 집계가 이동합니다.\n' : ''}${hasContentPerformance ? '• 이 프로젝트가 성과 집계 대상인 영상 결과물의 콘텐츠 성과가 이동합니다.\n' : ''}그룹에 직접 등록한 비용·수익은 이동하지 않습니다.`)) return;
+            if ((hasFinance || hasContentPerformance) && !window.confirm(`프로젝트 그룹을 변경할까요?\n\n${hasFinance ? '• 작업자 금액과 직접 비용·수익의 그룹 집계가 이동합니다.\n' : ''}${hasContentPerformance ? '• 이 프로젝트가 성과 집계 대상인 콘텐츠의 성과가 이동합니다.\n' : ''}그룹에 직접 등록한 비용·수익은 이동하지 않습니다.`)) return;
             confirmContentPerformanceMove = hasContentPerformance;
         }
         setSubmitting(true); setErrors({});
@@ -282,10 +325,10 @@ function ProjectsPage() {
         for (const content of detail.videoContents.filter(item => item.primaryProjectId === detail.projectId)) {
             const candidates = content.connectedProjectIds.filter(candidateId => candidateId !== detail.projectId);
             if (candidates.length === 1) {
-                if (!window.confirm(`${content.title} 결과물의 성과 집계 프로젝트를 #${candidates[0]}로 이전하고 삭제할까요?`)) return;
+                if (!window.confirm(`${content.title} 콘텐츠의 성과 집계 프로젝트를 #${candidates[0]}로 이전하고 삭제할까요?`)) return;
                 primaryProjectReassignments.push({ videoContentId: content.videoContentId, newPrimaryProjectId: candidates[0] });
             } else if (candidates.length > 1) {
-                const selected = Number(window.prompt(`${content.title} 결과물의 새 성과 집계 프로젝트 ID를 입력해 주세요.\n선택 가능: ${candidates.join(', ')}`, String(candidates[0])));
+                const selected = Number(window.prompt(`${content.title} 콘텐츠의 새 성과 집계 프로젝트 ID를 입력해 주세요.\n선택 가능: ${candidates.join(', ')}`, String(candidates[0])));
                 if (!candidates.includes(selected)) {
                     setFeedback({ type: 'error', message: '연결된 프로젝트 중에서 새 성과 집계 프로젝트를 선택해 주세요.' });
                     return;
@@ -293,7 +336,7 @@ function ProjectsPage() {
                 primaryProjectReassignments.push({ videoContentId: content.videoContentId, newPrimaryProjectId: selected });
             }
         }
-        if (!window.confirm('프로젝트를 삭제할까요? 비용·수익·정산과 영상 게시 이력은 유지됩니다.')) return;
+        if (!window.confirm('프로젝트를 삭제할까요? 비용·수익·정산과 콘텐츠·YouTube 동영상 이력은 유지됩니다.')) return;
         let response = await deleteWorkspaceProject(currentWorkspace.workspaceId, detail.projectId, context, { primaryProjectReassignments });
         if (!response.success && response.errorCode === 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED') {
             if (!window.confirm(`${response.message}\n\n계속 삭제할까요?`)) return;
@@ -322,108 +365,181 @@ function ProjectsPage() {
         return response.success;
     };
 
-    /** Project 기본값으로 결과물을 즉시 만들고 게시물 등록 단계로 이어갑니다. */
-    const addVideoContent = async () => {
-        if (!currentWorkspace || !detail) return;
-        const response = await createProjectVideoContent(currentWorkspace.workspaceId, detail.projectId, {}, context);
-        if (response.success) setDetail(response.data);
-        setFeedback({ type: response.success ? 'success' : 'error', message: response.message ?? '' });
+    /** 낙관적 잠금 충돌은 기존 입력을 자동 재시도하지 않고 최신 상세로 복구합니다. */
+    const handleYouTubeConflict = async (message: string) => {
+        setYoutubeModal(null);
+        setFeedback({ type: 'error', message });
+        await loadDetail();
     };
 
-    /** 결과물별 게시물 입력값을 서로 독립적으로 유지합니다. */
-    const changePublicationDraft = (videoContentId: number, patch: Partial<PublicationDraft>) => {
-        setPublicationDrafts(current => {
-            const previous = current[videoContentId] ?? {
-                youtubeVideo: '',
-                channelId: String(detail?.channelId ?? '')
-            };
-            return { ...current, [videoContentId]: { ...previous, ...patch } };
-        });
-        if (patch.youtubeVideo !== undefined) {
-            // 사용자가 값을 고치기 시작하면 이전 서버 검증 결과를 즉시 제거합니다.
-            setPublicationErrors(current => {
-                if (!(videoContentId in current)) return current;
-                const next = { ...current };
-                delete next[videoContentId];
-                return next;
-            });
+    /** 결과물 생성·수정 모달을 Project 제안값 또는 현재 값으로 엽니다. */
+    const openContentForm = (content: VideoContentResponse | null = null) => {
+        if (!detail) return;
+        setYoutubeModal({ kind: 'CONTENT_FORM', content, title: content?.title ?? detail.title, videoType: content?.videoType ?? detail.videoType, youtubeVideo: '', channelId: String(detail.channelId), publishedAt: currentLocalDateTimeValue(), revenueOption: 'DEFAULT', customRate: '', confirmation: null, duplicateLocation: null, fieldErrors: {}, error: null });
+    };
+
+    /** 확인 토큰 재시도를 포함해 결과물 제목·유형을 저장합니다. */
+    const submitContentForm = async () => {
+        if (!currentWorkspace || !detail || youtubeModal?.kind !== 'CONTENT_FORM') return;
+        setYoutubeSubmitting(true);
+        const response = youtubeModal.content
+            ? await updateVideoContent(currentWorkspace.workspaceId, detail.projectId, youtubeModal.content.videoContentId, { title: youtubeModal.title, videoType: youtubeModal.videoType, expectedVersion: youtubeModal.content.version, defaultRateChangeConfirmationToken: youtubeModal.confirmation?.confirmationToken }, context)
+            : await createProjectVideoContent(currentWorkspace.workspaceId, detail.projectId, {
+                title: youtubeModal.title,
+                videoType: youtubeModal.videoType,
+                initialPublication: youtubeModal.youtubeVideo.trim() ? {
+                    youtubeVideo: youtubeModal.youtubeVideo,
+                    channelId: Number(youtubeModal.channelId),
+                    publishedAt: youtubeModal.publishedAt ? new Date(youtubeModal.publishedAt).toISOString() : null,
+                    revenueOption: youtubeModal.revenueOption,
+                    customRevenuePerView: youtubeModal.customRate || null
+                } : null
+            }, context);
+        setYoutubeSubmitting(false);
+        if (response.success) {
+            setDetail(response.data); setYoutubeModal(null); setFeedback({ type: 'success', message: response.message ?? '' });
+        } else if (response.errorCode === 'DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED' && isDefaultRateChangeConfirmation(response.data)) {
+            const confirmation = response.data;
+            setYoutubeModal(current => current?.kind === 'CONTENT_FORM' ? { ...current, confirmation, duplicateLocation: null, error: null } : current);
+        } else if (response.errorCode === 'VIDEO_CONTENT_VERSION_CONFLICT' || response.errorCode === 'YOUTUBE_PUBLICATION_VERSION_CONFLICT') {
+            await handleYouTubeConflict(response.message);
+        } else {
+            const fieldErrors = Object.fromEntries(
+                (response.errors ?? [])
+                    .filter(error => ['title', 'youtubeVideo', 'channelId', 'publishedAt', 'customRevenuePerView'].includes(error.field))
+                    .map(error => [error.field, error.reason])
+            ) as Partial<Record<ContentFormField, string>>;
+            const duplicateLocation = response.errorCode === 'DUPLICATE_YOUTUBE_VIDEO' && isDuplicateYouTubeVideoLocation(response.data) ? response.data : null;
+            setYoutubeModal(current => current?.kind === 'CONTENT_FORM'
+                ? { ...current, duplicateLocation, fieldErrors, error: Object.keys(fieldErrors).length > 0 ? null : response.message }
+                : current);
+            if (Object.keys(fieldErrors).length > 0) {
+                window.requestAnimationFrame(() => document.querySelector<HTMLElement>('#youtube-management-modal-title')?.closest('[role="dialog"]')?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+            }
         }
     };
 
-    /** 긴 상세 화면에서도 오류가 난 게시물 입력란을 즉시 찾을 수 있게 포커스와 스크롤을 맞춥니다. */
-    const focusPublicationInput = (videoContentId: number) => {
-        window.requestAnimationFrame(() => {
-            const input = document.getElementById(`project-youtube-video-${videoContentId}`);
-            if (!(input instanceof HTMLInputElement)) return;
-            input.focus({ preventScroll: true });
+    /** 게시물 등록 또는 일반 정보 수정 모달을 엽니다. */
+    const openPublicationForm = (content: VideoContentResponse, publication: YouTubePublicationResponse | null = null) => {
+        if (!detail) return;
+        setYoutubeModal({ kind: 'PUBLICATION_FORM', content, publication, youtubeVideo: '', channelId: String(publication?.channelId ?? detail.channelId), publishedAt: publication ? toLocalDateTimeValue(publication.publishedAt) : currentLocalDateTimeValue(), revenueOption: publication?.revenueOption ?? 'DEFAULT', customRate: publication?.revenueOption === 'CUSTOM' ? publication.appliedRate ?? '' : '', confirmation: null, duplicateLocation: null, fieldError: null });
+    };
 
-            // 이미 보이는 입력란은 화면을 움직이지 않고, 화면 밖에 있을 때만 가운데로 이동합니다.
-            const bounds = input.getBoundingClientRect();
-            if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
-                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+    /** 게시물 등록·수정을 처리하고 DEFAULT 단가 영향은 같은 모달에서 재확인합니다. */
+    const submitPublicationForm = async () => {
+        if (!currentWorkspace || !detail || youtubeModal?.kind !== 'PUBLICATION_FORM') return;
+        const channelId = Number(youtubeModal.channelId);
+        const current = youtubeModal.content.publications.find(item => item.publicationId !== youtubeModal.publication?.publicationId && item.channelId === channelId && item.lifecycleStatus === 'CURRENT');
+        const publishedAt = youtubeModal.publishedAt ? new Date(youtubeModal.publishedAt).toISOString() : null;
+        setYoutubeSubmitting(true);
+        const response = youtubeModal.publication
+            ? await updateYouTubePublication(currentWorkspace.workspaceId, detail.projectId, youtubeModal.content.videoContentId, youtubeModal.publication.publicationId, { channelId, publishedAt, expectedVersion: youtubeModal.publication.version, replaceCurrentPublicationId: current?.publicationId ?? null, replaceCurrentPublicationVersion: current?.version ?? null, defaultRateChangeConfirmationToken: youtubeModal.confirmation?.confirmationToken }, context)
+            : await createYouTubePublication(currentWorkspace.workspaceId, detail.projectId, youtubeModal.content.videoContentId, { channelId, youtubeVideo: youtubeModal.youtubeVideo, publishedAt, revenueOption: youtubeModal.revenueOption, customRevenuePerView: youtubeModal.customRate || null, supersedesPublicationId: current?.publicationId ?? null, supersedesPublicationVersion: current?.version ?? null }, context);
+        setYoutubeSubmitting(false);
+        if (response.success) {
+            setDetail(response.data); setYoutubeModal(null); setFeedback({ type: 'success', message: response.message ?? '' });
+        } else if (response.errorCode === 'DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED' && isDefaultRateChangeConfirmation(response.data)) {
+            const confirmation = response.data;
+            setYoutubeModal(value => value?.kind === 'PUBLICATION_FORM' ? { ...value, confirmation, duplicateLocation: null, fieldError: null } : value);
+        } else if (response.errorCode.includes('VERSION_CONFLICT')) await handleYouTubeConflict(response.message);
+        else {
+            const duplicateLocation = response.errorCode === 'DUPLICATE_YOUTUBE_VIDEO' && isDuplicateYouTubeVideoLocation(response.data) ? response.data : null;
+            setYoutubeModal(value => value?.kind === 'PUBLICATION_FORM' ? { ...value, duplicateLocation, fieldError: response.message } : value);
+        }
+    };
+
+    /** 게시물 수익 설정 모달을 엽니다. */
+    const openRevenueForm = (content: VideoContentResponse, publication: YouTubePublicationResponse) => {
+        setYoutubeModal({ kind: 'REVENUE_FORM', content, publication, revenueOption: publication.revenueOption ?? 'DEFAULT', customRate: publication.revenueOption === 'CUSTOM' ? publication.appliedRate ?? '' : '', fieldError: null });
+    };
+
+    /** 관리자 전용 게시물 예상 수익 방식을 저장합니다. */
+    const submitRevenueForm = async () => {
+        if (!currentWorkspace || !detail || youtubeModal?.kind !== 'REVENUE_FORM') return;
+        setYoutubeSubmitting(true);
+        const response = await updateYouTubePublicationRevenue(currentWorkspace.workspaceId, detail.projectId, youtubeModal.content.videoContentId, youtubeModal.publication.publicationId, { revenueOption: youtubeModal.revenueOption, customRevenuePerView: youtubeModal.customRate || null, expectedVersion: youtubeModal.publication.version }, context);
+        setYoutubeSubmitting(false);
+        if (response.success) { setDetail(response.data); setYoutubeModal(null); setFeedback({ type: 'success', message: response.message ?? '' }); }
+        else if (response.errorCode.includes('VERSION_CONFLICT')) await handleYouTubeConflict(response.message);
+        else setYoutubeModal(value => value?.kind === 'REVENUE_FORM' ? { ...value, fieldError: response.message } : value);
+    };
+
+    /** 연결 관리 모달의 현재 연결과 검색 후보를 다시 조회합니다. */
+    const loadConnectionCandidates = async (content: VideoContentResponse, keyword = '', page = 1) => {
+        if (!currentWorkspace || !detail) return;
+        const requestId = ++latestConnectionRequestIdRef.current;
+        setYoutubeModal(previous => {
+            const current = previous?.kind === 'CONNECTIONS' && previous.content.videoContentId === content.videoContentId ? previous : null;
+            return {
+                kind: 'CONNECTIONS', content, connectedProjects: current?.connectedProjects ?? [],
+                candidates: [], keyword: current?.keyword ?? keyword, appliedKeyword: keyword,
+                page, totalPages: 1, requestId, readOnly: detail.archivedAt !== null, loading: true, error: null
+            };
+        });
+        const response = await getVideoContentProjectCandidates(currentWorkspace.workspaceId, detail.projectId, content.videoContentId, { keyword, page }, context);
+        if (activeViewContextRef.current !== viewContextKey) return;
+        setYoutubeModal(current => {
+            if (current?.kind !== 'CONNECTIONS' || current.requestId !== requestId) return current;
+            if (!response.success) return { ...current, loading: false, error: response.message };
+            const { connectedProjects, items, page: resolvedPage, totalPages } = response.data;
+            return { ...current, connectedProjects, candidates: items, page: resolvedPage, totalPages, loading: false };
         });
     };
 
-    /** 같은 Channel의 CURRENT가 있으면 명시적 대체 확인 후 새 게시물을 등록합니다. */
-    const addPublication = async (content: VideoContentResponse) => {
-        if (!currentWorkspace || !detail) return;
-        const draft = publicationDrafts[content.videoContentId] ?? { youtubeVideo: '', channelId: String(detail.channelId) };
-        const channelId = Number(draft.channelId);
-        const current = content.publications.find(publication => publication.channelId === channelId && publication.lifecycleStatus === 'CURRENT');
-        if (current && !window.confirm(`${current.channelName}의 현재 게시물을 새 게시물로 대체할까요? 기존 성과와 게시 이력은 보존됩니다.`)) return;
-
-        setPublicationErrors(values => {
-            const next = { ...values };
-            delete next[content.videoContentId];
-            return next;
-        });
-        setFeedback(null);
-        const response = await createYouTubePublication(currentWorkspace.workspaceId, detail.projectId, content.videoContentId, { channelId, youtubeVideo: draft.youtubeVideo, supersedesPublicationId: current?.publicationId ?? null }, context);
+    /** 한 건씩 Project 연결을 추가하거나 해제하고 최신 version으로 모달을 갱신합니다. */
+    const mutateConnection = async (candidate: VideoContentProjectCandidate) => {
+        if (!currentWorkspace || !detail || youtubeModal?.kind !== 'CONNECTIONS') return;
+        setYoutubeSubmitting(true);
+        const response = candidate.connected
+            ? await disconnectVideoContentProject(currentWorkspace.workspaceId, detail.projectId, youtubeModal.content.videoContentId, candidate.projectId, youtubeModal.content.version, context)
+            : await connectVideoContentProject(currentWorkspace.workspaceId, detail.projectId, youtubeModal.content.videoContentId, candidate.projectId, youtubeModal.content.version, context);
+        setYoutubeSubmitting(false);
         if (response.success) {
             setDetail(response.data);
-            setPublicationDrafts(values => ({ ...values, [content.videoContentId]: { ...draft, youtubeVideo: '' } }));
+            const content = response.data.videoContents.find(item => item.videoContentId === youtubeModal.content.videoContentId);
+            if (content) await loadConnectionCandidates(content, youtubeModal.appliedKeyword, youtubeModal.page);
+            else setYoutubeModal(null);
             setFeedback({ type: 'success', message: response.message ?? '' });
-            return;
-        }
-        if (response.errorCode === 'INVALID_YOUTUBE_VIDEO' || response.errorCode === 'DUPLICATE_YOUTUBE_VIDEO') {
-            setPublicationErrors(values => ({ ...values, [content.videoContentId]: response.message }));
-            focusPublicationInput(content.videoContentId);
-            return;
-        }
-        setFeedback({ type: 'error', message: response.message });
+        } else if (response.errorCode.includes('VERSION_CONFLICT')) await handleYouTubeConflict(response.message);
+        else setFeedback({ type: 'error', message: response.message });
     };
 
-    /** 연결 Project 중 새 집계 대상을 선택하고 실제 그룹 간 성과 이동이 있을 때만 재확인합니다. */
-    const changePrimaryProject = async (content: VideoContentResponse) => {
+    /** 대표 Project 변경 모달에 연결 Project 이름과 그룹을 준비합니다. */
+    const openPrimaryForm = async (content: VideoContentResponse) => {
         if (!currentWorkspace || !detail) return;
-        const candidates = content.connectedProjectIds.filter(candidateId => candidateId !== content.primaryProjectId);
-        const selected = Number(window.prompt(`새 성과 집계 프로젝트 ID를 입력해 주세요.\n선택 가능: ${candidates.join(', ')}`, String(candidates[0] ?? '')));
-        if (!candidates.includes(selected)) {
-            setFeedback({ type: 'error', message: '연결된 다른 프로젝트 중에서 새 성과 집계 프로젝트를 선택해 주세요.' });
-            return;
-        }
+        const response = await getVideoContentProjectCandidates(currentWorkspace.workspaceId, detail.projectId, content.videoContentId, { size: 1 }, context);
+        if (!response.success) { setFeedback({ type: 'error', message: response.message }); return; }
+        const candidates = response.data.connectedProjects.filter(item => !item.primary && item.canManage);
+        setYoutubeModal({ kind: 'PRIMARY_FORM', content, candidates, projectId: String(candidates[0]?.projectId ?? ''), reasonType: 'MERGED', reason: '', needsPerformanceConfirmation: false, error: null });
+    };
 
-        let response = await changeVideoContentPrimaryProject(
-            currentWorkspace.workspaceId,
-            detail.projectId,
-            content.videoContentId,
-            { newPrimaryProjectId: selected },
-            context
-        );
-        // Mock API가 그룹 간 성과 이동을 감지한 경우에만 사용자 확인 후 같은 요청을 재시도합니다.
-        if (!response.success && response.errorCode === 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED') {
-            if (!window.confirm(`${response.message}\n\n계속 변경할까요?`)) return;
-            response = await changeVideoContentPrimaryProject(
-                currentWorkspace.workspaceId,
-                detail.projectId,
-                content.videoContentId,
-                { newPrimaryProjectId: selected, confirmContentPerformanceMove: true },
-                context
-            );
+    /** 사유와 성과 이동 확인을 포함해 대표 Project를 변경합니다. */
+    const submitPrimaryForm = async () => {
+        if (!currentWorkspace || !detail || youtubeModal?.kind !== 'PRIMARY_FORM') return;
+        setYoutubeSubmitting(true);
+        const response = await changeVideoContentPrimaryProject(currentWorkspace.workspaceId, detail.projectId, youtubeModal.content.videoContentId, { newPrimaryProjectId: Number(youtubeModal.projectId), changeReasonType: youtubeModal.reasonType, changeReason: youtubeModal.reason || null, expectedVersion: youtubeModal.content.version, confirmContentPerformanceMove: youtubeModal.needsPerformanceConfirmation }, context);
+        setYoutubeSubmitting(false);
+        if (response.success) { setDetail(response.data); setYoutubeModal(null); setFeedback({ type: 'success', message: response.message ?? '' }); }
+        else if (response.errorCode === 'CONTENT_PERFORMANCE_MOVE_CONFIRMATION_REQUIRED') setYoutubeModal({ ...youtubeModal, needsPerformanceConfirmation: true, error: response.message });
+        else if (response.errorCode.includes('VERSION_CONFLICT')) await handleYouTubeConflict(response.message);
+        else setYoutubeModal({ ...youtubeModal, error: response.message });
+    };
+
+    /** 확인 모달에서 게시·공유 이력이 없는 영상의 물리 삭제를 요청합니다. */
+    const submitContentDeletion = async () => {
+        if (!currentWorkspace || !detail || youtubeModal?.kind !== 'CONTENT_DELETE') return;
+        setYoutubeSubmitting(true);
+        const response = await deleteProjectVideoContent(currentWorkspace.workspaceId, detail.projectId, youtubeModal.content.videoContentId, youtubeModal.content.version, context);
+        setYoutubeSubmitting(false);
+        if (response.success) {
+            setDetail(response.data);
+            setYoutubeModal(null);
+            setFeedback({ type: 'success', message: response.message ?? '영상을 삭제했습니다.' });
+        } else if (response.errorCode === 'VIDEO_CONTENT_VERSION_CONFLICT') {
+            await handleYouTubeConflict(response.message);
+        } else {
+            setYoutubeModal(current => current?.kind === 'CONTENT_DELETE' ? { ...current, error: response.message } : current);
         }
-        if (response.success) setDetail(response.data);
-        setFeedback({ type: response.success ? 'success' : 'error', message: response.message ?? '' });
     };
 
     /** 게시물별 동기화·종료·복원을 수행하고 전체 결과물 집계를 새 응답으로 교체합니다. */
@@ -434,22 +550,39 @@ function ProjectsPage() {
         if (action === 'sync') response = await syncYouTubePublication(...base, context);
         else if (action === 'restore') {
             const current = content.publications.find(item => item.channelId === publication.channelId && item.lifecycleStatus === 'CURRENT');
-            if (current && !window.confirm(`${current.channelName}의 현재 게시물을 대체하고 이 게시물을 복원할까요?`)) return;
-            response = await restoreYouTubePublication(...base, current?.publicationId ?? null, context);
+            if (current && !window.confirm(`${current.channelName}의 현재 YouTube 동영상을 대체하고 이 동영상을 복원할까요?`)) return;
+            response = await restoreYouTubePublication(...base, publication.version, current?.publicationId ?? null, current?.version ?? null, context);
         } else {
             const reason: YouTubeRemovalReason = action === 'incorrect' ? 'INCORRECT' : 'UNAVAILABLE';
-            const message = reason === 'INCORRECT' ? '잘못 연결한 게시물로 처리할까요? 현재·누적 성과에서 모두 제외됩니다.' : '게시 종료 처리할까요? 마지막 성과는 누적 게시 성과에 남습니다.';
+            const message = reason === 'INCORRECT' ? '잘못 연결한 YouTube 동영상으로 처리할까요? 현재·누적 성과에서 모두 제외됩니다.' : '동영상 연결을 종료할까요? 마지막 성과는 누적 성과에 남습니다.';
             if (!window.confirm(message)) return;
-            response = await removeYouTubePublication(...base, reason, context);
+            response = await removeYouTubePublication(...base, reason, publication.version, context);
         }
         if (response.success) setDetail(response.data);
+        else if (response.errorCode.includes('VERSION_CONFLICT')) { await handleYouTubeConflict(response.message); return; }
         setFeedback({ type: response.success ? 'success' : 'error', message: response.message ?? '' });
+    };
+
+    /** 중복 동영상 오류에서 조회 가능한 기존 콘텐츠로 이동합니다. */
+    const openDuplicateLocation = (duplicate: DuplicateYouTubeVideoLocation) => {
+        if (!duplicate.canAccess) return;
+        const listSearch = (location.state as { listSearch?: string } | null)?.listSearch;
+        setYoutubeModal(null);
+        navigate(`/projects/${duplicate.projectId}/videos?videoContentId=${duplicate.videoContentId}`, {
+            state: listSearch ? { listSearch } : undefined
+        });
     };
 
     const activeMember = detail?.members.find(member => member.userId === user?.userId && member.active);
     const canEdit = isAdmin || activeMember?.permission === 'EDIT';
     const canManage = isAdmin || activeMember?.isOwner === true;
-    return <section className="project-area-page">{projectId === null ? <><ProjectAreaTabs /><ProjectList projects={projects} channels={channels} groups={groups} loading={loading} error={error} params={params} totalPages={totalPages} onFilter={setFilter} onResetFilters={() => setParams(new URLSearchParams(), { replace: true })} onCreate={requestCreateForm} /></> : <ProjectDetailView detail={detail} channels={channels} loading={loading} error={error} feedback={feedback} canSeeRevenue={isAdmin} canEdit={canEdit} canManage={canManage} statusSubmitting={submitting} publicationDrafts={publicationDrafts} publicationErrors={publicationErrors} onPublicationDraft={changePublicationDraft} onStatusChange={changeProjectStatus} onEdit={() => detail && openForm(detail)} onArchive={() => void archive()} onDelete={() => void remove()} onAddVideoContent={() => void addVideoContent()} onChangePrimaryProject={content => void changePrimaryProject(content)} onAddPublication={content => void addPublication(content)} onPublicationAction={(content, publication, action) => void mutatePublication(content, publication, action)} />}{modalOpen && <ProjectGroupModal titleId="project-form-title" title={editingProject ? '프로젝트 수정' : '새 프로젝트'} description={editingProject ? '프로젝트 기본 정보와 일정을 수정합니다.' : '영상 제작 과정의 기본 정보와 시작 상태를 설정합니다.'} onRequestClose={closeForm}><ProjectForm formRef={formRef} values={form} errors={errors} channels={channels} groups={groups} edit={editingProject !== null} admin={isAdmin} submitting={submitting} onChange={change} onSubmit={submit} onCancel={closeForm} /></ProjectGroupModal>}</section>;
+    return <section className="project-area-page">
+        {projectId === null
+            ? <><ProjectAreaTabs /><ProjectList projects={projects} channels={channels} groups={groups} loading={loading} error={error} params={params} totalPages={totalPages} onFilter={setFilter} onResetFilters={() => setParams(new URLSearchParams(), { replace: true })} onCreate={requestCreateForm} /></>
+            : <ProjectDetailView detail={detail} loading={loading} error={error} feedback={feedback} canSeeRevenue={isAdmin} canEdit={canEdit} canManage={canManage} statusSubmitting={submitting} onStatusChange={changeProjectStatus} onEdit={() => detail && openForm(detail)} onArchive={() => void archive()} onDelete={() => void remove()} onAddVideoContent={() => openContentForm()} onEditVideoContent={openContentForm} onDeleteVideoContent={content => setYoutubeModal({ kind: 'CONTENT_DELETE', content, error: null })} onManageConnections={content => void loadConnectionCandidates(content)} onChangePrimaryProject={content => void openPrimaryForm(content)} onShowContentHistory={content => setYoutubeModal({ kind: 'CONTENT_HISTORY', content })} onAddPublication={content => openPublicationForm(content)} onEditPublication={openPublicationForm} onEditRevenue={openRevenueForm} onShowPublicationHistory={publication => setYoutubeModal({ kind: 'PUBLICATION_HISTORY', publication })} onPublicationAction={(content, publication, action) => void mutatePublication(content, publication, action)} />}
+        {modalOpen && <ProjectGroupModal titleId="project-form-title" title={editingProject ? '프로젝트 수정' : '새 프로젝트'} description={editingProject ? '프로젝트 기본 정보와 일정을 수정합니다.' : '영상 제작 과정의 기본 정보와 시작 상태를 설정합니다.'} onRequestClose={closeForm}><ProjectForm formRef={formRef} values={form} errors={errors} channels={channels} groups={groups} edit={editingProject !== null} admin={isAdmin} submitting={submitting} onChange={change} onSubmit={submit} onCancel={closeForm} /></ProjectGroupModal>}
+        {youtubeModal && <YouTubeManagementModal state={youtubeModal} channels={channels} canSeeRevenue={isAdmin} submitting={youtubeSubmitting} onChange={setYoutubeModal} onClose={() => setYoutubeModal(null)} onOpenDuplicateLocation={openDuplicateLocation} onSubmitContent={() => void submitContentForm()} onSubmitContentDeletion={() => void submitContentDeletion()} onSubmitPublication={() => void submitPublicationForm()} onSubmitRevenue={() => void submitRevenueForm()} onSearchConnections={(keyword, page) => youtubeModal.kind === 'CONNECTIONS' && void loadConnectionCandidates(youtubeModal.content, keyword, page)} onMutateConnection={candidate => void mutateConnection(candidate)} onSubmitPrimary={() => void submitPrimaryForm()} />}
+    </section>;
 }
 
 type ProjectAccessGuide = {
@@ -486,8 +619,8 @@ function getProjectAccessGuide(project: ProjectListItemResponse): ProjectAccessG
     if (canEdit) allowed.push('기본 정보·상태·일정 수정', 'YouTube 영상 연결과 성과 동기화');
     else restricted.push('프로젝트 내용 수정과 YouTube 관리');
 
-    if (canManageFinance) allowed.push('프로젝트 그룹과 게시물 예상 수익 확인');
-    else restricted.push('프로젝트 그룹과 게시물 예상 수익 확인');
+    if (canManageFinance) allowed.push('프로젝트 그룹과 YouTube 동영상 예상 수익 확인');
+    else restricted.push('프로젝트 그룹과 YouTube 동영상 예상 수익 확인');
 
     if (canManage) {
         allowed.push('프로젝트 삭제');
@@ -645,7 +778,6 @@ const COMPLETENESS_LABEL = { COMPLETE: '집계 완료', PARTIAL: '일부 미집�
 
 type ProjectDetailViewProps = {
     detail: ProjectDetailResponse | null;
-    channels: WorkspaceChannelListItem[];
     loading: boolean;
     error: string | null;
     feedback: Feedback | null;
@@ -653,16 +785,20 @@ type ProjectDetailViewProps = {
     canEdit: boolean;
     canManage: boolean;
     statusSubmitting: boolean;
-    publicationDrafts: Record<number, PublicationDraft>;
-    publicationErrors: Record<number, string>;
-    onPublicationDraft: (videoContentId: number, patch: Partial<PublicationDraft>) => void;
     onStatusChange: (status: ProjectStatus) => Promise<boolean>;
     onEdit: () => void;
     onArchive: () => void;
     onDelete: () => void;
     onAddVideoContent: () => void;
+    onEditVideoContent: (content: VideoContentResponse) => void;
+    onDeleteVideoContent: (content: VideoContentResponse) => void;
+    onManageConnections: (content: VideoContentResponse) => void;
     onChangePrimaryProject: (content: VideoContentResponse) => void;
+    onShowContentHistory: (content: VideoContentResponse) => void;
     onAddPublication: (content: VideoContentResponse) => void;
+    onEditPublication: (content: VideoContentResponse, publication: YouTubePublicationResponse) => void;
+    onEditRevenue: (content: VideoContentResponse, publication: YouTubePublicationResponse) => void;
+    onShowPublicationHistory: (publication: YouTubePublicationResponse) => void;
     onPublicationAction: (content: VideoContentResponse, publication: YouTubePublicationResponse, action: 'sync' | 'unavailable' | 'incorrect' | 'restore') => void;
 };
 
@@ -671,7 +807,7 @@ function getProjectStatusGuidance(status: ProjectStatus, archived: boolean): str
     if (archived && (status === 'PLANNING' || status === 'EDITING' || status === 'REVIEW')) {
         return '이 상태로 변경하면 프로젝트 보관이 자동으로 해제됩니다.';
     }
-    if (status === 'UPLOADED') return '영상 결과물이나 YouTube 게시물을 자동으로 만들지는 않습니다.';
+    if (status === 'UPLOADED') return '콘텐츠나 YouTube 동영상을 자동으로 만들지는 않습니다.';
     if (status === 'CANCELLED') return '제작 취소로 표시되며 나중에 다른 상태로 변경해 다시 진행할 수 있습니다.';
     return '프로젝트의 현재 제작 진행 단계를 표시합니다.';
 }
@@ -693,7 +829,7 @@ function PerformanceSummary({ title, aggregate, canSeeRevenue }: { title: string
 }
 
 /** 한 Channel의 게시물을 최신순 타임라인으로 표시하고 게시물별 동작을 제공합니다. */
-function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, onAction }: { content: VideoContentResponse; publications: YouTubePublicationResponse[]; canEdit: boolean; canSeeRevenue: boolean; onAction: ProjectDetailViewProps['onPublicationAction'] }) {
+function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, onAction, onEdit, onEditRevenue, onShowHistory }: { content: VideoContentResponse; publications: YouTubePublicationResponse[]; canEdit: boolean; canSeeRevenue: boolean; onAction: ProjectDetailViewProps['onPublicationAction']; onEdit: ProjectDetailViewProps['onEditPublication']; onEditRevenue: ProjectDetailViewProps['onEditRevenue']; onShowHistory: ProjectDetailViewProps['onShowPublicationHistory'] }) {
     return (
         <section className="project-publication-channel">
             <h4>📺 {publications[0].channelName}</h4>
@@ -707,6 +843,7 @@ function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, on
                                 <div><span className="project-publication__status">{PUBLICATION_STATUS_LABEL[publication.lifecycleStatus]}</span>{publication.removalReason && <small>{publication.removalReason === 'INCORRECT' ? '잘못 연결됨' : '운영 종료'}</small>}</div>
                                 <a href={publication.youtubeVideoUrl} target="_blank" rel="noreferrer">{publication.youtubeVideoId} ↗</a>
                             </div>
+                            <p>실제 게시 일시 · {publication.publishedAt ? new Date(publication.publishedAt).toLocaleString('ko-KR') : '게시 일시 미상'}</p>
                             <div className="project-publication__metrics">
                                 <span>조회수 <strong>{performance ? performance.viewCount.toLocaleString() : '미집계'}</strong></span>
                                 <span>좋아요 <strong>{performance ? performance.likeCount.toLocaleString() : '—'}</strong></span>
@@ -715,7 +852,12 @@ function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, on
                             </div>
                             <p>{needsAttention ? `확인 필요 · ${performance?.lastErrorMessage ?? '동기화 실패'}` : performance?.lastSuccessAt ? `마지막 성공 ${new Date(performance.lastSuccessAt).toLocaleString('ko-KR')}` : '아직 동기화하지 않았습니다.'}</p>
                             {canSeeRevenue && <p>{publication.revenueOption === 'DEFAULT' ? '채널 기본 단가' : publication.revenueOption === 'CUSTOM' ? '개별 단가' : '수익 계산 안 함'} · 조회당 {publication.appliedRate}원</p>}
-                            {canEdit && <div className="project-publication__actions">{publication.lifecycleStatus === 'CURRENT' ? <><button className="project-button" onClick={() => onAction(content, publication, 'sync')}>성과 동기화</button><button className="project-button" onClick={() => onAction(content, publication, 'unavailable')}>게시 종료</button><button className="project-button project-button--danger" onClick={() => onAction(content, publication, 'incorrect')}>잘못 연결</button></> : <button className="project-button" onClick={() => onAction(content, publication, 'restore')}>게시 중으로 복원</button>}</div>}
+                            <div className="project-publication__actions">
+                                {canEdit && <button className="project-button" onClick={() => onEdit(content, publication)}>동영상 정보 수정</button>}
+                                {canEdit && canSeeRevenue && !(publication.lifecycleStatus === 'REMOVED' && publication.removalReason === 'INCORRECT') && <button className="project-button" onClick={() => onEditRevenue(content, publication)}>수익 설정</button>}
+                                <button className="project-button" onClick={() => onShowHistory(publication)}>상태 이력</button>
+                                {canEdit && (publication.lifecycleStatus === 'CURRENT' ? <><button className="project-button" onClick={() => onAction(content, publication, 'sync')}>성과 동기화</button><button className="project-button" onClick={() => onAction(content, publication, 'unavailable')}>게시 종료</button><button className="project-button project-button--danger" onClick={() => onAction(content, publication, 'incorrect')}>잘못 연결</button></> : <button className="project-button" onClick={() => onAction(content, publication, 'restore')}>게시 중으로 복원</button>)}
+                            </div>
                         </li>
                     );
                 })}
@@ -725,21 +867,42 @@ function PublicationTimeline({ content, publications, canEdit, canSeeRevenue, on
 }
 
 /** URL 탭에 따라 프로젝트 기본 정보와 영상 결과물을 분리해 표시합니다. */
-function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeRevenue, canEdit, canManage, statusSubmitting, publicationDrafts, publicationErrors, onPublicationDraft, onStatusChange, onEdit, onArchive, onDelete, onAddVideoContent, onChangePrimaryProject, onAddPublication, onPublicationAction }: ProjectDetailViewProps) {
+function ProjectDetailView({ detail, loading, error, feedback, canSeeRevenue, canEdit, canManage, statusSubmitting, onStatusChange, onEdit, onArchive, onDelete, onAddVideoContent, onEditVideoContent, onDeleteVideoContent, onManageConnections, onChangePrimaryProject, onShowContentHistory, onAddPublication, onEditPublication, onEditRevenue, onShowPublicationHistory, onPublicationAction }: ProjectDetailViewProps) {
     const location = useLocation();
+    const [searchParams] = useSearchParams();
     const [selectedStatus, setSelectedStatus] = useState<ProjectStatus>(detail?.status ?? 'PLANNING');
+    const [highlightedContentId, setHighlightedContentId] = useState<number | null>(null);
+    const videoView = location.pathname.endsWith('/videos');
+    const targetContentId = Number(searchParams.get('videoContentId')) || null;
 
     /** 저장 응답이나 다른 Project 조회로 상세가 바뀌면 인라인 선택값도 서버 상태에 맞춥니다. */
     useEffect(() => {
         if (detail) setSelectedStatus(detail.status);
     }, [detail]);
 
+    /** 직접 이동한 콘텐츠 카드를 화면에 맞추고 잠시 강조합니다. */
+    useEffect(() => {
+        if (!videoView || !detail || targetContentId === null || !detail.videoContents.some(content => content.videoContentId === targetContentId)) {
+            setHighlightedContentId(null);
+            return;
+        }
+        setHighlightedContentId(targetContentId);
+        const frame = window.requestAnimationFrame(() => {
+            document.getElementById(`video-content-${targetContentId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        const timeout = window.setTimeout(() => setHighlightedContentId(null), 3000);
+        return () => {
+            window.cancelAnimationFrame(frame);
+            window.clearTimeout(timeout);
+        };
+    }, [detail, targetContentId, videoView]);
+
     if (loading) return <p className="project-state">프로젝트를 불러오는 중...</p>;
     if (!detail || error) return <FeedbackMessage type="error" message={error ?? '프로젝트를 찾을 수 없습니다.'} />;
 
     const back = (location.state as { listSearch?: string } | null)?.listSearch;
-    const videoView = location.pathname.endsWith('/videos');
     const archiveActionAvailable = isArchiveActionAvailable(detail);
+    const canEditContent = canEdit && detail.archivedAt === null;
     const archiveUnavailableMessage = '업로드 완료 또는 제작 취소 상태에서 보관할 수 있습니다.';
     const submitStatusChange = async () => {
         const changed = await onStatusChange(selectedStatus);
@@ -769,25 +932,266 @@ function ProjectDetailView({ detail, channels, loading, error, feedback, canSeeR
                 <article><h2>작업 요약</h2><strong className="project-big-number">{detail.completedTaskCount}/{detail.taskCount}</strong><p>완료 / 전체 작업</p><ResourceNavigationLink to={`/projects/${detail.projectId}/tasks`} state={back ? { listSearch: back } : undefined} label="작업 관리로 이동" variant="detail" /></article>
                 <article><h2>참여자</h2><ul>{detail.members.filter(item => item.active).map(item => <li key={item.workspaceMemberId}>{item.name}{item.isOwner ? ' 👑' : ''} <small>{item.permission === 'EDIT' ? '편집' : '보기'}</small></li>)}</ul></article>
             </div>}
-            {videoView && <section className="project-section project-video-contents">
-                <header className="project-section__header"><div><h2>영상 결과물과 YouTube 게시 이력</h2><p>프로젝트는 제작 과정이며, 완성 결과물과 실제 게시물은 별도로 관리합니다.</p></div>{canEdit && <button className="project-button project-button--primary" onClick={onAddVideoContent}>결과물 추가</button>}</header>
-                {detail.videoContents.length === 0 ? <div className="project-state"><strong>아직 영상 결과물이 없습니다.</strong><p>결과물을 추가해 게시 이력과 성과를 연결할 수 있습니다.</p></div> : detail.videoContents.map(content => {
-                    const draft = publicationDrafts[content.videoContentId] ?? { youtubeVideo: '', channelId: String(detail.channelId) };
-                    const publicationError = publicationErrors[content.videoContentId];
-                    const publicationErrorId = `project-youtube-video-error-${content.videoContentId}`;
+            {videoView && <section className="project-video-contents">
+                <header className="project-section__header"><div><h2>콘텐츠와 YouTube 동영상</h2><p>게시 전 콘텐츠와 실제 YouTube 동영상을 한곳에서 관리합니다.</p></div>{canEditContent && <button className="project-button project-button--primary" onClick={onAddVideoContent}>콘텐츠 추가</button>}</header>
+                {detail.archivedAt && <p className="project-content-readonly">보관된 프로젝트에서는 콘텐츠와 동영상을 조회할 수 있습니다. 변경하려면 프로젝트를 복원해 주세요.</p>}
+                {detail.videoContents.length === 0 ? <div className="project-state"><strong>아직 등록된 콘텐츠가 없습니다.</strong><p>{canEditContent ? '콘텐츠를 추가하면서 YouTube 동영상도 함께 연결할 수 있습니다.' : '콘텐츠가 등록되면 이곳에서 확인할 수 있습니다.'}</p></div> : detail.videoContents.map(content => {
                     const byChannel = [...content.publications.reduce((map, publication) => map.set(publication.channelId, [...(map.get(publication.channelId) ?? []), publication]), new Map<number, YouTubePublicationResponse[]>()).values()];
                     return (
-                        <article className="project-video-content" key={content.videoContentId}>
-                            <header><div><span>{content.videoType === 'LONG' ? '롱폼' : '쇼츠'}</span><h3>{content.title}</h3><p>성과 집계 프로젝트 #{content.primaryProjectId} · 연결 프로젝트 {content.connectedProjectIds.length}개</p></div><div className="project-video-content__actions">{content.primaryProjectId === detail.projectId && <strong className="project-primary-badge" title="이 영상의 성과가 현재 프로젝트와 프로젝트 그룹에 집계됩니다.">성과 집계 대상</strong>}{canEdit && content.connectedProjectIds.length > 1 && <button className="project-button" onClick={() => onChangePrimaryProject(content)}>집계 프로젝트 변경</button>}</div></header>
-                            {canEdit && <div className="project-publication-form"><select aria-label="게시 채널" value={draft.channelId} onChange={event => onPublicationDraft(content.videoContentId, { channelId: event.target.value })}>{channels.map(channel => <option key={channel.channelId} value={channel.channelId}>{channel.name}</option>)}</select><div className="project-publication-field"><input id={`project-youtube-video-${content.videoContentId}`} aria-label="YouTube URL 또는 영상 ID" aria-invalid={Boolean(publicationError)} aria-describedby={publicationError ? publicationErrorId : undefined} value={draft.youtubeVideo} placeholder="YouTube URL 또는 11자리 영상 ID" onChange={event => onPublicationDraft(content.videoContentId, { youtubeVideo: event.target.value })} />{publicationError && <small id={publicationErrorId} role="alert">{publicationError}</small>}</div><button className="project-button project-button--primary" onClick={() => onAddPublication(content)}>등록</button></div>}
+                        <article id={`video-content-${content.videoContentId}`} className={`project-video-content${highlightedContentId === content.videoContentId ? ' project-video-content--highlighted' : ''}`} key={content.videoContentId}>
+                            <header><div><span>{content.videoType === 'LONG' ? '롱폼' : '쇼츠'}</span><h3>{content.title}</h3><p>성과 집계 프로젝트 #{content.primaryProjectId} · 연결 프로젝트 {content.connectedProjectIds.length}개</p></div><div className="project-video-content__actions">{content.primaryProjectId === detail.projectId && <strong className="project-primary-badge" title="이 콘텐츠의 성과가 현재 프로젝트와 프로젝트 그룹에 집계됩니다.">성과 집계 대상</strong>}{(detail.archivedAt || canEditContent) && <button className="project-button" onClick={() => onManageConnections(content)}>{detail.archivedAt ? '연결 보기' : '연결 관리'}</button>}{canEditContent && <><button className="project-button project-button--primary" onClick={() => onAddPublication(content)}>YouTube 동영상 추가</button><button className="project-button" onClick={() => onEditVideoContent(content)}>수정</button>{content.connectedProjectIds.length > 1 && <button className="project-button" onClick={() => onChangePrimaryProject(content)}>집계 프로젝트 변경</button>}{content.publications.length === 0 && <span className="project-action-tooltip" title={content.connectedProjectIds.length > 1 ? '다른 프로젝트 연결을 먼저 해제해 주세요.' : undefined}><button className="project-button project-button--danger" disabled={content.connectedProjectIds.length > 1} aria-label={content.connectedProjectIds.length > 1 ? '콘텐츠 삭제: 다른 프로젝트 연결을 먼저 해제해 주세요.' : undefined} onClick={() => onDeleteVideoContent(content)}>콘텐츠 삭제</button></span>}</>}<button className="project-button" onClick={() => onShowContentHistory(content)}>집계 변경 이력</button></div></header>
                             <div className="project-performance-grid"><PerformanceSummary title="현재 성과" aggregate={content.currentPerformance} canSeeRevenue={canSeeRevenue} /><PerformanceSummary title="누적 게시 성과" aggregate={content.cumulativePerformance} canSeeRevenue={canSeeRevenue} /></div>
-                            {byChannel.length > 0 ? <div className="project-publication-timelines">{byChannel.map(publications => <PublicationTimeline key={publications[0].channelId} content={content} publications={publications} canEdit={canEdit} canSeeRevenue={canSeeRevenue} onAction={onPublicationAction} />)}</div> : <p className="project-empty-publication">등록된 YouTube 게시물이 없습니다.</p>}
+                            {byChannel.length > 0 ? <div className="project-publication-timelines">{byChannel.map(publications => <PublicationTimeline key={publications[0].channelId} content={content} publications={publications} canEdit={canEditContent} canSeeRevenue={canSeeRevenue} onAction={onPublicationAction} onEdit={onEditPublication} onEditRevenue={onEditRevenue} onShowHistory={onShowPublicationHistory} />)}</div> : <p className="project-empty-publication">연결된 YouTube 동영상이 없습니다.</p>}
                         </article>
                     );
                 })}
             </section>}
             {!videoView && <section className="project-section"><h2>프로젝트 상태 변경 이력</h2><ol className="project-history">{[...detail.statusHistory].reverse().map((item, index) => <li key={`${item.changedAt}-${index}`}><strong>{STATUS_LABEL[item.status]}</strong><span>{new Date(item.changedAt).toLocaleString('ko-KR')} · {item.changedByName}</span></li>)}</ol></section>}
         </>
+    );
+}
+
+const PRIMARY_REASON_LABEL: Record<PrimaryProjectChangeReasonType, string> = {
+    MERGED: '합본 제작',
+    CONNECTION_CORRECTION: '연결 정정',
+    PERFORMANCE_ATTRIBUTION: '성과 귀속 변경',
+    OTHER: '기타'
+};
+
+/** DEFAULT 단가 변경 확인에서 역할별로 허용된 영향 정보만 표시합니다. */
+function DefaultRateImpactNotice({ confirmation, canSeeRevenue }: { confirmation: DefaultRateChangeConfirmation; canSeeRevenue: boolean }) {
+    if (confirmation.impacts.length === 0) {
+        return <section className="youtube-impact-notice" aria-live="polite">
+            <strong>적용 단가가 바뀌지 않습니다.</strong>
+            <p>계속하려면 다시 저장해 주세요.</p>
+        </section>;
+    }
+    return <section className="youtube-impact-notice" aria-live="polite">
+        <strong>저장하면 채널 기본 단가 적용값이 함께 변경됩니다.</strong>
+        <ul>{confirmation.impacts.map(impact => <li key={impact.publicationId}>
+            <span>{impact.channelName} · YouTube 동영상 #{impact.publicationId}</span>
+            {canSeeRevenue && impact.currentRate !== undefined && impact.nextRate !== undefined && <small>{impact.currentRate}원 → {impact.nextRate}원{impact.estimatedRevenueDelta ? ` · 예상 수익 변화 ${formatMoney(impact.estimatedRevenueDelta)}원` : ''}</small>}
+        </li>)}</ul>
+        <p>표시된 영향을 확인한 뒤 다시 저장해 주세요.</p>
+    </section>;
+}
+
+/** 중복 YouTube 동영상의 기존 등록 위치와 권한별 다음 행동을 안내합니다. */
+function DuplicateYouTubeVideoNotice({ duplicate, onOpen }: { duplicate: DuplicateYouTubeVideoLocation; onOpen: (duplicate: DuplicateYouTubeVideoLocation) => void }) {
+    return <aside className="youtube-duplicate-notice" role="status">
+        <strong>이미 등록된 YouTube 동영상입니다.</strong>
+        {duplicate.canAccess ? <>
+            <dl>
+                <div><dt>콘텐츠</dt><dd>{duplicate.contentTitle}</dd></div>
+                <div><dt>프로젝트</dt><dd>{duplicate.projectTitle}</dd></div>
+                <div><dt>채널</dt><dd>{duplicate.channelName}</dd></div>
+            </dl>
+            <button type="button" className="project-button project-button--primary" onClick={() => onOpen(duplicate)}>기존 콘텐츠 보기</button>
+        </> : <p>제작팀의 다른 콘텐츠에 등록되어 있습니다. 확인하려면 프로젝트 관리자에게 문의해 주세요.</p>}
+    </aside>;
+}
+
+/** 연결 프로젝트와 신규 후보에 같은 행 표시를 사용합니다. */
+function ConnectionProjectList({ items, disabled, readOnly = false, onMutate }: { items: VideoContentProjectCandidate[]; disabled: boolean; readOnly?: boolean; onMutate: (item: VideoContentProjectCandidate) => void }) {
+    return <ul>{items.map(item => {
+        const reason = item.primary ? '성과 집계 프로젝트를 먼저 변경해 주세요.'
+            : item.archived ? '프로젝트를 복원한 뒤 연결을 변경할 수 있습니다.'
+                : !item.canManage ? '이 프로젝트를 관리할 권한이 없습니다.' : undefined;
+        return <li key={item.projectId}>
+            <div><strong>{item.title}</strong><small>{item.projectGroupName ?? '프로젝트 그룹 없음'}{item.archived ? ' · 보관됨' : ''}</small></div>
+            <div>
+                {item.primary && <span className="project-primary-badge">성과 집계 대상</span>}
+                {!readOnly && <button type="button" className={item.connected ? 'project-button project-button--danger' : 'project-button project-button--primary'} disabled={disabled || Boolean(reason)} title={reason} onClick={() => onMutate(item)}>{item.connected ? '연결 해제' : '연결'}</button>}
+            </div>
+        </li>;
+    })}</ul>;
+}
+
+type YouTubeManagementModalProps = {
+    state: YouTubeModalState;
+    channels: WorkspaceChannelListItem[];
+    canSeeRevenue: boolean;
+    submitting: boolean;
+    onChange: React.Dispatch<React.SetStateAction<YouTubeModalState | null>>;
+    onClose: () => void;
+    onOpenDuplicateLocation: (duplicate: DuplicateYouTubeVideoLocation) => void;
+    onSubmitContent: () => void;
+    onSubmitContentDeletion: () => void;
+    onSubmitPublication: () => void;
+    onSubmitRevenue: () => void;
+    onSearchConnections: (keyword: string, page?: number) => void;
+    onMutateConnection: (candidate: VideoContentProjectCandidate) => void;
+    onSubmitPrimary: () => void;
+};
+
+/** 영상 결과물·게시물의 입력, 연결과 이력을 목적별 전용 모달로 표시합니다. */
+function YouTubeManagementModal({ state, channels, canSeeRevenue, submitting, onChange, onClose, onOpenDuplicateLocation, onSubmitContent, onSubmitContentDeletion, onSubmitPublication, onSubmitRevenue, onSearchConnections, onMutateConnection, onSubmitPrimary }: YouTubeManagementModalProps) {
+    const title = state.kind === 'CONTENT_FORM' ? state.content ? '콘텐츠 수정' : '콘텐츠 추가'
+        : state.kind === 'PUBLICATION_FORM' ? state.publication ? '동영상 정보 수정' : 'YouTube 동영상 추가'
+            : state.kind === 'REVENUE_FORM' ? '예상 수익 설정'
+                : state.kind === 'CONNECTIONS' ? '프로젝트 연결 관리'
+                    : state.kind === 'PRIMARY_FORM' ? '성과 집계 프로젝트 변경'
+                        : state.kind === 'CONTENT_DELETE' ? '콘텐츠 삭제'
+                        : state.kind === 'CONTENT_HISTORY' ? '집계 프로젝트 변경 이력'
+                            : '동영상 상태 이력';
+    const description = state.kind === 'CONTENT_FORM' ? state.content ? '콘텐츠의 제목과 유형을 설정합니다.' : '콘텐츠와 YouTube 동영상을 한 번에 추가할 수 있습니다.'
+        : state.kind === 'PUBLICATION_FORM' ? state.publication ? 'YouTube 동영상의 Channel과 게시 시점을 관리합니다.' : '기존 콘텐츠에 추가 업로드·재업로드 동영상을 연결합니다.'
+            : state.kind === 'REVENUE_FORM' ? '조회수 기반 예상 플랫폼 수익 계산 방식을 설정합니다.'
+                : state.kind === 'CONNECTIONS' ? '같은 제작팀의 관리 가능한 프로젝트를 연결하거나 해제합니다.'
+                    : state.kind === 'PRIMARY_FORM' ? '이 영상의 콘텐츠 성과가 집계될 프로젝트를 선택합니다.'
+                        : state.kind === 'CONTENT_DELETE' ? 'YouTube 동영상이 연결되지 않은 콘텐츠를 완전히 삭제합니다.'
+                        : '저장된 변경 기록을 최신순으로 확인합니다.';
+
+    return <ProjectGroupModal titleId="youtube-management-modal-title" title={title} description={description} onRequestClose={onClose}>
+        {state.kind === 'CONTENT_FORM' && <form className="project-form youtube-management-form" onSubmit={event => { event.preventDefault(); onSubmitContent(); }} noValidate>
+            <label>
+                <span>콘텐츠 제목</span>
+                <input
+                    id="video-content-title"
+                    data-autofocus
+                    value={state.title}
+                    maxLength={150}
+                    aria-invalid={Boolean(state.fieldErrors.title)}
+                    aria-describedby={state.fieldErrors.title ? 'video-content-title-error' : undefined}
+                    onChange={event => onChange({ ...state, title: event.target.value, confirmation: null, fieldErrors: { ...state.fieldErrors, title: undefined }, error: null })}
+                />
+                {state.fieldErrors.title && <small id="video-content-title-error" role="alert">{state.fieldErrors.title}</small>}
+            </label>
+            <ProjectChoiceField name="video-content-type" legend="콘텐츠 유형" value={state.videoType} options={[{ value: 'LONG', label: '롱폼' }, { value: 'SHORTS', label: '쇼츠' }]} onChange={value => onChange({ ...state, videoType: value as ProjectVideoType, confirmation: null, error: null })} />
+            {!state.content && <section className="youtube-initial-publication" aria-labelledby="initial-publication-title">
+                <div>
+                    <h3 id="initial-publication-title">YouTube 동영상 연결 <em>선택</em></h3>
+                    <p>이미 YouTube에 올린 동영상이 있다면 URL 또는 영상 ID를 입력하세요. 비워 두면 콘텐츠만 저장됩니다.</p>
+                </div>
+                <label>
+                    <span>YouTube URL 또는 영상 ID</span>
+                    <input value={state.youtubeVideo} placeholder="YouTube URL 또는 11자리 영상 ID" aria-invalid={Boolean(state.fieldErrors.youtubeVideo)} aria-describedby={state.fieldErrors.youtubeVideo ? 'initial-youtube-video-error' : undefined} onChange={event => onChange({ ...state, youtubeVideo: event.target.value, duplicateLocation: null, fieldErrors: { ...state.fieldErrors, youtubeVideo: undefined }, error: null })} />
+                    {state.fieldErrors.youtubeVideo && <small id="initial-youtube-video-error" role="alert">{state.fieldErrors.youtubeVideo}</small>}
+                </label>
+                {state.youtubeVideo.trim() && <div className="youtube-initial-publication__details">
+                    <label>
+                        <span>게시 채널</span>
+                        <select value={state.channelId} aria-invalid={Boolean(state.fieldErrors.channelId)} aria-describedby={state.fieldErrors.channelId ? 'initial-channel-error' : undefined} onChange={event => onChange({ ...state, channelId: event.target.value, fieldErrors: { ...state.fieldErrors, channelId: undefined }, error: null })}>{channels.map(channel => <option key={channel.channelId} value={channel.channelId}>{channel.name}</option>)}</select>
+                        {state.fieldErrors.channelId && <small id="initial-channel-error" role="alert">{state.fieldErrors.channelId}</small>}
+                    </label>
+                    <label>
+                        <span>실제 게시 일시 <em>선택</em></span>
+                        <input type="datetime-local" value={state.publishedAt} aria-invalid={Boolean(state.fieldErrors.publishedAt)} aria-describedby={state.fieldErrors.publishedAt ? 'initial-published-at-error' : undefined} onChange={event => onChange({ ...state, publishedAt: event.target.value, fieldErrors: { ...state.fieldErrors, publishedAt: undefined }, error: null })} />
+                        {state.fieldErrors.publishedAt && <small id="initial-published-at-error" role="alert">{state.fieldErrors.publishedAt}</small>}
+                    </label>
+                    {canSeeRevenue ? <>
+                        <ProjectChoiceField name="initial-publication-revenue-option" legend="예상 수익 방식" value={state.revenueOption} options={[{ value: 'DEFAULT', label: '채널 기본 단가' }, { value: 'CUSTOM', label: '동영상 개별 단가' }, { value: 'DISABLED', label: '수익 계산 안 함' }]} onChange={value => onChange({ ...state, revenueOption: value as ProjectRevenueOption, fieldErrors: { ...state.fieldErrors, customRevenuePerView: undefined }, error: null })} />
+                        {state.revenueOption === 'CUSTOM' && <label>
+                            <span>조회당 개별 단가</span>
+                            <input inputMode="decimal" value={state.customRate} placeholder="0" aria-invalid={Boolean(state.fieldErrors.customRevenuePerView)} aria-describedby={state.fieldErrors.customRevenuePerView ? 'initial-custom-rate-error' : undefined} onChange={event => onChange({ ...state, customRate: event.target.value, fieldErrors: { ...state.fieldErrors, customRevenuePerView: undefined }, error: null })} onBlur={() => { const result = normalizeRateInput(state.customRate); onChange(result.success ? { ...state, customRate: result.value, fieldErrors: { ...state.fieldErrors, customRevenuePerView: undefined } } : { ...state, fieldErrors: { ...state.fieldErrors, customRevenuePerView: result.message } }); }} />
+                            {state.fieldErrors.customRevenuePerView && <small id="initial-custom-rate-error" role="alert">{state.fieldErrors.customRevenuePerView}</small>}
+                        </label>}
+                    </> : <p className="youtube-helper-text">채널 기본 단가 방식이 적용되며 금액 정보는 제작팀 소유자와 관리자만 확인할 수 있습니다.</p>}
+                </div>}
+            </section>}
+            {state.duplicateLocation && <DuplicateYouTubeVideoNotice duplicate={state.duplicateLocation} onOpen={onOpenDuplicateLocation} />}
+            {state.confirmation && <DefaultRateImpactNotice confirmation={state.confirmation} canSeeRevenue={canSeeRevenue} />}
+            {state.error && <FeedbackMessage type="error" message={state.error} />}
+            <ProjectModalActions onCancel={onClose} submitLabel={state.confirmation ? '영향 확인 후 저장' : state.content ? '저장' : state.youtubeVideo.trim() ? '콘텐츠와 동영상 추가' : '콘텐츠 추가'} submitting={submitting} />
+        </form>}
+
+        {state.kind === 'PUBLICATION_FORM' && (() => {
+            const selectedChannelId = Number(state.channelId);
+            const current = state.content.publications.find(item => item.publicationId !== state.publication?.publicationId && item.channelId === selectedChannelId && item.lifecycleStatus === 'CURRENT');
+            return <form className="project-form youtube-management-form" onSubmit={event => { event.preventDefault(); onSubmitPublication(); }} noValidate>
+                {!state.publication && <label><span>YouTube URL 또는 영상 ID</span><input data-autofocus value={state.youtubeVideo} placeholder="YouTube URL 또는 11자리 영상 ID" onChange={event => onChange({ ...state, youtubeVideo: event.target.value, duplicateLocation: null, fieldError: null })} /></label>}
+                <label><span>게시 채널</span><select value={state.channelId} disabled={Boolean(state.publication && state.publication.lifecycleStatus !== 'CURRENT')} onChange={event => onChange({ ...state, channelId: event.target.value, confirmation: null, fieldError: null })}>{channels.map(channel => <option key={channel.channelId} value={channel.channelId}>{channel.name}</option>)}</select></label>
+                <label><span>실제 게시 일시 <em>선택</em></span><input type="datetime-local" value={state.publishedAt} onChange={event => onChange({ ...state, publishedAt: event.target.value, confirmation: null, fieldError: null })} /></label>
+                {!state.publication && canSeeRevenue && <>
+                    <ProjectChoiceField name="publication-revenue-option" legend="예상 수익 방식" value={state.revenueOption} options={[{ value: 'DEFAULT', label: '채널 기본 단가' }, { value: 'CUSTOM', label: '동영상 개별 단가' }, { value: 'DISABLED', label: '수익 계산 안 함' }]} onChange={value => onChange({ ...state, revenueOption: value as ProjectRevenueOption, fieldError: null })} />
+                    {state.revenueOption === 'CUSTOM' && <label><span>조회당 개별 단가</span><input inputMode="decimal" value={state.customRate} placeholder="0" onChange={event => onChange({ ...state, customRate: event.target.value, fieldError: null })} onBlur={() => { const result = normalizeRateInput(state.customRate); onChange(result.success ? { ...state, customRate: result.value, fieldError: null } : { ...state, fieldError: result.message }); }} /></label>}
+                </>}
+                {!state.publication && !canSeeRevenue && <p className="youtube-helper-text">채널 기본 단가 방식이 적용되며 금액 정보는 제작팀 소유자와 관리자만 확인할 수 있습니다.</p>}
+                {current && <p className="youtube-replacement-notice"><strong>{current.channelName}</strong>의 게시 중 동영상 #{current.publicationId}을 대체합니다. 기존 성과와 상태 이력은 보존됩니다.</p>}
+                {state.duplicateLocation && <DuplicateYouTubeVideoNotice duplicate={state.duplicateLocation} onOpen={onOpenDuplicateLocation} />}
+                {state.confirmation && <DefaultRateImpactNotice confirmation={state.confirmation} canSeeRevenue={canSeeRevenue} />}
+                {state.fieldError && <FeedbackMessage type="error" message={state.fieldError} />}
+                <ProjectModalActions onCancel={onClose} submitLabel={state.confirmation ? '영향 확인 후 저장' : state.publication ? '저장' : '등록'} submitting={submitting} />
+            </form>;
+        })()}
+
+        {state.kind === 'REVENUE_FORM' && <form className="project-form youtube-management-form" onSubmit={event => { event.preventDefault(); onSubmitRevenue(); }} noValidate>
+            <ProjectChoiceField name="revenue-setting-option" legend="예상 수익 방식" value={state.revenueOption} options={[{ value: 'DEFAULT', label: '채널 기본 단가' }, { value: 'CUSTOM', label: '동영상 개별 단가' }, { value: 'DISABLED', label: '수익 계산 안 함' }]} onChange={value => onChange({ ...state, revenueOption: value as ProjectRevenueOption, fieldError: null })} />
+            {state.revenueOption === 'CUSTOM' && <label><span>조회당 개별 단가</span><input data-autofocus inputMode="decimal" value={state.customRate} placeholder="0" onChange={event => onChange({ ...state, customRate: event.target.value, fieldError: null })} onBlur={() => { const result = normalizeRateInput(state.customRate); onChange(result.success ? { ...state, customRate: result.value, fieldError: null } : { ...state, fieldError: result.message }); }} /></label>}
+            <p className="youtube-helper-text">이 설정은 예상 플랫폼 수익에만 사용되며 실제 수익·손익·ROI에는 포함되지 않습니다.</p>
+            {state.fieldError && <FeedbackMessage type="error" message={state.fieldError} />}
+            <ProjectModalActions onCancel={onClose} submitLabel="저장" submitting={submitting} />
+        </form>}
+
+        {state.kind === 'CONNECTIONS' && <div className="youtube-connection-manager" aria-busy={state.loading}>
+            <h3>현재 연결된 프로젝트</h3>
+            {state.connectedProjects.length > 0
+                ? <ConnectionProjectList items={state.connectedProjects} disabled={submitting || state.loading} readOnly={state.readOnly} onMutate={onMutateConnection} />
+                : !state.loading && !state.error && <p className="youtube-connection-empty">조회할 수 있는 연결 프로젝트가 없습니다.</p>}
+            {!state.readOnly && <>
+                <h3>연결할 프로젝트</h3>
+                <form className="youtube-connection-search" onSubmit={event => { event.preventDefault(); if (!submitting) onSearchConnections(state.keyword); }}>
+                    <input data-autofocus aria-label="연결할 프로젝트 이름 검색" value={state.keyword} placeholder="프로젝트 이름 검색" onChange={event => {
+                        const keyword = event.target.value;
+                        onChange(current => current?.kind === 'CONNECTIONS' ? { ...current, keyword } : current);
+                    }} />
+                    <button className="project-button" type="submit" disabled={submitting}>검색</button>
+                </form>
+                {!state.loading && !state.error && (state.candidates.length > 0
+                    ? <ConnectionProjectList items={state.candidates} disabled={submitting} onMutate={onMutateConnection} />
+                    : <p className="youtube-connection-empty">{state.appliedKeyword.trim() ? '검색 결과가 없습니다.' : '추가로 연결할 수 있는 프로젝트가 없습니다.'}</p>)}
+                {!state.loading && state.totalPages > 1 && <nav className="project-pagination" aria-label="연결 후보 페이지">
+                    <button className="project-button" type="button" disabled={submitting || state.page <= 1} onClick={() => onSearchConnections(state.appliedKeyword, state.page - 1)}>이전</button>
+                    <span>{state.page} / {state.totalPages}</span>
+                    <button className="project-button" type="button" disabled={submitting || state.page >= state.totalPages} onClick={() => onSearchConnections(state.appliedKeyword, state.page + 1)}>다음</button>
+                </nav>}
+            </>}
+            {state.loading && <p role="status">프로젝트를 불러오는 중...</p>}
+            {state.error && <FeedbackMessage type="error" message={state.error} />}
+            <ProjectModalActions onCancel={onClose} cancelLabel="닫기" />
+        </div>}
+
+        {state.kind === 'PRIMARY_FORM' && <form className="project-form youtube-management-form" onSubmit={event => { event.preventDefault(); onSubmitPrimary(); }} noValidate>
+            <label><span>새 성과 집계 프로젝트</span><select data-autofocus value={state.projectId} onChange={event => onChange({ ...state, projectId: event.target.value, error: null, needsPerformanceConfirmation: false })}><option value="">선택</option>{state.candidates.map(candidate => <option key={candidate.projectId} value={candidate.projectId}>{candidate.title} · {candidate.projectGroupName ?? '그룹 없음'}</option>)}</select></label>
+            {state.candidates.length === 0 && <p className="youtube-helper-text">변경할 수 있는 활성 연결 프로젝트가 없습니다. 먼저 `연결 관리`에서 프로젝트를 연결해 주세요.</p>}
+            <ProjectChoiceField name="primary-change-reason" legend="변경 사유" value={state.reasonType} options={Object.entries(PRIMARY_REASON_LABEL).map(([value, label]) => ({ value, label }))} onChange={value => onChange({ ...state, reasonType: value as PrimaryProjectChangeReasonType, error: null })} />
+            <label><span>사유 메모 <em>선택</em></span><textarea value={state.reason} maxLength={255} rows={3} onChange={event => onChange({ ...state, reason: event.target.value, error: null })} /></label>
+            {state.needsPerformanceConfirmation && <label className="youtube-replacement-confirm"><input type="checkbox" required /><span>콘텐츠 성과가 새 프로젝트 그룹으로 이동하고 실제 비용·수익은 이동하지 않음을 확인했습니다.</span></label>}
+            {state.error && <FeedbackMessage type={state.needsPerformanceConfirmation ? 'info' : 'error'} message={state.error} />}
+            <ProjectModalActions onCancel={onClose} submitLabel={state.needsPerformanceConfirmation ? '영향 확인 후 변경' : '변경'} submitting={submitting} submittingLabel="변경 중…" submitDisabled={!state.projectId} />
+        </form>}
+
+        {state.kind === 'CONTENT_DELETE' && <div className="youtube-content-deletion">
+            <strong>{state.content.title}</strong>
+            <p>연결된 YouTube 동영상이 없어 완전히 삭제할 수 있습니다. 삭제한 콘텐츠와 대표 프로젝트 변경 이력은 복구할 수 없습니다.</p>
+            {state.error && <FeedbackMessage type="error" message={state.error} />}
+            <ProjectModalActions onCancel={onClose} submitLabel="콘텐츠 삭제" submitting={submitting} submittingLabel="삭제 중…" submitVariant="danger" onSubmit={onSubmitContentDeletion} />
+        </div>}
+
+        {state.kind === 'CONTENT_HISTORY' && <div className="youtube-history-list">{state.content.primaryProjectHistory.length === 0 ? <p>변경 이력이 없습니다.</p> : <ol>{[...state.content.primaryProjectHistory].reverse().map((history, index) => <li key={`${history.changedAt}-${index}`}><strong>{PRIMARY_REASON_LABEL[history.reasonType]}</strong><span>{history.fromProjectName ?? '없음'} → {history.toProjectName}</span><small>{history.fromProjectGroupName ?? '그룹 없음'} → {history.toProjectGroupName ?? '그룹 없음'} · {history.reason ?? '메모 없음'} · {history.changedByName} · {new Date(history.changedAt).toLocaleString('ko-KR')}</small></li>)}</ol>}<ProjectModalActions onCancel={onClose} cancelLabel="닫기" /></div>}
+
+        {state.kind === 'PUBLICATION_HISTORY' && <div className="youtube-history-list">{state.publication.statusHistory.length === 0 ? <p>변경 이력이 없습니다.</p> : <ol>{[...state.publication.statusHistory].reverse().map((history, index) => <li key={`${history.changedAt}-${index}`}><strong>{history.fromStatus ? PUBLICATION_STATUS_LABEL[history.fromStatus] : '등록'} → {PUBLICATION_STATUS_LABEL[history.toStatus]}</strong><span>{history.reason ?? '사유 없음'}</span><small>{history.changedByName} · {new Date(history.changedAt).toLocaleString('ko-KR')}{history.relatedPublicationId ? ` · 관련 동영상 #${history.relatedPublicationId}` : ''}</small></li>)}</ol>}<ProjectModalActions onCancel={onClose} cancelLabel="닫기" /></div>}
+    </ProjectGroupModal>;
+}
+
+type ProjectModalActionsProps = {
+    onCancel: () => void;
+    onSubmit?: () => void;
+    cancelLabel?: string;
+    submitLabel?: string;
+    submitting?: boolean;
+    submittingLabel?: string;
+    submitDisabled?: boolean;
+    submitVariant?: 'primary' | 'danger';
+};
+
+/** 프로젝트 영역 모달의 취소·확정 버튼 순서와 공통 디자인을 한 곳에서 유지합니다. */
+function ProjectModalActions({ onCancel, onSubmit, cancelLabel = '취소', submitLabel, submitting = false, submittingLabel = '저장 중…', submitDisabled = false, submitVariant = 'primary' }: ProjectModalActionsProps) {
+    return (
+        <div className="project-form__actions">
+            <button type="button" className="project-button" disabled={submitting} onClick={onCancel}>{cancelLabel}</button>
+            {submitLabel && <button type={onSubmit ? 'button' : 'submit'} className={`project-button project-button--${submitVariant}`} disabled={submitting || submitDisabled} onClick={onSubmit}>{submitting ? submittingLabel : submitLabel}</button>}
+        </div>
     );
 }
 
@@ -867,7 +1271,7 @@ function ProjectForm({ formRef, values, errors, channels, groups, edit, admin, s
             </label>
             <ProjectChoiceField
                 name="project-video-type"
-                legend="영상 유형"
+                legend="기본 콘텐츠 유형"
                 value={values.videoType}
                 options={[
                     { value: 'LONG', label: '롱폼' },
