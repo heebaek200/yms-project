@@ -85,6 +85,7 @@ type ConfirmationRecord = {
     userId: number;
     workspaceId: number;
     videoContentId: number;
+    videoContentVersion: number;
     publicationId: number | null;
     requestSignature: string;
     impactSignature: string;
@@ -251,6 +252,7 @@ function issueConfirmation(
     const token = crypto.randomUUID();
     const expiresAt = Date.now() + CONFIRMATION_TTL_MS;
     const affected = new Set(impacts.map(impact => impact.publicationId));
+    if (publicationId !== null) affected.add(publicationId);
     const publicationVersions = content.publications
         .filter(publication => affected.has(publication.publicationId))
         .map(publication => ({ publicationId: publication.publicationId, version: publication.version }));
@@ -260,6 +262,7 @@ function issueConfirmation(
         userId: context.userId,
         workspaceId,
         videoContentId,
+        videoContentVersion: content.version,
         publicationId,
         requestSignature,
         impactSignature: JSON.stringify(impacts),
@@ -289,21 +292,25 @@ function validateConfirmation(
     content: VideoContent,
     context: YouTubeContext
 ): { valid: true } | { valid: false; response: MutationResponse } {
-    const record = token ? confirmationRecords.get(token) : undefined;
+    const candidate = token ? confirmationRecords.get(token) : undefined;
+    const record = candidate
+        && candidate.kind === kind
+        && candidate.userId === context.userId
+        && candidate.workspaceId === workspaceId
+        && candidate.videoContentId === videoContentId
+        && candidate.publicationId === publicationId
+        && candidate.requestSignature === requestSignature
+        ? candidate
+        : undefined;
+    if (record && kind === 'VIDEO_TYPE' && record.videoContentVersion !== content.version) {
+        confirmationRecords.delete(record.token);
+        return { valid: false, response: { success: false, errorCode: 'VIDEO_CONTENT_VERSION_CONFLICT', message: '다른 사용자가 콘텐츠를 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null } };
+    }
     if (record && hasPublicationVersionConflict(record, content)) {
         confirmationRecords.delete(record.token);
         return { valid: false, response: { success: false, errorCode: 'YOUTUBE_PUBLICATION_VERSION_CONFLICT', message: '다른 사용자가 동영상을 먼저 변경했습니다. 최신 내용을 다시 불러와 주세요.', errors: null } };
     }
-    const valid = record
-        && record.kind === kind
-        && record.userId === context.userId
-        && record.workspaceId === workspaceId
-        && record.videoContentId === videoContentId
-        && record.publicationId === publicationId
-        && record.requestSignature === requestSignature
-        && record.impactSignature === JSON.stringify(impacts)
-        && record.expiresAt > Date.now();
-    if (valid) {
+    if (record && record.impactSignature === JSON.stringify(impacts) && record.expiresAt > Date.now()) {
         confirmationRecords.delete(record.token);
         return { valid: true };
     }
@@ -314,7 +321,9 @@ function validateConfirmation(
         response: {
             success: false,
             errorCode: 'DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED',
-            message: token ? '단가 영향이 달라졌습니다. 최신 내용을 다시 확인해 주세요.' : '채널 기본 단가 적용값이 함께 변경됩니다.',
+            message: impacts.length === 0
+                ? '적용 단가가 바뀌지 않습니다. 계속하려면 다시 저장해 주세요.'
+                : token ? '최신 단가 영향을 다시 확인해 주세요.' : '채널 기본 단가 적용값이 함께 변경됩니다.',
             errors: null,
             data
         }
@@ -410,7 +419,7 @@ export async function updateVideoContent(workspaceId: number, projectId: number,
     const impacts = request.videoType === target.content.videoType
         ? []
         : videoTypeRateImpacts(workspaceId, target.content, request.videoType);
-    if (impacts.length > 0) {
+    if (impacts.length > 0 || request.defaultRateChangeConfirmationToken !== undefined) {
         const checked = validateConfirmation(request.defaultRateChangeConfirmationToken, 'VIDEO_TYPE', workspaceId, videoContentId, null, JSON.stringify({ title, videoType: request.videoType }), impacts, target.content, context);
         if (!checked.valid) return checked.response;
     }
@@ -584,7 +593,7 @@ export async function updateYouTubePublication(workspaceId: number, projectId: n
     const nextRate = publication.revenueOption === 'DEFAULT' && channelChanged ? defaultRate(workspaceId, request.channelId, target.content.videoType) ?? '0' : publication.appliedRate;
     const rateChanged = comparableRate(nextRate) !== comparableRate(publication.appliedRate);
     const impacts: DefaultRateChangeImpactItem[] = rateChanged ? [{ publicationId, channelId: channel.channelId, channelName: channel.name, rateWillChange: true, currentRate: publication.appliedRate, nextRate, estimatedRevenueDelta: ((publication.performance?.viewCount ?? 0) * (Number(nextRate) - Number(publication.appliedRate))).toFixed(2) }] : [];
-    if (impacts.length > 0) {
+    if (impacts.length > 0 || request.defaultRateChangeConfirmationToken !== undefined) {
         const checked = validateConfirmation(request.defaultRateChangeConfirmationToken, 'PUBLICATION_CHANNEL', workspaceId, videoContentId, publicationId, JSON.stringify({ channelId: request.channelId, publishedAt: request.publishedAt, replaceCurrentPublicationId: request.replaceCurrentPublicationId ?? null }), impacts, target.content, context);
         if (!checked.valid) return checked.response;
     }

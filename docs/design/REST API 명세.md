@@ -1627,7 +1627,7 @@ PATCH /api/video-contents/{videoContentId}
 1. 요청의 `expectedVersion`과 토큰에 결합된 영향 YouTubePublication version을 현재 값과 비교합니다.
 2. VideoContent version이 다르면 `409 VIDEO_CONTENT_VERSION_CONFLICT`, 영향 Publication version이 하나라도 다르면 `409 YOUTUBE_PUBLICATION_VERSION_CONFLICT`를 반환합니다. 두 경우 모두 새 확인 토큰을 발급하지 않습니다.
 3. version이 모두 유효할 때만 토큰 만료 여부와 최신 Channel 기본 단가·영향 범위를 다시 계산합니다.
-4. 토큰이 만료되었거나 단가·영향 범위가 달라졌으면 저장하지 않고 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 최신 영향에 대한 새 토큰을 반환합니다.
+4. 토큰이 만료되었거나 단가·영향 범위가 달라졌으면 저장하지 않고 `409 DEFAULT_REVENUE_RATE_CHANGE_CONFIRMATION_REQUIRED`와 최신 영향에 대한 새 토큰을 반환합니다. 유형·게시 채널 변경 모두 제출된 토큰은 최신 영향이 0건이어도 검증합니다. 최신 영향이 0건으로 바뀌면 `impacts: []`로 새 토큰을 발급하며, 그 토큰의 검증을 통과하면 적용 단가를 유지한 채 변경을 저장합니다.
 
 version 충돌 응답을 받은 클라이언트는 기존 토큰과 오래된 `expectedVersion`을 폐기하고 최신 VideoContent 상세를 다시 조회해야 합니다. 최신 version만 요청에 대입하여 자동 재시도해서는 안 되며 사용자가 최신 상태에서 변경과 영향을 다시 확인하게 합니다.
 

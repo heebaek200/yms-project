@@ -960,6 +960,12 @@ const PRIMARY_REASON_LABEL: Record<PrimaryProjectChangeReasonType, string> = {
 
 /** DEFAULT 단가 변경 확인에서 역할별로 허용된 영향 정보만 표시합니다. */
 function DefaultRateImpactNotice({ confirmation, canSeeRevenue }: { confirmation: DefaultRateChangeConfirmation; canSeeRevenue: boolean }) {
+    if (confirmation.impacts.length === 0) {
+        return <section className="youtube-impact-notice" aria-live="polite">
+            <strong>적용 단가가 바뀌지 않습니다.</strong>
+            <p>계속하려면 다시 저장해 주세요.</p>
+        </section>;
+    }
     return <section className="youtube-impact-notice" aria-live="polite">
         <strong>저장하면 채널 기본 단가 적용값이 함께 변경됩니다.</strong>
         <ul>{confirmation.impacts.map(impact => <li key={impact.publicationId}>
